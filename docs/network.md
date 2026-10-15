@@ -1,58 +1,66 @@
 # Network Configuration — Arena Voice POC
 
-## Topology
+## Local Hotspot Topology
 
 ```
 CELL PHONE HOTSPOT (2.4 GHz Wi-Fi)
 │
 ├── PC (Windows corporate machine)
-│   ├── Backend:      http://0.0.0.0:5000
+│   ├── Wi-Fi IP:     192.168.43.x (or 172.20.10.x / 192.168.137.x)
+│   ├── Backend:      http://0.0.0.0:5000 (binds all interfaces)
 │   └── Voice Studio: http://localhost:5173
 │
 └── ESP32 #1 (arcade button)
-    └── Sends POST to http://<PC_IP>:5000/api/chair-press
+    ├── Receives IP from Hotspot DHCP (e.g., 192.168.43.50)
+    └── Sends HTTP POST to http://<PC_WIFI_IP>:5000/api/chair-press
 ```
 
-## Important Notes
+## Step-by-Step Hotspot Setup
 
-- The ESP32 operates **only on 2.4 GHz**. The phone hotspot must broadcast on 2.4 GHz.
-- The system does **NOT** require internet access. All relevant traffic is local.
-- **`localhost` on the ESP32 means the ESP32 itself**, not the PC. The firmware must use the PC's actual IP address.
+### 1. Configure the Phone Hotspot
+1. On your smartphone, enable **Personal Hotspot / Roteador Wi-Fi**.
+2. **CRITICAL**: Ensure the hotspot band is set to **2.4 GHz** (often labeled *"Maximize Compatibility"* or *"Banda de 2.4 GHz"*). The ESP32 does not support 5 GHz.
+3. Note your Hotspot SSID and Password.
 
-## How to Find the PC's IP Address
+### 2. Connect the Corporate PC to the Hotspot
+1. Connect your PC's Wi-Fi adapter to the phone hotspot.
+2. Open PowerShell and run:
+   ```powershell
+   Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -match 'Wi-Fi' } | Select-Object InterfaceAlias, IPAddress
+   ```
+   Or simply:
+   ```powershell
+   ipconfig
+   ```
+3. Look for the **IPv4 Address** of your Wi-Fi adapter (e.g., `192.168.43.150`).
 
-After connecting the PC to the phone hotspot:
+### 3. Configure the ESP32 Firmware
+1. In the `firmware/` directory, copy the template:
+   ```powershell
+   Copy-Item "firmware\config_secrets.h.example" "firmware\config_secrets.h"
+   ```
+2. Open `firmware/config_secrets.h` and update:
+   ```cpp
+   #define WIFI_SSID     "SeuHotspot"
+   #define WIFI_PASSWORD "SuaSenha"
+   #define BACKEND_HOST  "192.168.43.150" // O IP obtido no passo 2
+   #define BACKEND_PORT  5000
+   #define CHAIR_ID      1
+   ```
+3. Flash the firmware to ESP32 #1.
 
-```powershell
-ipconfig
-```
+### 4. Windows Firewall & Port 5000
+Because the backend listens on `0.0.0.0:5000`, it accepts incoming connections from any adapter.
+If the ESP32 logs an HTTP connection failure (-1 or connection refused):
+- Verify if Windows Firewall is prompting for permission.
+- If necessary, allow inbound connections on port 5000 for private networks:
+  ```powershell
+  # (Somente se necessário e permitido pela política corporativa)
+  Test-NetConnection -ComputerName 127.0.0.1 -Port 5000
+  ```
 
-Look for the Wi-Fi adapter connected to the hotspot. The **IPv4 Address** (e.g., `192.168.x.x`) is what the ESP32 firmware needs.
+## Current Machine Network Diagnostic (Audited)
 
-## Firmware Configuration
-
-In `firmware/config_secrets.h` (not committed to Git):
-
-```cpp
-#define WIFI_SSID     "YourHotspotName"
-#define WIFI_PASSWORD "YourHotspotPassword"
-#define BACKEND_HOST  "192.168.x.x"
-#define BACKEND_PORT  5000
-```
-
-## Firewall Considerations
-
-The PC's Windows Firewall may block incoming HTTP connections on port 5000.
-If the ESP32 cannot reach the backend:
-
-1. Check if the backend is listening on `0.0.0.0:5000` (not just `localhost:5000`).
-2. Check Windows Firewall rules for port 5000.
-3. If blocked by corporate policy, document as `[BLOCKED BY CORPORATE ENVIRONMENT]`.
-
-## Ports Used
-
-| Service | Port | Accessible From |
-|---------|------|-----------------|
-| Backend HTTP | 5000 | PC + ESP32 (local network) |
-| Backend SignalR | 5000 (same) | PC (localhost) |
-| Frontend Dev Server | 5173 | PC (localhost only) |
+Interfaces currently active on this machine:
+- `Ethernet 4`: `10.148.156.136` (Corporate network)
+- When Wi-Fi hotspot is activated, the new Wi-Fi adapter IP will appear in the output of `Get-NetIPAddress`.
