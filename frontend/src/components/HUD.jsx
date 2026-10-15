@@ -112,15 +112,18 @@ export function HUD({
           </button>
 
           {/* SignalR Connection Status Badge */}
-          <div className={`glass-panel rounded-2xl px-3 py-2.5 flex items-center gap-2 border text-xs font-semibold ${
-            connectionStatus === 'CONECTADO'
-              ? 'border-emerald-500/40 text-emerald-400'
-              : connectionStatus === 'RECONECTANDO'
-                ? 'border-amber-500/40 text-amber-400'
-                : 'border-red-500/30 text-gray-400'
-          }`}>
+          <div
+            className={`glass-panel rounded-2xl px-3 py-2.5 flex items-center gap-2 border text-xs font-semibold ${
+              connectionStatus === 'CONECTADO'
+                ? 'border-emerald-500/40 text-emerald-400'
+                : connectionStatus === 'RECONECTANDO'
+                  ? 'border-amber-500/40 text-amber-400'
+                  : 'border-red-500/30 text-gray-400'
+            }`}
+            title={`Backend SignalR: ${backendUrl || 'http://localhost:5000'}${connectionError ? ` (Erro: ${connectionError})` : ''}`}
+          >
             <Wifi className="w-3.5 h-3.5" />
-            <span>{connectionStatus}</span>
+            <span>SignalR: {connectionStatus}</span>
           </div>
 
           {/* Live counter */}

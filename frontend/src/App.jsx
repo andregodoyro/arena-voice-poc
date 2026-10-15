@@ -1,13 +1,15 @@
 import React, { useState, useCallback } from 'react';
 import { StudioCanvas } from './components/StudioCanvas';
 import { HUD } from './components/HUD';
+import { useSignalR } from './services/useSignalR';
 
 /**
  * App — Root component for Arena Voice POC.
  * 
  * Architectural Decoupling:
- * Separates Event Sources (Mouse/Dev vs SignalR/Hardware) from Chair State & Animation.
- * The 3D animation receives only the state update and triggers GSAP accordingly.
+ * 1. Hardware/SignalR Layer: useSignalR listens to remote events.
+ * 2. State & Command Layer: turnChair processes valid chair turns.
+ * 3. Presentation Layer: StudioCanvas and HUD render the 3D scene & controls.
  */
 export default function App() {
   // ── Global Chair State ───────────────────────────────────────────────────
@@ -21,15 +23,11 @@ export default function App() {
 
   // ── Mode & Audit State ───────────────────────────────────────────────────
   const [isDevMode, setIsDevMode] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState('DESCONECTADO');
   const [lastEvent, setLastEvent] = useState(null);
 
   /**
    * turnChair — Canonical Command to rotate a chair.
-   * Agnostic to the event source. Can be called by:
-   * - SignalR listener (POC Hardware Mode)
-   * - Mouse click on 3D mesh (Dev Mode)
-   * - HUD button (Dev Mode)
+   * Can be invoked by SignalR (hardware) or manual Dev interactions.
    */
   const turnChair = useCallback((chairId, source = 'POC_HARDWARE') => {
     setChairs((prev) =>
@@ -44,6 +42,15 @@ export default function App() {
     });
 
     console.log(`[ArenaVoice POC] Cadeira #${chairId} virou via [${source}] às ${now}`);
+  }, []);
+
+  /**
+   * resetAllChairs — Resets all 5 chairs to facing away (isTurned: false).
+   */
+  const resetAllChairs = useCallback(() => {
+    setChairs((prev) => prev.map((c) => ({ ...c, isTurned: false })));
+    setLastEvent(null);
+    console.log('[ArenaVoice POC] Todas as cadeiras foram resetadas para o estado inicial');
   }, []);
 
   /**
@@ -70,15 +77,6 @@ export default function App() {
   }, [isDevMode]);
 
   /**
-   * resetAllChairs — Resets all 5 chairs to facing away (isTurned: false).
-   */
-  const resetAllChairs = useCallback(() => {
-    setChairs((prev) => prev.map((c) => ({ ...c, isTurned: false })));
-    setLastEvent(null);
-    console.log('[ArenaVoice POC] Todas as cadeiras foram resetadas para o estado inicial');
-  }, []);
-
-  /**
    * turnAllChairs — Convenience function for full demo.
    */
   const turnAllChairs = useCallback(() => {
@@ -87,6 +85,13 @@ export default function App() {
       return prev.map((c) => ({ ...c, isTurned: !allTurned }));
     });
   }, []);
+
+  // ── Hook de Conexão SignalR ─────────────────────────────────────────────
+  const { connectionStatus, connectionError, backendUrl, setBackendUrl } = useSignalR({
+    onChairTurned: (chairId, source) => turnChair(chairId, source),
+    onChairsReset: resetAllChairs,
+    initialBackendUrl: 'http://localhost:5000',
+  });
 
   return (
     <main style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
@@ -102,6 +107,9 @@ export default function App() {
         isDevMode={isDevMode}
         setIsDevMode={setIsDevMode}
         connectionStatus={connectionStatus}
+        connectionError={connectionError}
+        backendUrl={backendUrl}
+        setBackendUrl={setBackendUrl}
         lastEvent={lastEvent}
         turnChair={turnChair}
       />
