@@ -1,0 +1,26 @@
+# === .NET ===
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.log
+
+# === Node.js ===
+node_modules/
+dist/
+.vite/
+
+# === IDE ===
+.vs/
+.vscode/
+*.swp
+*.swo
+
+# === OS ===
+Thumbs.db
+.DS_Store
+
+# === Sensitive / Environment ===
+# Firmware Wi-Fi credentials (never commit real passwords)
+firmware/config_secrets.h
