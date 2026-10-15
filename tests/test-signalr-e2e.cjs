@@ -1,9 +1,12 @@
 const signalR = require('../frontend/node_modules/@microsoft/signalr');
 
+const backendUrl = (process.env.VITE_BACKEND_URL || 'http://127.0.0.1:5000').replace(/\/+$/, '');
+const signalrUrl = process.env.VITE_SIGNALR_URL || `${backendUrl}/hubs/arena-poc`;
+
 async function testSignalR() {
-    console.log('[Test] Conectando ao Hub SignalR em http://127.0.0.1:5000/hubs/arena-poc...');
+    console.log(`[Test] Conectando ao Hub SignalR em ${signalrUrl}...`);
     const connection = new signalR.HubConnectionBuilder()
-        .withUrl('http://127.0.0.1:5000/hubs/arena-poc')
+        .withUrl(signalrUrl)
         .build();
 
     let eventReceived = null;
@@ -17,8 +20,9 @@ async function testSignalR() {
     console.log('[Test SignalR] Conexao estabelecida com sucesso!');
 
     // Dispara POST HTTP para simular acionamento da Cadeira 1
-    console.log('[Test HTTP] Enviando POST /api/chair-press para Cadeira #1...');
-    const res = await fetch('http://127.0.0.1:5000/api/chair-press', {
+    const endpoint = `${backendUrl}/api/chair-press`;
+    console.log(`[Test HTTP] Enviando POST ${endpoint} para Cadeira #1...`);
+    const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chairId: 1 })

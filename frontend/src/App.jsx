@@ -90,7 +90,7 @@ export default function App() {
   const { connectionStatus, connectionError, backendUrl, setBackendUrl } = useSignalR({
     onChairTurned: (chairId, source) => turnChair(chairId, source),
     onChairsReset: resetAllChairs,
-    initialBackendUrl: 'http://localhost:5000',
+    initialBackendUrl: import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000',
   });
 
   return (

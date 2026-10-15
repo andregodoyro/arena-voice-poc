@@ -5,10 +5,15 @@ using System.Net.Sockets;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configuração de bind em todas as interfaces de rede locais (0.0.0.0:5000)
+// Configuração de host e porta (permite sobrescrita por variáveis de ambiente)
+var hostEnv = Environment.GetEnvironmentVariable("BACKEND_HOST") ?? "0.0.0.0";
+var portEnv = Environment.GetEnvironmentVariable("BACKEND_PORT");
+var port = int.TryParse(portEnv, out var p) ? p : 5000;
+
 builder.WebHost.ConfigureKestrel(options =>
 {
-    options.Listen(IPAddress.Any, 5000);
+    var bindAddress = hostEnv == "127.0.0.1" || hostEnv == "localhost" ? IPAddress.Loopback : IPAddress.Any;
+    options.Listen(bindAddress, port);
 });
 
 // Configuração CORS permissiva para desenvolvimento local
@@ -140,7 +145,7 @@ app.MapGet("/api/status", () => Results.Ok(new
 {
     status = "ONLINE",
     service = "Arena Voice POC Minimal Bridge",
-    port = 5000,
+    port = port,
     timestamp = DateTimeOffset.UtcNow
 }));
 
@@ -154,16 +159,16 @@ app.MapHub<ArenaPocHub>("/arenaHub"); // Rota retrocompatível
 Console.WriteLine("=============================================================");
 Console.WriteLine("        ARENA VOICE POC — MINIMAL EVENT BRIDGE              ");
 Console.WriteLine("=============================================================");
-Console.WriteLine(" Escutando em: http://0.0.0.0:5000");
+Console.WriteLine($" Escutando em: http://{hostEnv}:{port}");
 Console.WriteLine(" Endpoints disponíveis:");
-Console.WriteLine("   POST http://<IP_DO_PC>:5000/api/chair-press  (Recebe ESP32)");
-Console.WriteLine("   POST http://<IP_DO_PC>:5000/api/support      (Retrocompatível)");
-Console.WriteLine("   POST http://localhost:5000/api/reset        (Reset cadeiras)");
-Console.WriteLine("   GET  http://localhost:5000/api/state        (Estado atual)");
-Console.WriteLine("   GET  http://localhost:5000/api/status       (Health check)");
+Console.WriteLine($"   POST http://<IP_DO_PC>:{port}/api/chair-press  (Recebe ESP32)");
+Console.WriteLine($"   POST http://<IP_DO_PC>:{port}/api/support      (Retrocompatível)");
+Console.WriteLine($"   POST http://localhost:{port}/api/reset        (Reset cadeiras)");
+Console.WriteLine($"   GET  http://localhost:{port}/api/state        (Estado atual)");
+Console.WriteLine($"   GET  http://localhost:{port}/api/status       (Health check)");
 Console.WriteLine(" Hubs SignalR:");
-Console.WriteLine("   WS   http://localhost:5000/hubs/arena-poc   (Voice Studio)");
-Console.WriteLine("   WS   http://localhost:5000/arenaHub         (Retrocompatível)");
+Console.WriteLine($"   WS   http://localhost:{port}/hubs/arena-poc   (Voice Studio)");
+Console.WriteLine($"   WS   http://localhost:{port}/arenaHub         (Retrocompatível)");
 Console.WriteLine("-------------------------------------------------------------");
 Console.WriteLine(" Endereços IP locais desta máquina detectados:");
 try

@@ -17,8 +17,8 @@
 #include <HTTPClient.h>
 #include "config.h"
 
-// LED embutido da placa ESP32 (GPIO 2) para feedback visual de transmissão
-const int PINO_STATUS_LED = 2;
+// LED de status (definido em config.h, padrao GPIO 2)
+const int PINO_STATUS_LED = LED_PIN;
 
 // Variáveis de controle de debounce e borda
 int ultimoEstadoBotao = HIGH;
@@ -131,7 +131,7 @@ void enviarAcionamentoCadeira() {
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD_RATE);
   delay(1000);
 
   Serial.println("\n\n");
@@ -165,8 +165,8 @@ void loop() {
     if (ultimoEstadoBotao == HIGH && leituraAtual == LOW) {
       ultimoTempoDebounce = millis();
 
-      // Trava de segurança para evitar múltiplos envios se mantiver pressionado (rate limit de 1.5s)
-      if (millis() - ultimoDisparoSucesso > 1500) {
+      // Trava de segurança para evitar múltiplos envios se mantiver pressionado
+      if (millis() - ultimoDisparoSucesso > LOCKOUT_MS) {
         enviarAcionamentoCadeira();
       } else {
         Serial.println("[DEBOUNCE] Clique ignorado (intervalo mínimo entre acionamentos)");

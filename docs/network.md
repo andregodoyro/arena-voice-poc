@@ -50,14 +50,20 @@ CELL PHONE HOTSPOT (2.4 GHz Wi-Fi)
 3. Flash the firmware to ESP32 #1.
 
 ### 4. Windows Firewall & Port 5000
-Because the backend listens on `0.0.0.0:5000`, it accepts incoming connections from any adapter.
+Because the backend binds to `0.0.0.0:5000` by default (configurable via `BACKEND_HOST` and `BACKEND_PORT` in `.env`), it accepts incoming connections from any active network adapter, including the Wi-Fi hotspot.
+
 If the ESP32 logs an HTTP connection failure (-1 or connection refused):
 - Verify if Windows Firewall is prompting for permission.
-- If necessary, allow inbound connections on port 5000 for private networks:
+- Ensure the computer and ESP32 are connected to the same Wi-Fi hotspot network.
+- Test connection locally:
   ```powershell
-  # (Somente se necessário e permitido pela política corporativa)
   Test-NetConnection -ComputerName 127.0.0.1 -Port 5000
   ```
+
+### 5. Security & Versioning Policy
+- `firmware/config_secrets.h` is strictly local and listed in `.gitignore`. **NEVER COMMIT THIS FILE**.
+- Only `firmware/config_secrets.h.example` is committed as a reference template.
+- Similarly, `.env` is local and `.env.example` is the committed template.
 
 ## Current Machine Network Diagnostic (Audited)
 
