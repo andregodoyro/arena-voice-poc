@@ -1,0 +1,111 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #040408;
+  }
+
+  #root {
+    width: 100%;
+    height: 100%;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: #ffffff;
+    user-select: none;
+  }
+}
+
+/* ─── Glass Morphism Panel ─────────────────────────────── */
+.glass-panel {
+  background: rgba(8, 8, 18, 0.82);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+/* ─── Neon Effects ─────────────────────────────────────── */
+.neon-red {
+  box-shadow:
+    0 0 10px rgba(239, 68, 68, 0.7),
+    0 0 30px rgba(239, 68, 68, 0.4),
+    0 0 60px rgba(239, 68, 68, 0.2),
+    inset 0 0 12px rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.9) !important;
+}
+
+.neon-text-red {
+  color: #ff4d6d;
+  text-shadow:
+    0 0 10px rgba(239, 68, 68, 0.9),
+    0 0 25px rgba(239, 68, 68, 0.6),
+    0 0 50px rgba(239, 68, 68, 0.3);
+}
+
+.neon-text-gold {
+  color: #ffd166;
+  text-shadow:
+    0 0 10px rgba(245, 184, 50, 0.9),
+    0 0 25px rgba(245, 184, 50, 0.6),
+    0 0 50px rgba(245, 184, 50, 0.3);
+}
+
+/* ─── Bebas Neue for display text ─────────────────────── */
+.font-display {
+  font-family: 'Bebas Neue', 'Impact', sans-serif;
+  letter-spacing: 0.06em;
+}
+
+/* ─── Scanning Line Animated Badge ───────────────────── */
+@keyframes scan {
+  0%   { transform: translateY(-100%); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateY(400%); opacity: 0; }
+}
+
+.scan-line::after {
+  content: '';
+  position: absolute;
+  inset-x: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(239,68,68,0.6), transparent);
+  animation: scan 2.5s linear infinite;
+  pointer-events: none;
+}
+
+/* ─── Pulse Ring ──────────────────────────────────────── */
+@keyframes pulse-ring {
+  0%   { transform: scale(1);   opacity: 0.7; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+.pulse-ring::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border: 2px solid rgba(239, 68, 68, 0.7);
+  border-radius: inherit;
+  animation: pulse-ring 1.6s ease-out infinite;
+}
+
+/* ─── Button Press Tactile ────────────────────────────── */
+.btn-tactile {
+  transition: transform 0.1s ease, box-shadow 0.1s ease, brightness 0.2s ease;
+}
+.btn-tactile:active {
+  transform: scale(0.94) translateY(2px) !important;
+}
