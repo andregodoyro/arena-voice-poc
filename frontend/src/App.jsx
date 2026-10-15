@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { StudioCanvas } from './components/StudioCanvas';
 import { HUD } from './components/HUD';
 
 /**
- * App — Root component.
- * Owns the canonical state of all 5 judge chairs.
- * Passes state + callbacks down to Canvas (3D) and HUD (2D overlay).
+ * App — Root component for Arena Voice POC.
+ * 
+ * Architectural Decoupling:
+ * Separates Event Sources (Mouse/Dev vs SignalR/Hardware) from Chair State & Animation.
+ * The 3D animation receives only the state update and triggers GSAP accordingly.
  */
 export default function App() {
   // ── Global Chair State ───────────────────────────────────────────────────
@@ -17,35 +19,92 @@ export default function App() {
     { id: 5, name: 'Técnico 5', isTurned: false },
   ]);
 
-  /**
-   * toggleChair — flips the isTurned state of a single chair by id.
-   * Both the 3D mesh (onClick) and the HUD button call this same function,
-   * keeping a single source of truth.
-   */
-  const toggleChair = (id) => {
-    setChairs((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, isTurned: !c.isTurned } : c))
-    );
-  };
+  // ── Mode & Audit State ───────────────────────────────────────────────────
+  const [isDevMode, setIsDevMode] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState('DESCONECTADO');
+  const [lastEvent, setLastEvent] = useState(null);
 
   /**
-   * turnAll — if every chair is already turned, reset all to false.
-   * Otherwise turn all to true simultaneously.
+   * turnChair — Canonical Command to rotate a chair.
+   * Agnostic to the event source. Can be called by:
+   * - SignalR listener (POC Hardware Mode)
+   * - Mouse click on 3D mesh (Dev Mode)
+   * - HUD button (Dev Mode)
    */
-  const turnAll = () => {
+  const turnChair = useCallback((chairId, source = 'POC_HARDWARE') => {
+    setChairs((prev) =>
+      prev.map((c) => (c.id === chairId ? { ...c, isTurned: true } : c))
+    );
+
+    const now = new Date().toLocaleTimeString('pt-BR');
+    setLastEvent({
+      chairId,
+      source,
+      time: now,
+    });
+
+    console.log(`[ArenaVoice POC] Cadeira #${chairId} virou via [${source}] às ${now}`);
+  }, []);
+
+  /**
+   * toggleChairManual — Used strictly by Dev Mode UI/mouse interactions.
+   * If Dev Mode is disabled, manual clicks are ignored to guarantee
+   * that only physical hardware/SignalR can control the chairs.
+   */
+  const toggleChairManual = useCallback((chairId) => {
+    if (!isDevMode) {
+      console.warn(`[ArenaVoice POC] Clique manual na cadeira #${chairId} ignorado (Modo Dev DESATIVADO)`);
+      return;
+    }
+
+    setChairs((prev) =>
+      prev.map((c) => (c.id === chairId ? { ...c, isTurned: !c.isTurned } : c))
+    );
+
+    const now = new Date().toLocaleTimeString('pt-BR');
+    setLastEvent({
+      chairId,
+      source: 'DEV_MANUAL',
+      time: now,
+    });
+  }, [isDevMode]);
+
+  /**
+   * resetAllChairs — Resets all 5 chairs to facing away (isTurned: false).
+   */
+  const resetAllChairs = useCallback(() => {
+    setChairs((prev) => prev.map((c) => ({ ...c, isTurned: false })));
+    setLastEvent(null);
+    console.log('[ArenaVoice POC] Todas as cadeiras foram resetadas para o estado inicial');
+  }, []);
+
+  /**
+   * turnAllChairs — Convenience function for full demo.
+   */
+  const turnAllChairs = useCallback(() => {
     setChairs((prev) => {
       const allTurned = prev.every((c) => c.isTurned);
       return prev.map((c) => ({ ...c, isTurned: !allTurned }));
     });
-  };
+  }, []);
 
   return (
     <main style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
-      {/* 3D Canvas Layer (fills the entire viewport) */}
-      <StudioCanvas chairs={chairs} toggleChair={toggleChair} />
+      {/* 3D Canvas Layer */}
+      <StudioCanvas chairs={chairs} toggleChair={toggleChairManual} />
 
-      {/* 2D HUD Layer (absolute overlay, pointer-events-none on container) */}
-      <HUD chairs={chairs} toggleChair={toggleChair} turnAll={turnAll} />
+      {/* 2D HUD Layer with decoupled control */}
+      <HUD
+        chairs={chairs}
+        toggleChair={toggleChairManual}
+        turnAll={turnAllChairs}
+        resetAll={resetAllChairs}
+        isDevMode={isDevMode}
+        setIsDevMode={setIsDevMode}
+        connectionStatus={connectionStatus}
+        lastEvent={lastEvent}
+        turnChair={turnChair}
+      />
     </main>
   );
 }
