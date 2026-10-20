@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { StudioCanvas } from './components/StudioCanvas';
 import { HUD } from './components/HUD';
 import { useSignalR } from './services/useSignalR';
@@ -92,6 +92,50 @@ export default function App() {
     onChairsReset: resetAllChairs,
     initialBackendUrl: import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000',
   });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadArenaState() {
+      try {
+        const response = await fetch(`${backendUrl}/api/state`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const state = await response.json();
+
+        if (cancelled) {
+          return;
+        }
+
+        setChairs((prev) =>
+          prev.map((chair) => ({
+            ...chair,
+            isTurned: state.chairs?.[String(chair.id)] === true,
+          }))
+        );
+
+        console.log(
+          `[ArenaVoice POC] Estado inicial sincronizado: ${state.activeCount} cadeira(s) ativa(s)`
+        );
+      } catch (err) {
+        if (!cancelled) {
+          console.warn(
+            '[ArenaVoice POC] Falha ao carregar estado inicial do backend:',
+            err.message
+          );
+        }
+      }
+    }
+
+    loadArenaState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [backendUrl]);
 
   return (
     <main style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
