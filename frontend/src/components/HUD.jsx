@@ -68,7 +68,9 @@ export function HUD({
   isDevMode,
   setIsDevMode,
   connectionStatus,
+  connectionError,
   lastEvent,
+  backendUrl,
 }) {
   const turnedCount = chairs.filter((c) => c.isTurned).length;
   const allTurned   = turnedCount === chairs.length;
