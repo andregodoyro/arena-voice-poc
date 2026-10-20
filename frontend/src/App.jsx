@@ -87,7 +87,7 @@ export default function App() {
   }, []);
 
   // ── Hook de Conexão SignalR ─────────────────────────────────────────────
-  const { connectionStatus, connectionError, backendUrl, setBackendUrl } = useSignalR({
+  const { connectionStatus, connectionError, backendUrl, reconnectVersion, setBackendUrl } = useSignalR({
     onChairTurned: (chairId, source) => turnChair(chairId, source),
     onChairsReset: resetAllChairs,
     initialBackendUrl: import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000',
@@ -135,7 +135,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [backendUrl]);
+  }, [backendUrl, reconnectVersion]);
 
   return (
     <main style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>

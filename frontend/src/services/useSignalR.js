@@ -13,6 +13,7 @@ export function useSignalR({ onChairTurned, onChairsReset, initialBackendUrl }) 
   });
   const [connectionStatus, setConnectionStatus] = useState('DESCONECTADO');
   const [connectionError, setConnectionError] = useState(null);
+  const [reconnectVersion, setReconnectVersion] = useState(0);
 
   const callbacksRef = useRef({ onChairTurned, onChairsReset });
   callbacksRef.current = { onChairTurned, onChairsReset };
@@ -26,11 +27,46 @@ export function useSignalR({ onChairTurned, onChairsReset, initialBackendUrl }) 
   useEffect(() => {
     const hubUrl = `${backendUrl}/hubs/arena-poc`;
 
+    let disposed = false;
+    let reconnectTimer = null;
+
+    const LONG_RETRY_DELAY = 5000;
+
     const connection = new HubConnectionBuilder()
       .withUrl(hubUrl)
       .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
       .configureLogging(LogLevel.Warning)
       .build();
+
+    const startConnection = async () => {
+      if (disposed) return;
+
+      try {
+        await connection.start();
+
+        if (disposed) return;
+
+        console.log(`[SignalR] Conectado com sucesso em: ${hubUrl}`);
+        setConnectionStatus('CONECTADO');
+        setConnectionError(null);
+        setReconnectVersion((version) => version + 1);
+      } catch (err) {
+        if (disposed) return;
+
+        console.warn(
+          `[SignalR] Falha ao conectar em ${hubUrl}:`,
+          err.message
+        );
+
+        setConnectionStatus('DESCONECTADO');
+        setConnectionError(err.message);
+
+        reconnectTimer = setTimeout(
+          startConnection,
+          LONG_RETRY_DELAY
+        );
+      }
+    };
 
     // ── Tratamento do ciclo de vida da conexão ─────────────────────────────
     connection.onreconnecting(() => {
@@ -42,12 +78,24 @@ export function useSignalR({ onChairTurned, onChairsReset, initialBackendUrl }) 
       console.log('[SignalR] Reconectado com sucesso ao backend!');
       setConnectionStatus('CONECTADO');
       setConnectionError(null);
+      setReconnectVersion((version) => version + 1);
     });
 
     connection.onclose(() => {
-      console.log('[SignalR] Conexão encerrada.');
+      if (disposed) return;
+
+      console.warn(
+        '[SignalR] Reconexão automática esgotada. Continuando tentativas...'
+      );
+
       setConnectionStatus('DESCONECTADO');
+
+      reconnectTimer = setTimeout(
+        startConnection,
+        LONG_RETRY_DELAY
+      );
     });
+
 
     // ── Listeners de Eventos do Backend ────────────────────────────────────
     
@@ -79,20 +127,15 @@ export function useSignalR({ onChairTurned, onChairsReset, initialBackendUrl }) 
     });
 
     // ── Iniciar Conexão ────────────────────────────────────────────────────
-    connection
-      .start()
-      .then(() => {
-        console.log(`[SignalR] Conectado com sucesso em: ${hubUrl}`);
-        setConnectionStatus('CONECTADO');
-        setConnectionError(null);
-      })
-      .catch((err) => {
-        console.warn(`[SignalR] Falha ao conectar em ${hubUrl}:`, err.message);
-        setConnectionStatus('DESCONECTADO');
-        setConnectionError(err.message);
-      });
+    startConnection(); 
 
     return () => {
+      disposed = true;
+
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
+
       connection.stop();
     };
   }, [backendUrl]);
@@ -101,6 +144,7 @@ export function useSignalR({ onChairTurned, onChairsReset, initialBackendUrl }) 
     connectionStatus,
     connectionError,
     backendUrl,
+    reconnectVersion,
     setBackendUrl: handleBackendUrlChange,
   };
 }
