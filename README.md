@@ -157,7 +157,12 @@ node tests/test-signalr-e2e.cjs
 
 ## 📚 Documentação Técnica
 
+### Documentação Principal
+* **[Roadmap Oficial e Arquitetura (v1.1)](docs/roadmap.md):** Documento mestre de produto, visão arquitetural e planejamento progressivo em 10 fases.
+* **[Auditoria Técnica do Marco 1 (Software Foundation)](docs/software-foundation-audit.md):** Registro do estado comprovado da fundação de software, contratos validados e checklist de onboarding para novos desenvolvedores.
+
+### Referências Complementares
 * [Arquitetura e Fluxo do Evento](docs/architecture.md)
 * [Configuração de Rede e Hotspot](docs/network.md)
 * [Ligação de Hardware e Firmware](docs/hardware.md)
-* [Roadmap e Próximos Passos](docs/roadmap.md)
+* [Histórico de Marcos Iniciais](docs/archive/roadmap-initial.md)
