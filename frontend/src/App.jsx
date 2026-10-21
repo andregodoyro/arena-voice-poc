@@ -1,15 +1,14 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { StudioCanvas } from './components/StudioCanvas';
-import { HUD } from './components/HUD';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { StagePage } from './pages/StagePage';
+import { OperatorPage } from './pages/OperatorPage';
 import { useSignalR } from './services/useSignalR';
 
 /**
- * App — Root component for Arena Voice POC.
+ * App — Orquestrador de Estado, Sincronização e Roteamento.
  * 
- * Architectural Decoupling:
- * 1. Hardware/SignalR Layer: useSignalR listens to remote events.
- * 2. State & Command Layer: turnChair processes valid chair turns.
- * 3. Presentation Layer: StudioCanvas and HUD render the 3D scene & controls.
+ * Mantém a única fonte de verdade compartilhada (snapshot + realtime SignalR)
+ * e delega a renderização para as superfícies /stage e /operator via React Router.
  */
 export default function App() {
   // ── Global Chair State ───────────────────────────────────────────────────
@@ -138,25 +137,36 @@ export default function App() {
   }, [backendUrl, reconnectVersion]);
 
   return (
-    <main style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
-      {/* 3D Canvas Layer */}
-      <StudioCanvas chairs={chairs} toggleChair={toggleChairManual} />
-
-      {/* 2D HUD Layer with decoupled control */}
-      <HUD
-        chairs={chairs}
-        toggleChair={toggleChairManual}
-        turnAll={turnAllChairs}
-        resetAll={resetAllChairs}
-        isDevMode={isDevMode}
-        setIsDevMode={setIsDevMode}
-        connectionStatus={connectionStatus}
-        connectionError={connectionError}
-        backendUrl={backendUrl}
-        setBackendUrl={setBackendUrl}
-        lastEvent={lastEvent}
-        turnChair={turnChair}
+    <Routes>
+      <Route path="/" element={<Navigate to="/stage" replace />} />
+      <Route
+        path="/stage"
+        element={
+          <StagePage
+            chairs={chairs}
+            toggleChair={toggleChairManual}
+            turnAll={turnAllChairs}
+            resetAll={resetAllChairs}
+            isDevMode={isDevMode}
+            setIsDevMode={setIsDevMode}
+            connectionStatus={connectionStatus}
+            connectionError={connectionError}
+            backendUrl={backendUrl}
+            setBackendUrl={setBackendUrl}
+            lastEvent={lastEvent}
+            turnChair={turnChair}
+          />
+        }
       />
-    </main>
+      <Route
+        path="/operator"
+        element={
+          <OperatorPage
+            connectionStatus={connectionStatus}
+          />
+        }
+      />
+      <Route path="*" element={<Navigate to="/stage" replace />} />
+    </Routes>
   );
 }
