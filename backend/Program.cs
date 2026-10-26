@@ -1,4 +1,6 @@
+using ArenaVoicePocBackend.Domain.Entities;
 using ArenaVoicePocBackend.Hubs;
+using ArenaVoicePocBackend.Services;
 using Microsoft.AspNetCore.SignalR;
 using System.Net;
 using System.Net.Sockets;
@@ -29,6 +31,7 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<IArenaProjectStore, ArenaProjectStore>();
 
 var app = builder.Build();
 
@@ -119,11 +122,13 @@ app.MapPost("/api/support", async (ChairPressRequest request, HttpContext http, 
 // 2. ENDPOINTS AUXILIARES DE DIAGNÓSTICO E RESET
 // =========================================================================
 
-// GET /api/state — Retorna o estado atual das 5 cadeiras
-app.MapGet("/api/state", () => Results.Ok(new
+// GET /api/state — Retorna o estado atual das 5 cadeiras e o contexto de evento/projeto
+app.MapGet("/api/state", (IArenaProjectStore store) => Results.Ok(new
 {
     chairs = chairStates,
-    activeCount = chairStates.Count(c => c.Value)
+    activeCount = chairStates.Count(c => c.Value),
+    currentEvent = store.GetCurrentEvent(),
+    currentProject = store.GetCurrentProject()
 }));
 
 // POST /api/reset — Reseta todas as cadeiras e notifica o Voice Studio
