@@ -147,7 +147,7 @@ function StudioTitle() {
 /**
  * StudioScene — orchestrates lights, stage geometry, GLTF model, and chairs.
  */
-export function StudioScene({ chairs, toggleChair }) {
+export function StudioScene({ chairs = [] }) {
   /**
    * Semi-circular arc positions for 5 chairs.
    * baseRotY is the initial Y rotation so each chair faces slightly inward.
@@ -214,7 +214,6 @@ export function StudioScene({ chairs, toggleChair }) {
           isTurned={c.isTurned}
           position={c.pos}
           baseRotY={c.baseRotY}
-          toggleChair={toggleChair}
         />
       ))}
 

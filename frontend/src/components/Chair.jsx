@@ -14,7 +14,7 @@ import * as THREE from 'three';
  *  - baseRotY    : number  — initial Y rotation (for arc curvature)
  *  - toggleChair : fn(id)  — parent callback to flip isTurned
  */
-export function Chair({ id, name, isTurned, position, baseRotY = 0, toggleChair }) {
+export function Chair({ id, name, isTurned, position, baseRotY = 0 }) {
   // Refs to Three.js objects for direct GSAP animation (bypassing React render cycle)
   const groupRef       = useRef(); // rotates during GSAP tween
   const spotRef        = useRef(); // spotlight intensity/color
@@ -80,11 +80,6 @@ export function Chair({ id, name, isTurned, position, baseRotY = 0, toggleChair 
     }
   }, [isTurned, baseRotY]);
 
-  // ─── Pointer cursor handlers ───────────────────────────────────────────────
-  const handlePointerOver = (e) => { if (!toggleChair) return; e.stopPropagation(); document.body.style.cursor = 'pointer'; };
-  const handlePointerOut  = ()    => { if (!toggleChair) return; document.body.style.cursor = 'default'; };
-  const handleClick       = (e)   => { if (!toggleChair) return; e.stopPropagation(); toggleChair(id); };
-
   // Colors (initial / reactive via GSAP after mount)
   const leatherColor = isTurned ? '#d90429' : '#6b0714';
   const btnColor     = isTurned ? '#ff0033' : '#330000';
@@ -105,13 +100,10 @@ export function Chair({ id, name, isTurned, position, baseRotY = 0, toggleChair 
         shadow-bias={-0.0001}
       />
 
-      {/* ── Clickable chair group (GSAP rotates this) ──────────────────────── */}
+      {/* ── Chair group (GSAP rotates this) ─────────────────────────────────── */}
       <group
         ref={groupRef}
         rotation={[0, baseRotY, 0]}
-        onClick={handleClick}
-        onPointerOver={handlePointerOver}
-        onPointerOut={handlePointerOut}
       >
         {/* BASE PEDESTAL */}
         <mesh position={[0, 0.22, 0]} castShadow receiveShadow>

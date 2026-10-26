@@ -8,7 +8,7 @@ import { StudioScene } from './StudioScene';
  * StudioCanvas — R3F Canvas container.
  * Configures renderer (sRGB, shadows), camera, orbit controls, and environment.
  */
-export function StudioCanvas({ chairs, toggleChair }) {
+export function StudioCanvas({ chairs = [] }) {
   return (
     <div
       style={{
@@ -59,7 +59,7 @@ export function StudioCanvas({ chairs, toggleChair }) {
           <Environment preset="night" environmentIntensity={0.5} />
 
           {/* ── Main Scene ────────────────────────────────────────────────── */}
-          <StudioScene chairs={chairs} toggleChair={toggleChair} />
+          <StudioScene chairs={chairs} />
 
           {/* ── Contact shadows on floor plane ────────────────────────────── */}
           <ContactShadows
