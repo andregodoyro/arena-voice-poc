@@ -110,6 +110,8 @@ async function main() {
     const receivedEvents = [];
 
     let resetReceived = false;
+    const projectChangedEvents = [];
+    const brandingUpdatedEvents = [];
 
     try {
         // --------------------------------------------------
@@ -163,6 +165,20 @@ async function main() {
         connection.on('ChairsReset', () => {
             console.log('[SignalR] ChairsReset recebido');
             resetReceived = true;
+        });
+
+        connection.on('CurrentProjectChanged', (data) => {
+            console.log(
+                `[SignalR] CurrentProjectChanged recebido: project=${data?.project?.title || data?.project?.id}`
+            );
+            projectChangedEvents.push(data);
+        });
+
+        connection.on('EventBrandingUpdated', (data) => {
+            console.log(
+                `[SignalR] EventBrandingUpdated recebido: eventId=${data?.eventId}`
+            );
+            brandingUpdatedEvents.push(data);
         });
 
         await connection.start();
@@ -321,6 +337,95 @@ async function main() {
             );
         }
 
+        // --------------------------------------------------
+        // 8. REALTIME EVENT: CurrentProjectChanged
+        // --------------------------------------------------
+
+        console.log('\n[8] Testando realtime: CurrentProjectChanged');
+
+        const selectRes = await request('/api/projects/proj-finflow-03/select', {
+            method: 'POST'
+        });
+
+        assert(
+            selectRes.status === 200,
+            'POST /api/projects/proj-finflow-03/select retorna HTTP 200',
+            `Recebido ${selectRes.status}`
+        );
+
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        assert(
+            projectChangedEvents.length > 0,
+            'SignalR recebeu evento CurrentProjectChanged'
+        );
+
+        const lastProjectEvent =
+            projectChangedEvents[projectChangedEvents.length - 1];
+
+        assert(
+            lastProjectEvent?.project?.id === 'proj-finflow-03',
+            'CurrentProjectChanged informa projeto correto (FinFlow)',
+            JSON.stringify(lastProjectEvent?.project)
+        );
+
+        assert(
+            lastProjectEvent?.project?.status === 1,
+            'CurrentProjectChanged informa status Current (1)'
+        );
+
+        assert(
+            Boolean(lastProjectEvent?.timestamp),
+            'CurrentProjectChanged possui timestamp'
+        );
+
+        // --------------------------------------------------
+        // 9. REALTIME EVENT: EventBrandingUpdated
+        // --------------------------------------------------
+
+        console.log('\n[9] Testando realtime: EventBrandingUpdated');
+
+        const updateBrandingRes = await request('/api/events/current', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                branding: {
+                    primaryColor: '#0077b6',
+                    secondaryColor: '#90e0ef'
+                }
+            })
+        });
+
+        assert(
+            updateBrandingRes.status === 200,
+            'PUT /api/events/current atualiza branding com HTTP 200',
+            `Recebido ${updateBrandingRes.status}`
+        );
+
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        assert(
+            brandingUpdatedEvents.length > 0,
+            'SignalR recebeu evento EventBrandingUpdated'
+        );
+
+        const lastBrandingEvent =
+            brandingUpdatedEvents[brandingUpdatedEvents.length - 1];
+
+        assert(
+            lastBrandingEvent?.branding?.primaryColor === '#0077b6',
+            'EventBrandingUpdated informa nova primaryColor',
+            lastBrandingEvent?.branding?.primaryColor
+        );
+
+        assert(
+            lastBrandingEvent?.branding?.secondaryColor === '#90e0ef',
+            'EventBrandingUpdated informa nova secondaryColor',
+            lastBrandingEvent?.branding?.secondaryColor
+        );
+
     } catch (err) {
         fail(
             'Execucao E2E concluida sem excecao inesperada',
@@ -374,7 +479,7 @@ async function main() {
     }
 
     console.log(
-        '\n>>> [PASS] SIGNALR E2E VALIDADO PARA CADEIRAS 1-5 E RESET\n'
+        '\n>>> [PASS] SIGNALR E2E VALIDADO PARA CADEIRAS, RESET, PROJETOS E BRANDING\n'
     );
 
     process.exit(0);

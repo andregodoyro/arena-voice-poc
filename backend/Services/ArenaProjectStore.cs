@@ -90,29 +90,55 @@ public class ArenaProjectStore : IArenaProjectStore
             return true;
         }
 
-        if (!_projects.TryGetValue(projectId, out var nextProject)) return false;
+        var res = SelectProject(projectId);
+        return res.Success;
+    }
+
+    public SelectProjectResult SelectProject(string projectId)
+    {
+        if (!_projects.TryGetValue(projectId, out var nextProject))
+        {
+            return new SelectProjectResult(false, null, null, "Projeto não encontrado.");
+        }
 
         lock (_contextLock)
         {
-            foreach (var p in _projects.Values.Where(p => p.EventId == nextProject.EventId))
+            if (_currentEventId != null && nextProject.EventId != _currentEventId)
             {
-                if (p.Id == projectId)
+                return new SelectProjectResult(false, null, null, "O projeto não pertence ao evento ativo.");
+            }
+
+            // Idempotência: se já é o projeto ativo, retorna sucesso sem reexecutar transição
+            if (_currentProjectId == projectId)
+            {
+                return new SelectProjectResult(true, nextProject, null);
+            }
+
+            Project? prevProject = null;
+
+            // Conclui projeto anterior, se houver
+            if (_currentProjectId != null && _projects.TryGetValue(_currentProjectId, out var prev))
+            {
+                if (prev.Status == ProjectStatus.Current)
                 {
-                    p.Status = ProjectStatus.Current;
-                    p.PresentationStartedAt ??= DateTimeOffset.UtcNow;
-                }
-                else if (p.Status == ProjectStatus.Current)
-                {
-                    p.Status = ProjectStatus.Completed;
-                    p.PresentationEndedAt ??= DateTimeOffset.UtcNow;
+                    prev.Status = ProjectStatus.Completed;
+                    prev.PresentationEndedAt ??= DateTimeOffset.UtcNow;
+                    prev.UpdatedAt = DateTimeOffset.UtcNow;
+                    prevProject = prev;
                 }
             }
+
+            // Atualiza status do novo projeto
+            nextProject.Status = ProjectStatus.Current;
+            nextProject.PresentationStartedAt ??= DateTimeOffset.UtcNow;
+            nextProject.UpdatedAt = DateTimeOffset.UtcNow;
 
             _currentProjectId = projectId;
             _currentEventId = nextProject.EventId;
             _lastUpdated = DateTimeOffset.UtcNow;
+
+            return new SelectProjectResult(true, nextProject, prevProject);
         }
-        return true;
     }
 
     public IReadOnlyList<Event> GetAllEvents() =>
@@ -164,11 +190,15 @@ public class ArenaProjectStore : IArenaProjectStore
         return removed;
     }
 
-    public IReadOnlyList<Project> GetProjectsByEvent(string eventId) =>
-        _projects.Values
-            .Where(p => p.EventId == eventId)
-            .OrderBy(p => p.OrderIndex)
-            .ToList();
+    public IReadOnlyList<Project> GetProjectsByEvent(string eventId, bool includeCompleted = false)
+    {
+        var query = _projects.Values.Where(p => p.EventId == eventId);
+        if (!includeCompleted)
+        {
+            query = query.Where(p => p.Status != ProjectStatus.Completed);
+        }
+        return query.OrderBy(p => p.OrderIndex).ToList();
+    }
 
     public Project? GetProjectById(string projectId) =>
         _projects.TryGetValue(projectId, out var proj) ? proj : null;
@@ -192,21 +222,23 @@ public class ArenaProjectStore : IArenaProjectStore
         return true;
     }
 
-    public bool DeleteProject(string projectId)
+    public DeleteProjectResult DeleteProject(string projectId)
     {
-        var removed = _projects.TryRemove(projectId, out _);
-        if (removed)
+        lock (_contextLock)
         {
-            lock (_contextLock)
+            if (_currentProjectId == projectId)
             {
-                if (_currentProjectId == projectId)
-                {
-                    _currentProjectId = null;
-                    _lastUpdated = DateTimeOffset.UtcNow;
-                }
+                return new DeleteProjectResult(Success: false, IsActiveProject: true, NotFound: false);
             }
         }
-        return removed;
+
+        var removed = _projects.TryRemove(projectId, out _);
+        if (!removed)
+        {
+            return new DeleteProjectResult(Success: false, IsActiveProject: false, NotFound: true);
+        }
+
+        return new DeleteProjectResult(Success: true, IsActiveProject: false, NotFound: false);
     }
 
     private void SeedInitialData()
