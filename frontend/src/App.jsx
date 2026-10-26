@@ -20,14 +20,12 @@ export default function App() {
     { id: 5, name: 'Técnico 5', isTurned: false },
   ]);
 
-  // ── Mode & Audit State ───────────────────────────────────────────────────
-  const [isDevMode, setIsDevMode] = useState(true);
-  const [lastEvent, setLastEvent] = useState(null);
+  // ── Session Event History ────────────────────────────────────────────────
   const [eventsHistory, setEventsHistory] = useState([]);
 
   /**
    * turnChair — Canonical Command to rotate a chair.
-   * Can be invoked by SignalR (hardware) or manual Dev interactions.
+   * Invoked upon receiving SignalR events from backend.
    */
   const turnChair = useCallback((chairId, source = 'POC_HARDWARE') => {
     setChairs((prev) =>
@@ -44,12 +42,6 @@ export default function App() {
       time: now,
     };
 
-    setLastEvent({
-      chairId,
-      source,
-      time: now,
-    });
-
     setEventsHistory((prev) => [eventItem, ...prev].slice(0, 15));
 
     console.log(`[ArenaVoice POC] Cadeira #${chairId} virou via [${source}] às ${now}`);
@@ -57,10 +49,10 @@ export default function App() {
 
   /**
    * resetAllChairs — Resets all 5 chairs to facing away (isTurned: false).
+   * Invoked strictly by SignalR ChairsReset broadcast listener.
    */
   const resetAllChairs = useCallback(() => {
     setChairs((prev) => prev.map((c) => ({ ...c, isTurned: false })));
-    setLastEvent(null);
 
     const now = new Date().toLocaleTimeString('pt-BR');
     const eventItem = {
@@ -74,45 +66,28 @@ export default function App() {
     console.log('[ArenaVoice POC] Todas as cadeiras foram resetadas para o estado inicial');
   }, []);
 
-  /**
-   * toggleChairManual — Used strictly by Dev Mode UI/mouse interactions.
-   * If Dev Mode is disabled, manual clicks are ignored to guarantee
-   * that only physical hardware/SignalR can control the chairs.
-   */
-  const toggleChairManual = useCallback((chairId) => {
-    if (!isDevMode) {
-      console.warn(`[ArenaVoice POC] Clique manual na cadeira #${chairId} ignorado (Modo Dev DESATIVADO)`);
-      return;
-    }
-
-    setChairs((prev) =>
-      prev.map((c) => (c.id === chairId ? { ...c, isTurned: !c.isTurned } : c))
-    );
-
-    const now = new Date().toLocaleTimeString('pt-BR');
-    setLastEvent({
-      chairId,
-      source: 'DEV_MANUAL',
-      time: now,
-    });
-  }, [isDevMode]);
-
-  /**
-   * turnAllChairs — Convenience function for full demo.
-   */
-  const turnAllChairs = useCallback(() => {
-    setChairs((prev) => {
-      const allTurned = prev.every((c) => c.isTurned);
-      return prev.map((c) => ({ ...c, isTurned: !allTurned }));
-    });
-  }, []);
-
   // ── Hook de Conexão SignalR ─────────────────────────────────────────────
-  const { connectionStatus, connectionError, backendUrl, reconnectVersion, setBackendUrl } = useSignalR({
+  const { connectionStatus, backendUrl, reconnectVersion } = useSignalR({
     onChairTurned: (chairId, source) => turnChair(chairId, source),
     onChairsReset: resetAllChairs,
     initialBackendUrl: import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000',
   });
+
+  /**
+   * requestResetArena — Despacha comando autoritativo POST /api/reset ao backend.
+   */
+  const requestResetArena = useCallback(async () => {
+    const response = await fetch(`${backendUrl}/api/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Falha no reset: HTTP ${response.status}`);
+    }
+
+    return response.json();
+  }, [backendUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -172,6 +147,7 @@ export default function App() {
             chairs={chairs}
             connectionStatus={connectionStatus}
             events={eventsHistory}
+            onResetArena={requestResetArena}
           />
         }
       />
