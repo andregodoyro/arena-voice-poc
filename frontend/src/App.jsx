@@ -141,22 +141,7 @@ export default function App() {
       <Route path="/" element={<Navigate to="/stage" replace />} />
       <Route
         path="/stage"
-        element={
-          <StagePage
-            chairs={chairs}
-            toggleChair={toggleChairManual}
-            turnAll={turnAllChairs}
-            resetAll={resetAllChairs}
-            isDevMode={isDevMode}
-            setIsDevMode={setIsDevMode}
-            connectionStatus={connectionStatus}
-            connectionError={connectionError}
-            backendUrl={backendUrl}
-            setBackendUrl={setBackendUrl}
-            lastEvent={lastEvent}
-            turnChair={turnChair}
-          />
-        }
+        element={<StagePage chairs={chairs} />}
       />
       <Route
         path="/operator"

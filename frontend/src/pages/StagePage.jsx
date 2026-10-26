@@ -1,47 +1,23 @@
 import React from 'react';
 import { StudioCanvas } from '../components/StudioCanvas';
-import { HUD } from '../components/HUD';
+import { StageHUD } from '../components/stage/StageHUD';
 
 /**
  * StagePage — Superfície de Apresentação ao Público (Telão 3D).
  * 
- * Nesta etapa de transição, preserva o comportamento visual e interativo
- * do Voice Studio existente, preparando o terreno para a limpeza subsequente do HUD.
+ * Experiência pública limpa e cinematográfica:
+ * - Voice Studio 3D com animações GSAP de 5 cadeiras;
+ * - HUD cênico sem controles de depuração ou intervenções manuais de mouse;
+ * - Reage exclusivamente a eventos do backend (SignalR) e snapshot inicial.
  */
-export function StagePage({
-  chairs,
-  toggleChair,
-  turnAll,
-  resetAll,
-  isDevMode,
-  setIsDevMode,
-  connectionStatus,
-  connectionError,
-  backendUrl,
-  setBackendUrl,
-  lastEvent,
-  turnChair,
-}) {
+export function StagePage({ chairs = [] }) {
   return (
     <main style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
-      {/* 3D Canvas Layer */}
-      <StudioCanvas chairs={chairs} toggleChair={toggleChair} />
+      {/* 3D Canvas Layer — sem manipulador de clique manual */}
+      <StudioCanvas chairs={chairs} />
 
-      {/* 2D HUD Layer */}
-      <HUD
-        chairs={chairs}
-        toggleChair={toggleChair}
-        turnAll={turnAll}
-        resetAll={resetAll}
-        isDevMode={isDevMode}
-        setIsDevMode={setIsDevMode}
-        connectionStatus={connectionStatus}
-        connectionError={connectionError}
-        backendUrl={backendUrl}
-        setBackendUrl={setBackendUrl}
-        lastEvent={lastEvent}
-        turnChair={turnChair}
-      />
+      {/* 2D HUD Cênico Limpo */}
+      <StageHUD chairs={chairs} />
     </main>
   );
 }

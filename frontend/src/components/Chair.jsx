@@ -81,9 +81,9 @@ export function Chair({ id, name, isTurned, position, baseRotY = 0, toggleChair 
   }, [isTurned, baseRotY]);
 
   // ─── Pointer cursor handlers ───────────────────────────────────────────────
-  const handlePointerOver = (e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; };
-  const handlePointerOut  = ()    => { document.body.style.cursor = 'default'; };
-  const handleClick       = (e)   => { e.stopPropagation(); toggleChair(id); };
+  const handlePointerOver = (e) => { if (!toggleChair) return; e.stopPropagation(); document.body.style.cursor = 'pointer'; };
+  const handlePointerOut  = ()    => { if (!toggleChair) return; document.body.style.cursor = 'default'; };
+  const handleClick       = (e)   => { if (!toggleChair) return; e.stopPropagation(); toggleChair(id); };
 
   // Colors (initial / reactive via GSAP after mount)
   const leatherColor = isTurned ? '#d90429' : '#6b0714';
