@@ -1,168 +1,159 @@
-# Arena Voice POC — Integração Físico-Digital Local
+# Arena Voice — Plataforma de Avaliação e Espetáculo de Inovação
 
-> **Status:** Marco 1 Concluído (Vertical Ponta a Ponta: Botão Físico -> ESP32 -> Backend -> SignalR -> Voice Studio 3D)  
-> **Objetivo:** Comprovar a integração físico-digital de menor complexidade e maior impacto do produto: pressionar o botão físico acoplado ao ESP32 gira a cadeira digital correspondente em 180° no Voice Studio 3D.
+> **Status:** Fase 1 Concluída (Operator + Stage Foundation)  
+> **Objetivo:** Estabelecer a fundação das duas superfícies principais da plataforma — o Telão 3D Público (`/stage`) e o Cockpit Operacional da Mesa Técnica (`/operator`) —, com comunicação em tempo real e backend autoritativo.
 
 ---
 
-## 🏗️ Arquitetura Implementada
+## 🏗️ Visão Geral e Arquitetura da Plataforma
+
+O **Arena Voice** é uma plataforma reutilizável projetada para conduzir dinâmicas imersivas de bancas avaliadoras inspiradas no formato The Voice (Demo Days, Hackathons, mostras de MVPs e bancas corporativas). 
+
+A plataforma divide-se com rigor em **quatro papéis arquiteturais**:
 
 ```text
-                     REDE WI-FI LOCAL (HOTSPOT DO CELULAR 2.4 GHz)
-   [Botão Físico Arcade] ──> [ESP32 #1 DevKit V4]
-   (GPIO 18 / GND)           (Debounce 50ms)
-                                    │
-                                    ▼ HTTP POST /api/chair-press (payload: {"chairId": 1})
-                     ┌────────────────────────────────────────┐
-                     │   ARENA VOICE POC BACKEND (ASP.NET)    │
-                     │   Minimal API (.NET 10) em 0.0.0.0:5000│
-                     ├────────────────────────────────────────┤
-                     │ • Validação de cadeira (1 a 5)         │
-                     │ • Auditoria e logs detalhados          │
-                     │ • Hub SignalR em /hubs/arena-poc       │
-                     └───────────────────┬────────────────────┘
-                                         │
-                                         ▼ SignalR WebSocket (Evento: ChairTurned)
-                     ┌────────────────────────────────────────┐
-                     │       VOICE STUDIO 3D (TELÃO)          │
-                     │   React 19 + Three.js + GSAP 3.15      │
-                     ├────────────────────────────────────────┤
-                     │ • useSignalR hook desacoplado          │
-                     │ • Comando turnChair(1)                 │
-                     │ • Giro de 180° com curva suave GSAP    │
-                     │ • Modo Dev vs Modo Hardware            │
-                     └────────────────────────────────────────┘
+                                  REDE LOCAL / WI-FI (2.4 GHz)
+             [Botão Físico ESP32]                   [Simulador de Testes]
+             (GPIO 18 / Debounce)                   (scripts/simulate-esp32)
+                      │                                       │
+                      └───────────────────┬───────────────────┘
+                                          │ HTTP POST /api/chair-press {"chairId": 1}
+                                          ▼
+                      ┌──────────────────────────────────────────────┐
+                      │             BACKEND ARENA VOICE              │
+                      │     ASP.NET Core (.NET 10 Minimal API)       │
+                      │             Binds em 0.0.0.0:5000            │
+                      ├──────────────────────────────────────────────┤
+                      │ • ÚNICA FONTE OFICIAL DA VERDADE (chairStates│
+                      │ • Validação de regras e integridade          │
+                      │ • Hub SignalR Realtime em /hubs/arena-poc    │
+                      │ • Endpoints: /api/chair-press, /state, /reset│
+                      └──────────────┬───────────────────────────────┘
+                                     │
+           ┌─────────────────────────┴────────────────────────┐
+           ▼ Broadcast Realtime (ChairTurned, ChairsReset)     ▼ Snapshot REST (/api/state)
+┌──────────────────────────────────────┐     ┌──────────────────────────────────────┐
+│      /stage — TELÃO PÚBLICO 3D       │     │    /operator — COCKPIT DA MESA       │
+│    (Experiência Cênica / Telão)      │     │     (Gestão e Operação da Sessão)    │
+├──────────────────────────────────────┤     ├──────────────────────────────────────┤
+│ • React 19 + Three.js + GSAP 3.15    │     │ • Dashboard 2D rápido e ergonômico   │
+│ • 5 Cadeiras 3D animadas em tempo real│    │ • Placar consolidado de votos (X / 5)│
+│ • StageHUD cênico (sem dados técnicos│     │ • Grade visual de status das cadeiras│
+│ • Zero botões ou cliques manuais     │     │ • Histórico da sessão em tempo real  │
+│ • 100% dirigido pelo backend         │     │ • Botão de Reset Autoritativo        │
+└──────────────────────────────────────┘     └──────────────────────────────────────┘
 ```
 
 ---
 
-## ⚙️ Configuração Portátil de Ambientes
+## 🖥️ Superfícies Disponíveis no Frontend
 
-O projeto foi projetado para rodar em múltiplos ambientes sem alteração de código versionado:
+O frontend opera como uma Single Page Application com roteamento oficial via **React Router**:
+
+| Rota | Superfície | Público-Alvo | Responsabilidade |
+| :--- | :--- | :--- | :--- |
+| **`http://localhost:5173/`** | Redirecionamento | Todos | Redireciona automaticamente para `/stage`. |
+| **`http://localhost:5173/stage`** | **Telão Público 3D** | Plateia / Apresentadores | Exibição em tela cheia do palco 3D interativo, rotação cinematográfica das cadeiras e placar consolidado. Superfície estritamente contemplativa, sem controles manuais. |
+| **`http://localhost:5173/operator`** | **Cockpit Operacional** | Mesa Técnica / Operador | Monitoramento do status do sistema (*"Sistema Pronto"*), estado individual das 5 cadeiras, linha do tempo de eventos e controle autoritativo de reset da rodada. |
+
+---
+
+## 🔄 Fluxo Operacional da Arena
+
+1. **Preparação da Apresentação:**
+   - O computador conectado ao projetor/telão abre **`/stage`** em modo tela cheia.
+   - O operador na mesa técnica abre **`/operator`** para acompanhar o evento.
+2. **Dinâmica de Voto (Live Pitch):**
+   - Quando um avaliador aciona o botão da sua cadeira (via ESP32 físico ou script de simulação), o backend processa o voto e dispara o evento `ChairTurned` via SignalR.
+   - O **`/stage`** executa imediatamente a rotação suave de 180° da cadeira 3D via GSAP, acende os holofotes e atualiza o placar cênico.
+   - O **`/operator`** atualiza a cadeira correspondente para `VIRADA`, incrementa o placar e registra o horário no histórico da sessão.
+3. **Reset Autoritativo de Rodada:**
+   - Ao final do pitch, o operador clica em **"Resetar Arena"** no `/operator`.
+   - O cockpit envia `POST /api/reset` ao backend.
+   - O backend zera o estado oficial em memória e emite o broadcast `ChairsReset`.
+   - Ambas as telas (`/stage` e `/operator`) retornam imediatamente as cadeiras para a posição inicial de forma sincronizada.
+
+---
+
+## 📡 Contratos e Comunicação
+
+### O Backend como Fonte Oficial da Verdade
+Nenhuma tela muta o estado das cadeiras localmente. O backend é a única autoridade sobre o estado do palco:
+- **`GET /api/state`:** Retorna o snapshot atual do estado da arena (`{"chairs": {"1": true, ...}, "activeCount": X}`). Utilizado para hidratação inicial ao carregar a página e para resincronização automática pós-reconexão.
+- **`POST /api/chair-press`:** Ingestão de acionamento de cadeira (`{"chairId": 1}`). Valida o intervalo de 1 a 5 e emite `ChairTurned`.
+- **`POST /api/reset`:** Comando autoritativo que zera todas as cadeiras e emite o broadcast `ChairsReset`.
+
+### Eventos em Tempo Real (SignalR `/hubs/arena-poc`)
+- **`ChairTurned`:** `{ chairId: int, timestamp: string, source: string }`
+- **`ChairsReset`:** Broadcast sem payload notificando que todas as 5 cadeiras retornaram à posição inicial.
+
+---
+
+## 💻 Cenários de Execução Local
+
+Ambiente compatível com Windows corporativo (ferramentas portáteis) e máquinas convencionais:
 
 ### 1. Separação Estrita de Configurações e Segredos
+Copie `.env.example` para `.env` se suas ferramentas portáteis estiverem fora do `PATH`:
+```cmd
+copy .env.example .env
+```
 
-| Arquivo | Função | Versionado no Git? |
-| :--- | :--- | :--- |
-| `.env.example` | Template de variáveis de ambiente do PC | ✅ **SIM** |
-| `.env` | Configuração local da máquina | ❌ **NÃO (ignorado)** |
-| `firmware/config.h` | Parâmetros técnicos fixos do firmware | ✅ **SIM** |
-| `firmware/config_secrets.h.example` | Template de credenciais do ESP32 | ✅ **SIM** |
-| `firmware/config_secrets.h` | Credenciais Wi-Fi e IP da sua placa | ❌ **NÃO (ignorado)** |
-
-> [!CAUTION]
-> **NUNCA COMMITE** os arquivos `.env` ou `firmware/config_secrets.h`. Eles contêm credenciais locais e caminhos privados de sua estação de trabalho.
-
----
-
-## 💻 Cenários de Execução
-
-### Cenário A: PC Corporativo (Ferramentas Portáteis fora do PATH)
-1. Copie `.env.example` para `.env`:
-   ```cmd
-   copy .env.example .env
-   ```
-2. Abra o `.env` e aponte para seus executáveis portáteis locais:
-   ```ini
-   BACKEND_HOST=0.0.0.0
-   BACKEND_PORT=5000
-   VITE_BACKEND_URL=http://localhost:5000
-   VITE_SIGNALR_URL=http://localhost:5000/hubs/arena-poc
-   DOTNET_EXE=C:\caminho\para\devtools\portable\dotnet\dotnet.exe
-   NODE_EXE=C:\caminho\para\devtools\portable\node\node.exe
-   NPM_EXE=C:\caminho\para\devtools\portable\node\npm.cmd
-   GIT_EXE=C:\caminho\para\devtools\portable\git\cmd\git.exe
-   ```
-3. Utilize os scripts `.cmd` (ou `.ps1`) normalmente na pasta `scripts/`.
-
-### Cenário B: Computador Convencional (Ferramentas no PATH global)
-1. O `.env` é opcional. Se desejar customizar portas ou URLs, copie `.env.example` para `.env` mantendo as variáveis de executáveis vazias:
-   ```ini
-   DOTNET_EXE=
-   NODE_EXE=
-   NPM_EXE=
-   GIT_EXE=
-   ```
-2. Os scripts detectarão automaticamente `dotnet`, `node` e `npm` presentes no `PATH`.
-
-### Cenário C: GitHub Codespaces / Containers Linux
-1. As ferramentas (.NET 10 SDK e Node.js) já estarão presentes globalmente no ambiente.
-2. Não é necessário criar `.env` (valores padrão `0.0.0.0:5000` serão usados).
-3. Execute diretamente via terminal:
-   ```bash
-   dotnet run --project backend/ArenaVoicePocBackend.csproj
-   npm --prefix frontend run dev
-   ```
-
----
-
-## 🚀 Como Executar
-
-### 1. Iniciar o Backend
-Abra um terminal e execute (via CMD ou PowerShell):
+### 2. Iniciar o Backend (.NET 10)
+Em um terminal, execute:
 ```cmd
 scripts\start-backend.cmd
 ```
-*(ou no PowerShell: `.\scripts\start-backend.ps1`)*
-
+*(ou PowerShell: `.\scripts\start-backend.ps1`)*  
 O backend iniciará ouvindo em `http://0.0.0.0:5000`.
 
-### 2. Iniciar o Frontend 3D
-Abra um segundo terminal e execute:
+### 3. Iniciar o Frontend (React 19 + Vite)
+Em um segundo terminal, execute:
 ```cmd
 scripts\start-frontend.cmd
 ```
-*(ou no PowerShell: `.\scripts\start-frontend.ps1`)*
+*(ou PowerShell: `.\scripts\start-frontend.ps1`)*  
+Acesse o sistema no navegador:
+- Telão Público: [http://localhost:5173/stage](http://localhost:5173/stage)
+- Cockpit da Mesa: [http://localhost:5173/operator](http://localhost:5173/operator)
 
-Abra o navegador em: [http://localhost:5173](http://localhost:5173).
-
-### 3. Testar a Simulação (Sem ESP32 físico)
-Para simular o acionamento do botão sem o hardware real:
+### 4. Simulação de Acionamento (Sem Hardware Físico)
+Para simular o voto de uma cadeira:
 ```cmd
-scripts\simulate-esp32.cmd
+scripts\simulate-esp32.cmd 1
 ```
-*(ou no PowerShell: `.\scripts\simulate-esp32.ps1 -ChairId 1`)*
+*(ou PowerShell: `.\scripts\simulate-esp32.ps1 -ChairId 1`)*
 
-A Cadeira #1 girará imediatamente no navegador 3D via SignalR!
+### 5. Execução de Testes Automatizados
+Com o backend em execução:
+```powershell
+# Suíte de Contratos REST (48 verificações)
+node tests/test-api.cjs
 
-### 4. Teste Automatizado E2E
-Com o backend em execução, execute o teste de ponta a ponta:
-```bash
+# Suíte de Integração Realtime SignalR (46 verificações)
 node tests/test-signalr-e2e.cjs
 ```
 
 ---
 
-## 🔌 Conectando o Hardware ESP32 Real
+## 🔌 Conexão de Botões Físicos ESP32
 
-1. Configure seu hotspot móvel para **2.4 GHz**.
-2. Conecte seu computador ao hotspot e anote seu IPv4 (via `ipconfig`).
-3. Crie `firmware/config_secrets.h` a partir do template:
-   ```cmd
-   copy firmware\config_secrets.h.example firmware\config_secrets.h
-   ```
-4. Edite `firmware/config_secrets.h`:
+1. Conecte o computador e a placa ESP32 à mesma rede Wi-Fi **2.4 GHz** (ex: Hotspot móvel).
+2. Configure as credenciais em `firmware/config_secrets.h`:
    ```cpp
-   #define WIFI_SSID     "NomeDoSeuHotspot"
-   #define WIFI_PASSWORD "SenhaDoSeuHotspot"
-   #define BACKEND_HOST  "192.168.x.x" // IPv4 do computador no hotspot
+   #define WIFI_SSID     "NomeDoHotspot"
+   #define WIFI_PASSWORD "SenhaDoHotspot"
+   #define BACKEND_HOST  "192.168.x.x" // IPv4 do computador na rede
    #define BACKEND_PORT  5000
-   #define CHAIR_ID      1
+   #define CHAIR_ID      1             // Identificador desta cadeira (1 a 5)
    ```
-5. Grave o código `firmware/sketch.ino` no ESP32 #1 via Arduino IDE ou PlatformIO.
-6. Pressione o botão físico conectado no pino **GPIO 18 e GND**.
-7. A Cadeira #1 girará no Voice Studio 3D instantaneamente.
+3. Grave o sketch no microcontrolador via Arduino IDE / PlatformIO.
+4. O botão físico conectado no pino **GPIO 18 e GND** comandará diretamente a virada da cadeira no palco.
 
 ---
 
 ## 📚 Documentação Técnica
 
-### Documentação Principal
-* **[Roadmap Oficial e Arquitetura (v1.1)](docs/roadmap.md):** Documento mestre de produto, visão arquitetural e planejamento progressivo em 10 fases.
-* **[Auditoria Técnica do Marco 1 (Software Foundation)](docs/software-foundation-audit.md):** Registro do estado comprovado da fundação de software, contratos validados e checklist de onboarding para novos desenvolvedores.
-
-### Referências Complementares
-* [Arquitetura e Fluxo do Evento](docs/architecture.md)
-* [Configuração de Rede e Hotspot](docs/network.md)
-* [Ligação de Hardware e Firmware](docs/hardware.md)
-* [Histórico de Marcos Iniciais](docs/archive/roadmap-initial.md)
+- **[Roadmap Oficial e Arquitetura de Produto (docs/roadmap.md)](docs/roadmap.md):** Visão completa de produto, princípios de UX e planejamento das 10 fases da plataforma.
+- **[Arquitetura Detalhada e Fluxos do Sistema (docs/architecture.md)](docs/architecture.md):** Separação de papéis, fluxos de acionamento, reset autoritativo, resiliência e contratos.
+- **[Auditoria da Fundação de Software (docs/software-foundation-audit.md)](docs/software-foundation-audit.md):** Registro dos marcos e validações das suítes de teste.

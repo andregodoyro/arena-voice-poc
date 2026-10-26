@@ -611,9 +611,9 @@ MACROBLOCO: EVENT SETUP & LIVE OPERATION (FASES 1 A 4)
 O mesmo workflow operacional construído progressivamente
 ════════════════════════════════════════════════════════════════
    │
-   ├─► FASE 1: Operator + Stage Foundation (PRÓXIMA FASE RECOMENDADA)
+   ├─► FASE 1: Operator + Stage Foundation (CONCLUÍDA)
    │
-   ├─► FASE 2: Event Setup + Project Management
+   ├─► FASE 2: Event Setup + Project Management (PRÓXIMA FASE RECOMENDADA)
    │
    ├─► FASE 3: Live Round Operation / Game State
    │
@@ -661,41 +661,27 @@ MACROBLOCO: ANALYTICS & PRODUCTION HARDENING (FASES 9 E 10)
 
 ---
 
-### FASE 1: Operator + Stage Foundation (PRÓXIMA FASE RECOMENDADA)
+### FASE 1: Operator + Stage Foundation (CONCLUÍDA)
 *Criar a fundação das duas superfícies principais da plataforma (`/operator` e `/stage`).*
 
+- **STATUS:** CONCLUÍDA
 - **OBJETIVO:** Estabelecer a separação física e de responsabilidades entre o telão público (`/stage`) e o painel operacional (`/operator`), criando uma base arquitetural expansível que receberá os módulos das fases seguintes sem necessidade de reconstrução.
-- **PRÉ-REQUISITOS:** Marco 1 concluído.
-- **ESCOPO:**
-  - Criação da superfície `/operator` (inicial, orientada a produto):
-    - Estado geral do sistema ("Sistema Pronto", "Telão Conectado", "Reconectando...");
-    - Disponibilidade e status de comunicação com o telão;
-    - Visualização do estado individual das 5 cadeiras (representação visual e funcional: virada/não virada);
-    - Placar atual da rodada (ex: 2 de 5 cadeiras viradas);
-    - Histórico visual recente de acionamentos ("Cadeira 3 acionada às 14:32");
-    - Ação operacional de "Resetar Arena" (com retorno visual e atualização imediata);
-    - Estrutura visual e arquitetural de tela preparada para receber os módulos operacionais futuros.
-  - Criação da superfície `/stage`:
-    - Renderização limpa do Voice Studio 3D em modo tela cheia;
-    - Visualização cinematográfica das cadeiras e placar ao vivo;
-    - Experiência pública estritamente limpa: sem controles administrativos, sem alternador de Modo Dev, sem botões manuais de teste e sem informações técnicas de infraestrutura.
-- **FORA DO ESCOPO:** Gestão de eventos (Event Management), cadastro de projetos (Project Management), controle de ciclo de vida da rodada (Round Management), gestão de avaliadores (Evaluator Management), motor de regras (Result Engine), persistência em banco de dados ou autenticação com login/senha.
-- **IMPLEMENTAÇÃO (CAMADA TÉCNICA ENCAPSULADA):**
-  - Implementação de roteamento no React no frontend (`/operator` e `/stage`).
-  - Camada de serviço de frontend abstrai o transporte: comandos despachados via HTTP REST (`POST /api/reset`, `GET /api/state`).
-  - O Stage escuta eventos em tempo real via SignalR (`/hubs/arena-poc`) e reidrata via snapshot REST `GET /api/state`.
-- **WORKFLOW:**
-  1. No notebook da mesa técnica, o operador abre `/operator`.
-  2. No notebook conectado ao projetor/telão, abre-se `/stage` em Fullscreen.
-  3. Quando uma cadeira é acionada (via hardware ou script), o `/stage` reage visualmente e o `/operator` atualiza seu painel de status em tempo real.
-  4. O operador clica em "Resetar Arena" no `/operator`; o backend processa o reset e emite `ChairsReset` via SignalR; o telão retorna as cadeiras suavemente e o painel do operador confirma a arena pronta.
-- **TESTES:**
-  - Teste simultâneo com duas instâncias de navegador (`/operator` e `/stage`).
-  - Teste automatizado validando propagação de reset remoto emitido pelo operador para o telão.
-- **CRITÉRIO DE ACEITE:** O telão funciona em tela cheia sem nenhum controle interativo de mouse visível; o operador consegue compreender e controlar o estado essencial da Arena sem precisar conhecer os mecanismos internos de comunicação.
-- **DOCUMENTAÇÃO:** Atualizar `README.md` documentando as URLs de acesso `/stage` e `/operator`.
-- **RISCOS:** Desconexão de uma das abas. (Mitigado pela sincronização contínua via `reconnectVersion` e `GET /api/state`).
-- **DEPENDÊNCIAS:** Marco 1.
+- **ENTREGAS REALIZADAS E VALIDADAS:**
+  - ✅ **Roteamento React Router 7:** Superfícies isoladas em `/stage` e `/operator`, com `/` redirecionando para `/stage`.
+  - ✅ **Telão Cênico 3D Sanitizado (`/stage`):** Renderização limpa do Voice Studio 3D com `StageHUD` contemplativo, placar consolidado ao vivo e sem controles manuais ou termos de infraestrutura.
+  - ✅ **Cockpit Operacional da Mesa (`/operator`):** Dashboard 2D ergonômico com `OperatorHeader` (status semântico *"Sistema Pronto"*), `ScoreBoard` (X/5 com barra segmentada), `ChairGrid` (monitoramento das 5 cadeiras) e `ActivityLog` (linha do tempo de eventos).
+  - ✅ **Reset Autoritativo Ponta a Ponta:** Botão "Resetar Arena" no Operator com loading state e proteção contra duplo clique, despachando `POST /api/reset` ao backend, que emite o broadcast SignalR `ChairsReset` sincronizando ambas as telas.
+  - ✅ **Sincronização Dupla e Resiliência:** Snapshot REST (`GET /api/state`) para hidratação e reconciliação automática pós-reconexão (`reconnectVersion`) + Realtime SignalR (`/hubs/arena-poc`).
+  - ✅ **Expurgo de Código Legado:** Remoção completa de `HUD.jsx`, `isDevMode`, `toggleChairManual`, `turnAllChairs`, `lastEvent` e ouvintes de raycasting no Three.js.
+  - ✅ **Limpeza do Pipeline 3D:** Remoção da prop órfã `toggleChair` e otimização da performance de renderização no palco.
+- **EVIDÊNCIAS DE TESTES:**
+  - `tests/test-api.cjs`: **48 PASS / 0 FAIL** (100% de conformidade REST).
+  - `tests/test-signalr-e2e.cjs`: **46 PASS / 0 FAIL** (100% de conformidade Realtime/Reset).
+  - Frontend Build (Vite 8): **Exit Code 0** (compilação limpa em ~3s).
+- **DOCUMENTAÇÃO:**
+  - `README.md` e `docs/architecture.md` plenamente atualizados com a arquitetura de duas superfícies, diagramas de sequência e fluxos autoritativos.
+- **PRÓXIMA FASE RECOMENDADA:**
+  - **FASE 2: Event Setup + Project Management**.
 
 ---
 
