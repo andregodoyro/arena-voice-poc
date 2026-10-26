@@ -1,6 +1,6 @@
 # Arquitetura — Arena Voice
 
-> **Status:** Fase 1 Concluída (Operator + Stage Foundation)  
+> **Status:** Fase 1 Concluída (`v0.1.0-phase1`) \| Fase 2 em Andamento (Milestones 2A e 2B Concluídos e Homologados)  
 > **Referência de Produto:** [Roadmap Oficial e Arquitetura de Produto (docs/roadmap.md)](roadmap.md)
 
 ---
@@ -155,13 +155,23 @@ O hook de serviço de rede (`frontend/src/services/useSignalR.js`) encapsula pol
 | :--- | :--- | :--- | :--- | :--- |
 | `POST` | `/api/chair-press` | `{"chairId": 1}` | `{"accepted": true, "chairId": 1, ...}` | Ingestão oficial de votos de avaliadores. |
 | `POST` | `/api/support` | `{"seatNumber": 1}` | `{"accepted": true, "chairId": 1, ...}` | Alias de retrocompatibilidade. |
-| `POST` | `/api/reset` | *Vazio* | `{"message": "...", "chairs": {...}}` | Comando autoritativo de reset da arena. |
-| `GET` | `/api/state` | *Vazio* | `{"chairs": {...}, "activeCount": X}` | Consulta de snapshot oficial para hidratação. |
+| `POST` | `/api/reset` | *Vazio* | `{"message": "...", "chairs": {...}}` | Comando autoritativo de reset de cadeiras da arena. |
+| `GET` | `/api/state` | *Vazio* | `{"chairs": {...}, "activeCount": X, "currentEvent": {...}, "currentProject": {...}}` | Consulta de snapshot oficial para hidratação. |
 | `GET` | `/api/status` | *Vazio* | `{"status": "ONLINE", ...}` | Health check de prontidão da API. |
+| `GET` | `/api/events/current` | *Vazio* | `Event` | Consulta do evento e branding ativo. |
+| `PUT` | `/api/events/current` | `UpdateEventDto` | `Event` | Atualiza metadados e branding do evento ativo. |
+| `GET` | `/api/projects` | `?includeCompleted=bool` | `List<Project>` | Lista projetos do evento (oculta concluídos por padrão). |
+| `GET` | `/api/projects/{id}` | *Vazio* | `Project` | Detalhes de um projeto específico por ID. |
+| `POST` | `/api/projects` | `CreateProjectDto` | `Project` (201 Created) | Cadastro de novo projeto na fila do evento. |
+| `PUT` | `/api/projects/{id}` | `UpdateProjectDto` | `Project` | Edição de projeto existente. |
+| `DELETE` | `/api/projects/{id}` | *Vazio* | `200 OK` / `409 Conflict` | Exclusão de projeto (bloqueia exclusão do ativo com 409). |
+| `POST` | `/api/projects/{id}/select`| *Vazio* | `SelectProjectResult` | Seleção autoritativa do pitch no palco. |
 
 ### Eventos SignalR (Hub `/hubs/arena-poc`)
 
 | Evento | Direção | Payload | Efeito no Frontend |
-| :--- | :---: | :--- | :--- |
+| :--- | :--- :--- | :--- | :--- |
 | `ChairTurned` | Server $\rightarrow$ Client | `{ chairId: int, timestamp: string, source: string }` | Vira a cadeira no 3D e atualiza o placar no Operator. |
-| `ChairsReset` | Server $\rightarrow$ Client | *Sem payload* | Retorna todas as cadeiras para de costas em todas as abas. |
+| `ChairsReset` | Server $\rightarrow$ Client | *Sem payload* | Retorna todas as cadeiras para a posição 0° em todas as abas. |
+| `CurrentProjectChanged` | Server $\rightarrow$ Client | `{ project: Project, previousProjectId: string, timestamp: string }` | Atualiza em tempo real o pitch ativo no palco e no cockpit. |
+| `EventBrandingUpdated` | Server $\rightarrow$ Client | `{ eventId: string, branding: BrandingConfig, timestamp: string }` | Atualiza neons cênicos e paleta de cores visual da arena. |

@@ -685,11 +685,12 @@ MACROBLOCO: ANALYTICS & PRODUCTION HARDENING (FASES 9 E 10)
 
 ---
 
-### FASE 2: Event Setup + Project Management
+### FASE 2: Event Setup + Project Management (EM ANDAMENTO: 2A e 2B Concluídos)
 *Permitir que o Arena Voice configure diferentes eventos e seus projetos sem alterar código.*
 
+- **STATUS:** EM ANDAMENTO (Milestones 2A e 2B Concluídos e Homologados; 156 testes aprovados)
 - **OBJETIVO:** Tornar a plataforma reutilizável e dinâmica, permitindo cadastrar eventos e seus respectivos projetos/MVPs com identidade visual, equipe e mídias, exibindo o projeto ativo no telão sob comando do operador.
-- **PRÉ-REQUISITOS:** Fase 1 concluída.
+- **PRÉ-REQUISITOS:** Fase 1 concluída (`v0.1.0-phase1`).
 - **ESCOPO:**
   - Operator Screen (Painel Operacional):
     - Interface para cadastrar e editar projetos participantes e ficha do MVP;
