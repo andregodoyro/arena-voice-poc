@@ -23,6 +23,7 @@ export default function App() {
   // ── Mode & Audit State ───────────────────────────────────────────────────
   const [isDevMode, setIsDevMode] = useState(true);
   const [lastEvent, setLastEvent] = useState(null);
+  const [eventsHistory, setEventsHistory] = useState([]);
 
   /**
    * turnChair — Canonical Command to rotate a chair.
@@ -34,11 +35,22 @@ export default function App() {
     );
 
     const now = new Date().toLocaleTimeString('pt-BR');
+    const eventItem = {
+      id: `${Date.now()}-${chairId}`,
+      chairId,
+      type: 'CHAIR_TURNED',
+      description: `Cadeira #${chairId} virou`,
+      source,
+      time: now,
+    };
+
     setLastEvent({
       chairId,
       source,
       time: now,
     });
+
+    setEventsHistory((prev) => [eventItem, ...prev].slice(0, 15));
 
     console.log(`[ArenaVoice POC] Cadeira #${chairId} virou via [${source}] às ${now}`);
   }, []);
@@ -49,6 +61,16 @@ export default function App() {
   const resetAllChairs = useCallback(() => {
     setChairs((prev) => prev.map((c) => ({ ...c, isTurned: false })));
     setLastEvent(null);
+
+    const now = new Date().toLocaleTimeString('pt-BR');
+    const eventItem = {
+      id: `${Date.now()}-reset`,
+      type: 'RESET',
+      description: 'Arena retornada à posição inicial',
+      time: now,
+    };
+    setEventsHistory((prev) => [eventItem, ...prev].slice(0, 15));
+
     console.log('[ArenaVoice POC] Todas as cadeiras foram resetadas para o estado inicial');
   }, []);
 
@@ -147,7 +169,9 @@ export default function App() {
         path="/operator"
         element={
           <OperatorPage
+            chairs={chairs}
             connectionStatus={connectionStatus}
+            events={eventsHistory}
           />
         }
       />
