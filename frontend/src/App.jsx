@@ -1,7 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { StagePage } from './pages/StagePage';
-import { OperatorPage } from './pages/OperatorPage';
+import { OperatorLayout } from './components/operator/OperatorLayout';
+import { OperatorCockpitTab } from './pages/operator/OperatorCockpitTab';
+import { OperatorProjectsTab } from './pages/operator/OperatorProjectsTab';
+import { OperatorEventTab } from './pages/operator/OperatorEventTab';
 import { useSignalR } from './services/useSignalR';
 
 /**
@@ -142,15 +145,22 @@ export default function App() {
       />
       <Route
         path="/operator"
-        element={
-          <OperatorPage
-            chairs={chairs}
-            connectionStatus={connectionStatus}
-            events={eventsHistory}
-            onResetArena={requestResetArena}
-          />
-        }
-      />
+        element={<OperatorLayout connectionStatus={connectionStatus} />}
+      >
+        <Route index element={<Navigate to="cockpit" replace />} />
+        <Route
+          path="cockpit"
+          element={
+            <OperatorCockpitTab
+              chairs={chairs}
+              events={eventsHistory}
+              onResetArena={requestResetArena}
+            />
+          }
+        />
+        <Route path="projects" element={<OperatorProjectsTab />} />
+        <Route path="event" element={<OperatorEventTab />} />
+      </Route>
       <Route path="*" element={<Navigate to="/stage" replace />} />
     </Routes>
   );

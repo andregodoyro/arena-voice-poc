@@ -133,3 +133,30 @@
   - `tests/test-signalr-e2e.cjs`: **55 PASS / 0 FAIL**
   - Total consolidado: **156 testes aprovados**.
 - **Impacto Futuro:** Concluiu 100% da camada de backend da Fase 2, deixando o sistema preparado para a construção da interface administrativa do operador (Milestone 2C).
+
+---
+
+## Milestone 2C.1 — Operator Layout Foundation
+- **Contexto:** Com as APIs de projetos e eventos homologadas no 2B, a interface do operador precisava evoluir de um cockpit isolado para um layout expansível e unificado por abas.
+- **Objetivo:** Estabelecer a fundação do layout do operador e o roteamento por abas conforme o ADR-007 (`/operator/cockpit`, `/operator/projects`, `/operator/event`).
+- **Arquitetura Criada:**
+  - `OperatorLayout`: Shell mestre contendo cabeçalho institucional, indicador de prontidão de rede e barra de navegação por abas (`OperatorNavTabs`).
+  - `OperatorNavTabs`: Navegação estilizada com `NavLink`, destacando a aba ativa sem perda de contexto.
+  - Sub-rotas aninhadas no React Router:
+    - `/operator/cockpit`: Cockpit ao vivo com cadeiras, placar, histórico e botão autoritativo de reset (`OperatorCockpitTab`).
+    - `/operator/projects`: Casca da gestão da fila de projetos (`OperatorProjectsTab`).
+    - `/operator/event`: Casca de configuração e branding do evento (`OperatorEventTab`).
+  - Redirecionamento automático de `/operator` para `/operator/cockpit`.
+- **Arquivos Principais:**
+  - `frontend/src/components/operator/OperatorNavTabs.jsx`
+  - `frontend/src/components/operator/OperatorLayout.jsx`
+  - `frontend/src/pages/operator/OperatorCockpitTab.jsx`
+  - `frontend/src/pages/operator/OperatorProjectsTab.jsx`
+  - `frontend/src/pages/operator/OperatorEventTab.jsx`
+  - `frontend/src/pages/OperatorPage.jsx`
+  - `frontend/src/App.jsx`
+- **Decisões Importantes:**
+  - Preservação integral do cockpit 2D da Fase 1 dentro da aba Cockpit (`/operator/cockpit`).
+  - Manutenção da conexão SignalR contínua no layout pai, impedindo desconexões ao alternar de aba.
+- **Testes & Validação:** Compilação do frontend (`npm run build`) concluída com êxito em ~8s sem erros de sintaxe ou dependências quebradas.
+- **Impacto Futuro:** Desbloqueou a inserção do catálogo de projetos (2C.2) e controles de CRUD/seleção (2C.3) em suas respectivas abas.
