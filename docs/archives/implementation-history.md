@@ -291,4 +291,44 @@
     - **Total: 156 testes aprovados (100% verde)**.
 - **Impacto Futuro:** Concluiu a gestão institucional e cênica do evento na mesa do operador. O próximo passo do Milestone 2C é a integração realtime fina na mesa técnica (Milestone 2C.5 - `CurrentProjectChanged`, `EventBrandingUpdated` e resync na mesa técnica).
 
+---
+
+### [2026-10-27] — Milestone 2C.5: Integração Realtime, Sincronização e Resync Hardening (Realtime Integration & Resync)
+- **Status:** ✅ Concluído
+- **Objetivo:** Conectar a mesa técnica operacional ao transporte em tempo real (SignalR WebSocket), eliminando qualquer dependência de refresh manual para visualização de mudanças no sistema e implementando resync autoritativo automático após quedas de rede, preservando o princípio de que o backend é a fonte autoritativa da verdade (ADR-001 e ADR-002).
+- **Arquitetura Criada / Modificada:**
+  - `useSignalR.js`: Expandido para suportar todos os eventos do ecossistema: `ChairTurned`, `ChairSupported`, `ChairsReset`, `CurrentProjectChanged`, `EventBrandingUpdated` e callbacks de ciclo de vida (`onReconnecting`, `onReconnected`, `onClose`) utilizando `callbacksRef` imune a stale closures.
+  - `OperatorContext.jsx`: Centralizou a única conexão SignalR do sistema operacional. Unificou o estado global das 5 cadeiras (`chairs`), histórico (`eventsHistory`), projeto ativo (`currentProject`), fila (`projects`), evento/branding (`currentEvent`), status de conectividade (`connectionStatus`) e indicador de resync (`isResyncing`).
+  - **Sincronização em Tempo Real de Projetos (2C.5.2):** Ao receber `CurrentProjectChanged`, executa atualização visual instantânea (reatividade rápida com atualização de badges e status 1/2) seguida de re-hidratação autoritativa silenciosa em background via `fetchOperationalData(false)` (ADR-002).
+  - **Sincronização em Tempo Real de Branding (2C.5.3):** Ao receber `EventBrandingUpdated`, atualiza imediatamente o branding em memória (refletindo no `ColorPreviewCard` e `EventForm`) e valida os metadados via snapshot.
+  - **Sincronização de Cadeiras e Arena (2C.5.4):** Eventos `ChairTurned` e `ChairsReset` atualizam instantaneamente `ScoreBoard`, `ChairGrid` e `ActivityLog`.
+  - **Reconnect & Resync Hardening (2C.5.5):** Detecção de desconexão com transição de estados (`CONECTADO` -> `RECONECTANDO` -> `RESSINCRONIZANDO` -> `CONECTADO`). Após reconexão do WebSocket, o sistema dispara imediatamente uma bateria completa de consultas autoritativas (`GET /api/state`, `GET /api/projects`, `GET /api/events/current`) antes de liberar a interface como pronta, garantindo que nenhum evento perdido durante a desconexão desalinhe a UI.
+  - `OperatorHeader.jsx`: Enriquecido com o estado visual ciano pulsante `"Sincronizando estado..."` para feedback explícito de resync em andamento.
+  - `OperatorLayout.jsx` & `App.jsx`: Arquitetura limpa com `<OperatorProvider>` encapsulando as rotas da aplicação, garantindo exatamente **uma única conexão ativa** de WebSocket, zero listeners duplicados e zero vazamentos de memória.
+- **Arquivos Principais:**
+  - `frontend/src/services/useSignalR.js`
+  - `frontend/src/contexts/OperatorContext.jsx`
+  - `frontend/src/components/operator/OperatorHeader.jsx`
+  - `frontend/src/components/operator/OperatorLayout.jsx`
+  - `frontend/src/pages/operator/OperatorCockpitTab.jsx`
+  - `frontend/src/pages/StagePage.jsx`
+  - `frontend/src/App.jsx`
+- **Decisões Importantes:**
+  - **Princípio Central ADR-002 (Snapshot First):** O WebSocket é utilizado para acelerar a renderização visual imediata, mas o snapshot REST autoritativo é sempre convocado em background e obrigatoriamente após qualquer reconexão.
+  - **Conexão Única Garantida:** Todo o frontend compartilha uma única instância de conexão SignalR gerenciada pelo `OperatorProvider`, eliminando concorrência de sockets e problemas de heartbeat.
+- **Testes & Validação:**
+  - Compilação de produção (`npm run build`): **100% verde** (2539 módulos transformados em 6.46s).
+  - Testes automatizados do SignalR:
+    - `ChairTurned`: ✅ Recebido e propagado
+    - `ChairsReset`: ✅ Recebido e propagado
+    - `CurrentProjectChanged`: ✅ Recebido e propagado
+    - `EventBrandingUpdated`: ✅ Recebido e propagado
+  - Suíte completa de testes automatizados de regressão:
+    - `test-api.cjs`: **48 PASS / 0 FAIL**
+    - `test-projects-api.cjs`: **53 PASS / 0 FAIL**
+    - `test-signalr-e2e.cjs`: **55 PASS / 0 FAIL**
+    - **Total: 156 testes aprovados (100% verde)**.
+- **Impacto Futuro:** Concluiu integralmente o **Milestone 2C (Operator Project & Event Management UI)**. A mesa técnica está 100% operacional, reativa e tolerante a falhas. O próximo passo é o **Milestone 2D (Stage Projection & Theming)**, levando as projeções do pitch ativo e neons dinâmicos ao telão 3D.
+
+
 

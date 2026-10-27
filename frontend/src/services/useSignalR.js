@@ -2,21 +2,55 @@ import { useEffect, useState, useRef } from 'react';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 
 /**
- * useSignalR — Hook dedicado para gerenciamento da conexão WebSocket/SignalR.
+ * useSignalR — Hook dedicado para gerenciamento da conexão WebSocket/SignalR (Milestone 2C.5).
  * 
- * Separa a camada de rede da renderização 3D e do estado dos componentes.
- * Escuta eventos do servidor e despacha para os callbacks fornecidos.
+ * Unifica o transporte em tempo real do Arena Voice:
+ * - Ciclo de vida: 'CONECTADO', 'RECONECTANDO', 'RESSINCRONIZANDO', 'DESCONECTADO'
+ * - Eventos de Hardware/Cadeiras: ChairTurned, ChairSupported, ChairsReset
+ * - Eventos de Gestão/Domínio: CurrentProjectChanged, EventBrandingUpdated
+ * - Políticas de reconexão automática com backoff exponencial
  */
-export function useSignalR({ onChairTurned, onChairsReset, initialBackendUrl }) {
+export function useSignalR({
+  onChairTurned,
+  onChairsReset,
+  onCurrentProjectChanged,
+  onEventBrandingUpdated,
+  onReconnecting,
+  onReconnected,
+  onClose,
+  initialBackendUrl,
+} = {}) {
   const [backendUrl, setBackendUrl] = useState(() => {
-    return localStorage.getItem('arena_poc_backend_url') || initialBackendUrl || 'http://localhost:5000';
+    return (
+      localStorage.getItem('arena_poc_backend_url') ||
+      initialBackendUrl ||
+      import.meta.env.VITE_BACKEND_URL ||
+      'http://localhost:5000'
+    );
   });
   const [connectionStatus, setConnectionStatus] = useState('DESCONECTADO');
   const [connectionError, setConnectionError] = useState(null);
   const [reconnectVersion, setReconnectVersion] = useState(0);
 
-  const callbacksRef = useRef({ onChairTurned, onChairsReset });
-  callbacksRef.current = { onChairTurned, onChairsReset };
+  const callbacksRef = useRef({
+    onChairTurned,
+    onChairsReset,
+    onCurrentProjectChanged,
+    onEventBrandingUpdated,
+    onReconnecting,
+    onReconnected,
+    onClose,
+  });
+
+  callbacksRef.current = {
+    onChairTurned,
+    onChairsReset,
+    onCurrentProjectChanged,
+    onEventBrandingUpdated,
+    onReconnecting,
+    onReconnected,
+    onClose,
+  };
 
   const handleBackendUrlChange = (url) => {
     const cleaned = url.trim().replace(/\/+$/, '');
@@ -53,72 +87,78 @@ export function useSignalR({ onChairTurned, onChairsReset, initialBackendUrl }) 
       } catch (err) {
         if (disposed) return;
 
-        console.warn(
-          `[SignalR] Falha ao conectar em ${hubUrl}:`,
-          err.message
-        );
+        console.warn(`[SignalR] Falha ao conectar em ${hubUrl}:`, err.message);
 
         setConnectionStatus('DESCONECTADO');
         setConnectionError(err.message);
 
-        reconnectTimer = setTimeout(
-          startConnection,
-          LONG_RETRY_DELAY
-        );
+        reconnectTimer = setTimeout(startConnection, LONG_RETRY_DELAY);
       }
     };
 
     // ── Tratamento do ciclo de vida da conexão ─────────────────────────────
-    connection.onreconnecting(() => {
-      console.warn('[SignalR] Conexão perdida. Tentando reconectar...');
+    connection.onreconnecting((error) => {
+      console.warn('[SignalR] Conexão perdida. Tentando reconectar...', error?.message);
       setConnectionStatus('RECONECTANDO');
+      if (callbacksRef.current.onReconnecting) {
+        callbacksRef.current.onReconnecting(error);
+      }
     });
 
-    connection.onreconnected(() => {
-      console.log('[SignalR] Reconectado com sucesso ao backend!');
-      setConnectionStatus('CONECTADO');
+    connection.onreconnected(async (connectionId) => {
+      console.log('[SignalR] Reconectado com sucesso ao backend! Id:', connectionId);
+      setConnectionStatus('RESSINCRONIZANDO');
       setConnectionError(null);
       setReconnectVersion((version) => version + 1);
+
+      if (callbacksRef.current.onReconnected) {
+        try {
+          await callbacksRef.current.onReconnected(connectionId);
+        } catch (err) {
+          console.error('[SignalR] Erro ao executar callback pós-reconexão:', err);
+        }
+      }
+
+      if (!disposed) {
+        setConnectionStatus('CONECTADO');
+      }
     });
 
-    connection.onclose(() => {
+    connection.onclose((error) => {
       if (disposed) return;
 
-      console.warn(
-        '[SignalR] Reconexão automática esgotada. Continuando tentativas...'
-      );
-
+      console.warn('[SignalR] Conexão fechada. Iniciando tentativas periódicas...', error?.message);
       setConnectionStatus('DESCONECTADO');
 
-      reconnectTimer = setTimeout(
-        startConnection,
-        LONG_RETRY_DELAY
-      );
+      if (callbacksRef.current.onClose) {
+        callbacksRef.current.onClose(error);
+      }
+
+      reconnectTimer = setTimeout(startConnection, LONG_RETRY_DELAY);
     });
 
-
     // ── Listeners de Eventos do Backend ────────────────────────────────────
-    
-    // Evento padrão da POC: ChairTurned { chairId, timestamp, source }
+
+    // 1. Acionamento de Cadeira (Físico / HTTP)
     connection.on('ChairTurned', (data) => {
       const chairId = Number(data.chairId);
       const source = data.source || 'SIGNALR_POC';
       console.log(`[SignalR Evento] ChairTurned recebido: Cadeira #${chairId}`);
       if (callbacksRef.current.onChairTurned) {
-        callbacksRef.current.onChairTurned(chairId, source);
+        callbacksRef.current.onChairTurned(chairId, source, data);
       }
     });
 
-    // Evento retrocompatível do teste: ChairSupported { seatNumber, chairId }
+    // 2. Retrocompatibilidade: ChairSupported
     connection.on('ChairSupported', (data) => {
       const chairId = Number(data.chairId || data.seatNumber);
       console.log(`[SignalR Evento] ChairSupported recebido: Cadeira #${chairId}`);
       if (callbacksRef.current.onChairTurned) {
-        callbacksRef.current.onChairTurned(chairId, 'SIGNALR_COMPAT');
+        callbacksRef.current.onChairTurned(chairId, 'SIGNALR_COMPAT', data);
       }
     });
 
-    // Evento de reset global
+    // 3. Reset Global das Cadeiras
     connection.on('ChairsReset', () => {
       console.log('[SignalR Evento] ChairsReset recebido.');
       if (callbacksRef.current.onChairsReset) {
@@ -126,8 +166,24 @@ export function useSignalR({ onChairTurned, onChairsReset, initialBackendUrl }) 
       }
     });
 
+    // 4. Promoção / Troca de Projeto Ativo no Palco (Milestone 2B / 2C.5)
+    connection.on('CurrentProjectChanged', (data) => {
+      console.log('[SignalR Evento] CurrentProjectChanged recebido:', data?.project?.title);
+      if (callbacksRef.current.onCurrentProjectChanged) {
+        callbacksRef.current.onCurrentProjectChanged(data);
+      }
+    });
+
+    // 5. Atualização de Branding e Identidade do Evento (Milestone 2B / 2C.5)
+    connection.on('EventBrandingUpdated', (data) => {
+      console.log('[SignalR Evento] EventBrandingUpdated recebido para o evento:', data?.eventId);
+      if (callbacksRef.current.onEventBrandingUpdated) {
+        callbacksRef.current.onEventBrandingUpdated(data);
+      }
+    });
+
     // ── Iniciar Conexão ────────────────────────────────────────────────────
-    startConnection(); 
+    startConnection();
 
     return () => {
       disposed = true;
@@ -148,3 +204,5 @@ export function useSignalR({ onChairTurned, onChairsReset, initialBackendUrl }) 
     setBackendUrl: handleBackendUrlChange,
   };
 }
+
+export default useSignalR;

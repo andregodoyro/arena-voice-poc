@@ -1,16 +1,27 @@
 import React from 'react';
 import { StudioCanvas } from '../components/StudioCanvas';
 import { StageHUD } from '../components/stage/StageHUD';
+import { useOperatorContext } from '../contexts/OperatorContext';
 
 /**
  * StagePage — Superfície de Apresentação ao Público (Telão 3D).
  * 
- * Experiência pública limpa e cinematográfica:
+ * Experiência pública limpa e cinematográfica (ADR-009):
  * - Voice Studio 3D com animações GSAP de 5 cadeiras;
  * - HUD cênico sem controles de depuração ou intervenções manuais de mouse;
  * - Reage exclusivamente a eventos do backend (SignalR) e snapshot inicial.
  */
-export function StagePage({ chairs = [] }) {
+export function StagePage({ chairs: propsChairs }) {
+  let contextChairs = [];
+  try {
+    const context = useOperatorContext();
+    contextChairs = context?.chairs || [];
+  } catch {
+    contextChairs = [];
+  }
+
+  const chairs = propsChairs || contextChairs;
+
   return (
     <main style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
       {/* 3D Canvas Layer — sem manipulador de clique manual */}

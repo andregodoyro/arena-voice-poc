@@ -3,6 +3,7 @@ import { RotateCcw } from 'lucide-react';
 import { ScoreBoard } from '../../components/operator/ScoreBoard';
 import { ChairGrid } from '../../components/operator/ChairGrid';
 import { ActivityLog } from '../../components/operator/ActivityLog';
+import { useOperatorContext } from '../../contexts/OperatorContext';
 
 /**
  * OperatorCockpitTab — Aba de Operação ao Vivo (/operator/cockpit).
@@ -13,7 +14,12 @@ import { ActivityLog } from '../../components/operator/ActivityLog';
  * - Disparo autoritativo de reset da arena (POST /api/reset);
  * - Log cronológico recente da sessão.
  */
-export function OperatorCockpitTab({ chairs = [], events = [], onResetArena }) {
+export function OperatorCockpitTab({ chairs: propsChairs, events: propsEvents, onResetArena: propsReset }) {
+  const context = useOperatorContext();
+  const chairs = propsChairs || context.chairs || [];
+  const events = propsEvents || context.eventsHistory || [];
+  const onResetArena = propsReset || context.requestResetArena;
+
   const [isResetting, setIsResetting] = useState(false);
 
   const handleReset = async () => {

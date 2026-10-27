@@ -18,6 +18,12 @@ export function OperatorHeader({ connectionStatus }) {
           colorClass: 'text-emerald-400 border-emerald-500/40 bg-emerald-950/30',
           dotClass: 'bg-emerald-400',
         };
+      case 'RESSINCRONIZANDO':
+        return {
+          label: 'Sincronizando estado...',
+          colorClass: 'text-cyan-400 border-cyan-500/40 bg-cyan-950/30',
+          dotClass: 'bg-cyan-400 animate-pulse',
+        };
       case 'RECONECTANDO':
         return {
           label: 'Reconectando ao sistema...',
