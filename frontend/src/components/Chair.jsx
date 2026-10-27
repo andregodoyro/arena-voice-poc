@@ -5,14 +5,15 @@ import * as THREE from 'three';
 
 /**
  * Chair Component — Individual interactive 3D judge chair.
+ * 
+ * Milestone 2D.2: Higienização Visual e Purga de Elementos Legados.
  *
  * Props:
- *  - id          : number  — unique chair identifier
- *  - name        : string  — coach/technician name label
- *  - isTurned    : boolean — whether chair is rotated 180° toward the singer
+ *  - id          : number  — unique chair identifier (1..5)
+ *  - name        : string  — evaluator/judge name label
+ *  - isTurned    : boolean — whether chair is rotated 180° toward the stage/pitch
  *  - position    : [x,y,z] — world position of this chair
  *  - baseRotY    : number  — initial Y rotation (for arc curvature)
- *  - toggleChair : fn(id)  — parent callback to flip isTurned
  */
 export function Chair({ id, name, isTurned, position, baseRotY = 0 }) {
   // Refs to Three.js objects for direct GSAP animation (bypassing React render cycle)
@@ -168,7 +169,7 @@ export function Chair({ id, name, isTurned, position, baseRotY = 0 }) {
           <meshStandardMaterial color="#181820" metalness={0.75} roughness={0.25} />
         </mesh>
 
-        {/* ── FRONT CONSOLE (EU QUERO VOCÊ button) ─────────────────────────── */}
+        {/* ── FRONT CONSOLE (Botão de Apoio da Banca) ─────────────────────────── */}
         <group position={[0, 0, 0.9]}>
           {/* Console body */}
           <mesh position={[0, 0.58, 0]} castShadow>
@@ -224,10 +225,12 @@ export function Chair({ id, name, isTurned, position, baseRotY = 0 }) {
             outlineWidth={0.025}
             outlineColor="#000000"
           >
-            {isTurned ? '★  EU QUERO VOCÊ  ★' : '— de costas —'}
+            {isTurned ? '★  APOIADO  ★' : '— EM AVALIAÇÃO —'}
           </Text>
         </group>
       </group>
     </group>
   );
 }
+
+export default Chair;
