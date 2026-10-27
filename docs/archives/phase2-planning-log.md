@@ -99,7 +99,7 @@ O Milestone 2C construirá a interface administrativa e operacional do Arena Voi
   - [x] **2C.1:** Operator Layout Foundation (`OperatorLayout`, `OperatorNavTabs`, rotas `/operator/cockpit`, `/operator/projects`, `/operator/event`).
   - [x] **2C.2:** Projects Visualization (`ProjectsApiClient`, `CurrentProjectCard`, `ProjectList`, `ProjectCard`).
   - [x] **2C.3:** Project Management (`ProjectModal`, Criar, Editar, Excluir com 409, Selecionar atômico).
-  - [ ] **2C.4:** Event Management (`EventSettingsForm`, `ColorPicker`, preview de neons cênicos).
+  - [x] **2C.4:** Event Management (`EventForm`, `ColorSwatch`, `ColorPreviewCard`, preview de neons cênicos).
   - [ ] **2C.5:** Realtime Integration (`CurrentProjectChanged`, `EventBrandingUpdated`, resync).
 - [ ] **Milestone 2D:** Projeção Cênica e Neons Dinâmicos no Telão 3D (`/stage`).
 - [ ] **Milestone 2E:** Validação Integrada, Documentação Final e Tag `v0.2.0-phase2`.

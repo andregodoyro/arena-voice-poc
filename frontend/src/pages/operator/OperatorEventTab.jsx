@@ -1,35 +1,75 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sliders,
-  Palette,
   RefreshCw,
   AlertCircle,
-  Calendar,
-  Sparkles,
-  Info,
+  CheckCircle2,
+  X,
   Loader2,
-  Image as ImageIcon,
+  Info,
 } from 'lucide-react';
 import { useOperatorContext } from '../../contexts/OperatorContext';
+import { eventsApi } from '../../api/eventsApi';
+import { EventForm } from '../../components/operator/EventForm';
+import { ColorPreviewCard } from '../../components/operator/ColorPreviewCard';
 
 /**
- * OperatorEventTab — Aba de Configurações e Branding do Evento (/operator/event).
+ * OperatorEventTab — Aba de Gestão Operacional e Identidade Visual do Evento (/operator/event).
  * 
- * Milestone 2C.2: Visualização dos dados do evento ativo em modo READ-ONLY.
- * Consome o OperatorContext, exibindo metadados e paleta de iluminação cênica.
+ * Milestone 2C.4: Área de edição operacional completa das configurações e branding do evento:
+ * - Edição institucional: título, descrição, tagline, logo (relativo ou absoluto)
+ * - Edição de iluminação cênica: cores primária e secundária dos neons do palco
+ * - Preview visual ao vivo sem necessidade de salvar
+ * - Feedback operacional (loading, sucesso, erro) e re-hidratação autoritativa via refresh()
  */
 export function OperatorEventTab() {
   const { currentEvent, loading, error, refresh } = useOperatorContext();
 
-  const formattedDate = currentEvent?.scheduledDate
-    ? new Date(currentEvent.scheduledDate).toLocaleString('pt-BR', {
-        dateStyle: 'long',
-        timeStyle: 'short',
-      })
-    : 'Data não informada';
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [actionFeedback, setActionFeedback] = useState(null);
+  const [livePreviewData, setLivePreviewData] = useState(null);
 
-  const primaryColor = currentEvent?.branding?.primaryColor || '#ff0055';
-  const secondaryColor = currentEvent?.branding?.secondaryColor || '#00ffff';
+  // Auto-dismiss do banner de feedback após 5 segundos
+  useEffect(() => {
+    if (!actionFeedback) return;
+    const timer = setTimeout(() => {
+      setActionFeedback(null);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [actionFeedback]);
+
+  // Atualiza os dados de preview ao carregar ou atualizar o evento
+  useEffect(() => {
+    if (currentEvent) {
+      setLivePreviewData({
+        title: currentEvent.title || '',
+        tagline: currentEvent.branding?.tagline || '',
+        logoUrl: currentEvent.branding?.logoUrl || '',
+        primaryColor: currentEvent.branding?.primaryColor || '#d90429',
+        secondaryColor: currentEvent.branding?.secondaryColor || '#00ffff',
+      });
+    }
+  }, [currentEvent]);
+
+  const handleSubmitEvent = async (payload) => {
+    setIsSubmitting(true);
+    try {
+      await eventsApi.updateCurrentEvent(payload);
+      setActionFeedback({
+        type: 'success',
+        message: 'Configurações e identidade visual do evento atualizadas com sucesso!',
+      });
+      await refresh();
+    } catch (err) {
+      console.error('[OperatorEventTab] Falha ao atualizar evento:', err);
+      setActionFeedback({
+        type: 'error',
+        message: err.message || 'Falha ao salvar as alterações do evento no servidor.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col space-y-6">
@@ -38,16 +78,16 @@ export function OperatorEventTab() {
         <div>
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
             <Sliders className="w-5 h-5 text-amber-500" />
-            <span>Configurações e Identidade do Evento</span>
+            <span>Gestão e Identidade do Evento</span>
           </h2>
           <p className="text-xs text-gray-400 mt-1">
-            Visualização dos metadados e parâmetros cênicos do evento ativo.
+            Controle operacional dos metadados, branding e ambientação cênica do palco.
           </p>
         </div>
 
         <button
           onClick={refresh}
-          disabled={loading}
+          disabled={loading || isSubmitting}
           className="px-3 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50"
           title="Recarregar dados do backend"
         >
@@ -56,7 +96,35 @@ export function OperatorEventTab() {
         </button>
       </div>
 
-      {/* ── FEEDBACK DE ERRO ─────────────────────────────────────────────────── */}
+      {/* ── FEEDBACK DE AÇÃO OPERACIONAL (TOAST / BANNER) ────────────────────── */}
+      {actionFeedback && (
+        <div
+          className={`glass-panel rounded-xl p-3.5 border text-xs flex items-center justify-between gap-3 animate-fade-in ${
+            actionFeedback.type === 'success'
+              ? 'border-emerald-500/30 bg-emerald-950/30 text-emerald-300'
+              : 'border-red-500/30 bg-red-950/30 text-red-300'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {actionFeedback.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+            )}
+            <span>{actionFeedback.message}</span>
+          </div>
+
+          <button
+            onClick={() => setActionFeedback(null)}
+            className="text-gray-400 hover:text-white p-1 rounded transition-colors shrink-0"
+            title="Dispensar aviso"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* ── FEEDBACK DE ERRO GERAL DO CONTEXTO ───────────────────────────────── */}
       {error && (
         <div className="glass-panel rounded-xl p-4 border border-red-500/30 bg-red-950/20 text-red-400 flex items-start justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
@@ -72,7 +140,7 @@ export function OperatorEventTab() {
         </div>
       )}
 
-      {/* ── FEEDBACK DE CARREGAMENTO INICIAL ─────────────────────────────────── */}
+      {/* ── CONTEÚDO PRINCIPAL: FORMULÁRIO E PREVIEW CÊNICO ──────────────────── */}
       {loading && !currentEvent ? (
         <div className="glass-panel rounded-2xl p-12 border border-white/10 flex flex-col items-center justify-center space-y-3 min-h-[300px]">
           <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
@@ -89,156 +157,23 @@ export function OperatorEventTab() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* ── PAINEL: INFORMAÇÕES GERAIS DO EVENTO ──────────────────────────── */}
-          <div className="glass-panel rounded-2xl p-6 border border-white/10 bg-white/[0.02] space-y-5">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                  <Info className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-white">Dados do Evento</h3>
-                  <p className="text-[11px] text-gray-400">Metadados institucionais</p>
-                </div>
-              </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {/* Formulário Operacional */}
+          <EventForm
+            event={currentEvent}
+            isSubmitting={isSubmitting}
+            onSubmit={handleSubmitEvent}
+            onLiveChange={setLivePreviewData}
+          />
 
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-white/[0.04] text-gray-400 border border-white/10">
-                ID: {currentEvent.id}
-              </span>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">
-                  Título do Evento
-                </label>
-                <p className="text-base font-semibold text-white mt-0.5">
-                  {currentEvent.title}
-                </p>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">
-                  Descrição
-                </label>
-                <p className="text-xs text-gray-300 leading-relaxed mt-0.5 whitespace-pre-line">
-                  {currentEvent.description || 'Nenhuma descrição detalhada informada.'}
-                </p>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">
-                  Data Prevista de Realização
-                </label>
-                <p className="text-xs text-gray-200 flex items-center gap-1.5 mt-1 font-mono">
-                  <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{formattedDate}</span>
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* ── PAINEL: BRANDING & ILUMINAÇÃO CÊNICA ──────────────────────────── */}
-          <div className="glass-panel rounded-2xl p-6 border border-white/10 bg-white/[0.02] space-y-5">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
-                  <Palette className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-white">Identidade Visual & Cênica</h3>
-                  <p className="text-[11px] text-gray-400">Neons e ambientação do palco</p>
-                </div>
-              </div>
-
-              <span className="text-[11px] text-gray-500 font-mono">
-                Modo Somente Leitura
-              </span>
-            </div>
-
-            <div className="space-y-4">
-              {/* Tagline */}
-              <div>
-                <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">
-                  Tagline / Frase Cênica
-                </label>
-                <p className="text-xs text-gray-200 italic mt-0.5 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span>"{currentEvent.branding?.tagline || 'Apresente sua ideia. Conquiste as cadeiras.'}"</span>
-                </p>
-              </div>
-
-              {/* Cores Cênicas */}
-              <div>
-                <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block mb-2">
-                  Paleta de Cores dos Neons
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Cor Primária */}
-                  <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 flex items-center gap-3">
-                    <div
-                      className="w-9 h-9 rounded-lg border border-white/20 shadow-md shrink-0"
-                      style={{
-                        backgroundColor: primaryColor,
-                        boxShadow: `0 0 16px ${primaryColor}55`,
-                      }}
-                    />
-                    <div className="min-w-0">
-                      <span className="block text-[10px] text-gray-400 uppercase font-medium">
-                        Cor Primária
-                      </span>
-                      <span className="text-xs font-mono font-bold text-white uppercase">
-                        {primaryColor}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Cor Secundária */}
-                  <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 flex items-center gap-3">
-                    <div
-                      className="w-9 h-9 rounded-lg border border-white/20 shadow-md shrink-0"
-                      style={{
-                        backgroundColor: secondaryColor,
-                        boxShadow: `0 0 16px ${secondaryColor}55`,
-                      }}
-                    />
-                    <div className="min-w-0">
-                      <span className="block text-[10px] text-gray-400 uppercase font-medium">
-                        Cor Secundária
-                      </span>
-                      <span className="text-xs font-mono font-bold text-white uppercase">
-                        {secondaryColor}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Logo URL */}
-              <div>
-                <label className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">
-                  Logotipo Cênico
-                </label>
-                <div className="mt-1 flex items-center gap-2 text-xs text-gray-400">
-                  <ImageIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                  <span className="truncate">
-                    {currentEvent.branding?.logoUrl || 'Nenhum logotipo externo definido (usando identidade padrão do sistema)'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Nota Informativa sobre o 2C.4 */}
-              <div className="pt-2">
-                <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] text-gray-500 flex items-start gap-2">
-                  <Info className="w-4 h-4 text-amber-500/70 shrink-0 mt-0.5" />
-                  <span>
-                    A edição de título, descrição e seleção dinâmica de cores via ColorPicker será ativada no Milestone <strong>2C.4</strong>.
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Preview Cênico em Tempo Real */}
+          <ColorPreviewCard
+            title={livePreviewData?.title || currentEvent.title}
+            tagline={livePreviewData?.tagline || currentEvent.branding?.tagline}
+            logoUrl={livePreviewData?.logoUrl ?? currentEvent.branding?.logoUrl}
+            primaryColor={livePreviewData?.primaryColor || currentEvent.branding?.primaryColor}
+            secondaryColor={livePreviewData?.secondaryColor || currentEvent.branding?.secondaryColor}
+          />
         </div>
       )}
     </div>

@@ -254,3 +254,41 @@
   - *Correção:* Aplicado estado de foco de alto contraste em todos os 7 campos (`title`, `pitchLeader`, `track`, `description`, `orderIndex`, `logoUrl`, `coverImageUrl`): fundo branco (`focus:bg-white`), texto escuro de alta legibilidade (`focus:text-gray-900`), borda de destaque cênico Arena Voice (`focus:border-red-600`), anel de brilho suave (`focus:ring-2 focus:ring-red-500/40`), sombra suave (`focus:shadow-lg focus:shadow-red-500/10`) e transição suave (`transition-all duration-200 ease-in-out`).
   - *Validação:* Atende aos critérios WCAG AAA de contraste (> 16:1) no estado ativo, mantém a identidade visual da mesa do operador e compilação de produção limpa (`npm run build`).
 
+---
+
+### [2026-10-27] — Milestone 2C.4: Gestão Operacional e Identidade do Evento (Event Management UI)
+- **Status:** ✅ Concluído
+- **Objetivo:** Transformar a aba `/operator/event` em uma área operacional completa de gestão das configurações e identidade visual do evento ativo, permitindo ao operador editar metadados institucionais (título, descrição, tagline, logotipo relativo/absoluto) e iluminação cênica (cores primária e secundária dos neons do palco), consumindo exclusivamente os endpoints REST existentes sem alterar backend nem SignalR.
+- **Arquitetura Criada / Modificada:**
+  - `eventsApi.js`: Expandido com o método mutante `updateCurrentEvent(payload)`, consumindo `PUT /api/events/current` com cabeçalho `Content-Type: application/json`.
+  - `ColorSwatch.jsx`: Componente interativo de seleção de cores hexadecimais (`#RRGGBB`), integrando seletor de cores nativo (color picker), digitação com formatação automática e paleta de presets cênicos predefinidos (Arena Red, Neon Pink, Cyber Cyan, Electric Amber, Matrix Mint, Deep Violet, Cosmic Blue, Sunset Orange).
+  - `ColorPreviewCard.jsx`: Painel de visualização cênica em tempo real, renderizando instantaneamente simulação do neon do telão com iluminação volumétrica, degradê dinâmico, amostras das cores, códigos hexadecimais, cálculo analítico de contraste relativo WCAG 2.1 (sobre palco escuro e diferenciação mútua) e preview do logotipo/tagline.
+  - `EventForm.jsx`: Formulário operacional com suporte a edição de título (3 a 150 caracteres), descrição, tagline, logotipo (com validação via `isValidMediaUrl`), seletores de cor primária e secundária, botão de reset/descarte para o estado do backend e botões de salvamento com estado de carregamento (`isSubmitting`).
+  - `OperatorEventTab.jsx`: Orquestração reativa consumindo `OperatorContext`, sincronizando alterações do formulário em tempo real para o `ColorPreviewCard` sem necessidade de submissão, executando `PUT /api/events/current` com re-hidratação autoritativa via `refresh()` e exibindo feedback de sucesso ou erro com auto-dismiss.
+- **Arquivos Principais:**
+  - `frontend/src/api/eventsApi.js`
+  - `frontend/src/components/operator/ColorSwatch.jsx`
+  - `frontend/src/components/operator/ColorPreviewCard.jsx`
+  - `frontend/src/components/operator/EventForm.jsx`
+  - `frontend/src/pages/operator/OperatorEventTab.jsx`
+- **Decisões Importantes:**
+  - Preservação estrita dos ADRs: ADR-001 (Backend Authoritative), ADR-002 (Snapshot First), ADR-003 (ActiveContext), ADR-004 (Rich SignalR Payloads), ADR-007 (Operator Tabbed Navigation), ADR-009 (Scenic Stage Decoupling) e ADR-010 (Strict HTTP Content-Type Negotiation).
+  - Política de Mídia Unificada: Aceita caminhos relativos internos (`/branding/*`, `/samples/*`), URLs absolutas externas (`http://`, `https://`) ou campos vazios, sem exigir upload de arquivos.
+  - Preview Imediato sem Auto-save: Cores e textos são refletidos instantaneamente no componente de preview cênico à medida que o operador interage, mas o estado do backend só é modificado mediante clique explícito em "Salvar Alterações".
+- **Testes & Validação:**
+  - Compilação de produção (`npm run build`): **100% verde** (2539 módulos transformados em 10.69s).
+  - Testes manuais integrados de API:
+    - Alteração de título, descrição e tagline persistidos com HTTP 200.
+    - Alteração com logotipo relativo interno (`/branding/custom-event-logo.png`) aceita com HTTP 200.
+    - Alteração com logotipo absoluto externo (`https://cdn.example.com/...`) aceita com HTTP 200.
+    - Alteração de cores primária e secundária hexadecimais aceitas com HTTP 200.
+    - Persistência e re-hidratação via `GET /api/events/current` confirmadas.
+    - Validação de rejeição de título curto (< 3 caracteres) e hexadecimal inválido com HTTP 400.
+  - Suíte completa de testes automatizados:
+    - `test-api.cjs`: **48 PASS / 0 FAIL**
+    - `test-projects-api.cjs`: **53 PASS / 0 FAIL**
+    - `test-signalr-e2e.cjs`: **55 PASS / 0 FAIL**
+    - **Total: 156 testes aprovados (100% verde)**.
+- **Impacto Futuro:** Concluiu a gestão institucional e cênica do evento na mesa do operador. O próximo passo do Milestone 2C é a integração realtime fina na mesa técnica (Milestone 2C.5 - `CurrentProjectChanged`, `EventBrandingUpdated` e resync na mesa técnica).
+
+
