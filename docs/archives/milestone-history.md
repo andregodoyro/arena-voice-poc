@@ -26,7 +26,7 @@ Este documento é a **fonte oficial de índice de marcos**, permitindo rastrear 
 | **1** | **1E** | Technical Cleanup & Documentation | ✅ Concluído | Remoção de código morto, purga de listeners 3D e docs | Tag formal de encerramento | `v0.1.0-phase1` |
 | **2** | **2A** | Domain Models & In-Memory Store | ✅ Concluído | Entidades `Event`, `Project`, `BrandingConfig`, `ActiveContext` | Snapshot `/api/state` | main |
 | **2** | **2B** | REST APIs & SignalR Contracts | ✅ Concluído | CRUD Projetos, Seleção Atômica, 409 Conflict, Realtime | 156 testes (48+53+55) | main |
-| **2** | **2C** | Operator Project Management UI | 🔄 Em Andamento | Layout e navegação por abas funcional (2C.1) | Frontend Build OK | main |
+| **2** | **2C** | Operator Project Management UI | 🔄 Em Andamento | Visualização de Projetos e Evento (2C.2) | Frontend Build OK | main |
 | **2** | **2D** | Stage Projection & Theming | ⏳ Pendente | Projeção cênica do pitch no telão 3D e neons dinâmicos | Consumo SignalR no Telão | - |
 | **2** | **2E** | Phase 2 Validation & Closure | ⏳ Pendente | Homologação integrada ponta a ponta e tag da Fase 2 | Tag `v0.2.0-phase2` | - |
 | **3** | **-** | Dynamic Round Management | 📅 Futuro | Ciclos de votação, cronômetro e bloqueio de cadeiras | Planejado | - |

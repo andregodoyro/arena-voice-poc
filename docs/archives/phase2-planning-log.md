@@ -97,7 +97,7 @@ O Milestone 2C construirá a interface administrativa e operacional do Arena Voi
 - [x] **Milestone 2B:** REST APIs e Contratos SignalR.
 - [ ] **Milestone 2C:** Implementação da Interface Administrativa do Operador.
   - [x] **2C.1:** Operator Layout Foundation (`OperatorLayout`, `OperatorNavTabs`, rotas `/operator/cockpit`, `/operator/projects`, `/operator/event`).
-  - [ ] **2C.2:** Projects Visualization (`ProjectsApiClient`, `CurrentProjectCard`, `ProjectList`, `ProjectCard`).
+  - [x] **2C.2:** Projects Visualization (`ProjectsApiClient`, `CurrentProjectCard`, `ProjectList`, `ProjectCard`).
   - [ ] **2C.3:** Project Management (`ProjectModal`, Criar, Editar, Excluir com 409, Selecionar atômico).
   - [ ] **2C.4:** Event Management (`EventSettingsForm`, `ColorPicker`, preview de neons cênicos).
   - [ ] **2C.5:** Realtime Integration (`CurrentProjectChanged`, `EventBrandingUpdated`, resync).

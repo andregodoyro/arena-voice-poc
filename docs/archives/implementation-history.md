@@ -160,3 +160,44 @@
   - Manutenção da conexão SignalR contínua no layout pai, impedindo desconexões ao alternar de aba.
 - **Testes & Validação:** Compilação do frontend (`npm run build`) concluída com êxito em ~8s sem erros de sintaxe ou dependências quebradas.
 - **Impacto Futuro:** Desbloqueou a inserção do catálogo de projetos (2C.2) e controles de CRUD/seleção (2C.3) em suas respectivas abas.
+
+---
+
+## Milestone 2C.2 — Projects & Event Visualization (Read-Only)
+- **Contexto:** Com as rotas por abas estabelecidas no 2C.1, era necessário alimentar as telas de Projetos e Evento com dados autoritativos do backend sem introduzir comportamentos mutantes ou modais prematuros.
+- **Objetivo:** Implementar a camada cliente de API, o contexto unificado `OperatorContext`, os componentes de visualização e preencher as abas `/operator/projects` e `/operator/event` em modo estritamente READ-ONLY.
+- **Arquitetura Criada:**
+  - `apiClient.js`: Cliente HTTP centralizado com tratamento de erros amigável e resolução dinâmica de URL.
+  - `projectsApi.js`: Endpoints de leitura de projetos (`getProjects`, `getProjectById`).
+  - `eventsApi.js`: Endpoints de leitura do evento atual (`getCurrentEvent`, `getState`).
+  - `OperatorContext.jsx`: Contexto compartilhado responsável por hidratar `currentEvent`, `currentProject` e `projects` simultaneamente via snapshot autoritativo (`Promise.all`), expondo estados de `loading`, `error` e comando `refresh()`.
+  - Componentes visuais dedicados:
+    - `Badge.jsx`: Indicadores distintos para `Pending`, `Current` e `Completed`.
+    - `CurrentProjectCard.jsx`: Destaque imersivo do projeto em apresentação no palco cênico com metadados e visual dinâmico.
+    - `ProjectCard.jsx`: Card de listagem individual de projetos com badge de status, pitch leader, track e ordem.
+    - `ProjectList.jsx`: Lista ordenada por `orderIndex` com tratamento de estados vazios.
+  - Telas integradas:
+    - `/operator/projects`: Cards de métricas (Total, Pendentes, Concluídos, Projeto Atual), Card de destaque do pitch no palco e lista ordenada.
+    - `/operator/event`: Painel informativo de metadados institucionais (título, descrição, data) e visualização das amostras de cor cênicas (primária/secundária).
+- **Arquivos Principais:**
+  - `frontend/src/api/apiClient.js`
+  - `frontend/src/api/projectsApi.js`
+  - `frontend/src/api/eventsApi.js`
+  - `frontend/src/contexts/OperatorContext.jsx`
+  - `frontend/src/components/operator/Badge.jsx`
+  - `frontend/src/components/common/Badge.jsx`
+  - `frontend/src/components/operator/CurrentProjectCard.jsx`
+  - `frontend/src/components/operator/ProjectCard.jsx`
+  - `frontend/src/components/operator/ProjectList.jsx`
+  - `frontend/src/components/operator/OperatorLayout.jsx`
+  - `frontend/src/pages/operator/OperatorProjectsTab.jsx`
+  - `frontend/src/pages/operator/OperatorEventTab.jsx`
+- **Decisões Importantes:**
+  - Escopo restrito a visualização (READ-ONLY) conforme planejado, sem incluir formulários, modais ou métodos mutantes (POST/PUT/DELETE/Select).
+  - Snapshot autoritativo prioritário na resolução do projeto ativo no palco.
+  - **Hotfix de Contrato de Domínio (Enum Numérico):** O backend C# serializa `ProjectStatus` como inteiros (`0=Pending`, `1=Current`, `2=Completed`, `3=Disqualified`). Foi criado o utilitário centralizado `frontend/src/utils/projectStatus.js` com funções de normalização (`normalizeProjectStatus`, `isCurrentProject`, `isPendingProject`, `isCompletedProject`), eliminando chamadas inseguras a `.toLowerCase()` e prevenindo a perda do valor `0` (falsy em JS).
+- **Testes & Validação:**
+  - Compilação de produção (`npm run build`) concluída com 100% de sucesso (2533 módulos transformados).
+  - Verificação automatizada dos casos de mapeamento do enum (0, 1, 2, 3 e strings).
+  - Suíte de integração com backend aprovada (`test-api.cjs`: 48 PASS / 0 FAIL; `test-projects-api.cjs`: 53 PASS / 0 FAIL).
+- **Impacto Futuro:** Deixou a interface 100% pronta para a injeção do modal de CRUD e do workflow de seleção de projeto (Milestone 2C.3).
