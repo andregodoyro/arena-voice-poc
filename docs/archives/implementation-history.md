@@ -201,3 +201,56 @@
   - Verificação automatizada dos casos de mapeamento do enum (0, 1, 2, 3 e strings).
   - Suíte de integração com backend aprovada (`test-api.cjs`: 48 PASS / 0 FAIL; `test-projects-api.cjs`: 53 PASS / 0 FAIL).
 - **Impacto Futuro:** Deixou a interface 100% pronta para a injeção do modal de CRUD e do workflow de seleção de projeto (Milestone 2C.3).
+
+---
+
+## Milestone 2C.3 — Project Management (CRUD & Seleção Cênica)
+- **Contexto:** Com a visualização de projetos homologada no 2C.2, a mesa técnica precisava da capacidade de gerenciar pitches de forma operacional através de formulários, confirmações explícitas e comandos de promoção ao palco.
+- **Objetivo:** Implementar o fluxo completo de gerenciamento de projetos (Criação, Edição, Exclusão com confirmação e Seleção atômica) consumindo exclusivamente as APIs existentes sem alterar o backend.
+- **Arquitetura Criada:**
+  - `projectsApi.js`: Expandido com métodos mutantes `createProject`, `updateProject`, `deleteProject` e `selectProject`.
+  - `ProjectModal.jsx`: Modal de formulário para criação e edição de projetos com campos obrigatórios (`title`, `pitchLeader`, `track`), campos opcionais (`orderIndex`, `logoUrl`, `coverImageUrl`, `description`), validações visuais em tempo de submissão e suporte a atalho de teclado (`Escape`).
+  - `ConfirmDialog.jsx`: Diálogo de confirmação explícita para ações destrutivas (exclusão de projetos) com estilo cênico dark e foco acessível.
+  - `ProjectCard.jsx`: Enriquecido com barra de ações operacionais:
+    - Botão "Colocar no Palco" (`Play`): visível e acionável apenas para projetos que não estão no palco, com proteção anti-duplo clique (`isProcessing`).
+    - Botão "Editar" (`Edit2`): abre o `ProjectModal` pré-populado.
+    - Botão "Excluir" (`Trash2`): desabilitado para o projeto ativo (`isCurrent` / status 1) com tooltip informativo.
+  - `OperatorProjectsTab.jsx`: Orquestração completa de estado:
+    - Habilitação do botão "+ Novo Projeto" abrindo o `ProjectModal`.
+    - Diálogo de confirmação antes de disparar o `DELETE`.
+    - **Proteção ADR-006 (HTTP 409 Conflict):** Em caso de rejeição de exclusão pelo backend, exibe banner de aviso e jamais remove o item localmente.
+    - Banner temporário de feedback visual com auto-dismiss (5s) para todas as operações.
+    - Re-hidratação autoritativa via `refresh()` após qualquer mutação bem-sucedida.
+- **Arquivos Principais:**
+  - `frontend/src/api/projectsApi.js`
+  - `frontend/src/api/apiClient.js`
+  - `frontend/src/components/operator/ProjectModal.jsx`
+  - `frontend/src/components/operator/ConfirmDialog.jsx`
+  - `frontend/src/components/operator/ProjectCard.jsx`
+  - `frontend/src/components/operator/ProjectList.jsx`
+  - `frontend/src/pages/operator/OperatorProjectsTab.jsx`
+- **Decisões Importantes:**
+  - Salvaguarda rígida do ADR-006: exclusão de projetos ativos é bloqueada tanto no front (botão desabilitado) quanto no tratamento de erro da API (captura de 409 sem deleção otimista).
+  - Respeito ao ADR-005: promoção cênica via `POST /api/projects/{id}/select` com proteção contra múltiplos cliques rápidos e sincronização autoritativa.
+- **Testes & Validação:**
+  - Compilação de produção (`npm run build`) concluída com 100% de sucesso (2535 módulos transformados).
+  - Testes automatizados de API:
+    - `tests/test-api.cjs`: **48 PASS / 0 FAIL**
+    - `tests/test-projects-api.cjs`: **53 PASS / 0 FAIL**
+  - Validação manual de fluxos: criação (201), edição (200), seleção (200), exclusão de projeto ativo rejeitada (409 Conflict) e exclusão de inativo (200).
+- **Impacto Futuro:** Concluiu a gestão de projetos na mesa técnica, liberando o avanço para a gestão de evento e branding (Milestone 2C.4).
+- **Investigação e Correção de Rolagem (Scroll Fix):**
+  - *Sintoma:* Roda do mouse não rolava verticalmente quando a fila de projetos ultrapassava a altura da tela no `/operator/projects`.
+  - *Causa Raiz:* Regra global legada em `frontend/src/index.css` fixava `html, body { overflow: hidden; height: 100%; }` e `#root { height: 100%; }` (definida na Fase 1 para a cena 3D do Stage). O container do Operator expandia com o conteúdo dos cards, mas o `body` bloqueava eventos de rolagem nativos.
+  - *Correção:* Em `index.css`, `html, body` e `#root` foram atualizados para `min-height: 100%; overflow-x: hidden; overflow-y: auto; scroll-behavior: smooth;` com estilização de scrollbar dark suave. Em `OperatorLayout.jsx`, os wrappers de cabeçalho e rodapé receberam `shrink-0`. A página cênica `/stage` manteve seu isolamento com `overflow: hidden; width: 100vw; height: 100vh;`.
+  - *Validação:* Validado com 5, 10, 20 e 30 projetos com rolagem fluida e compilação do frontend limpa.
+- **Hotfix de UX — Validação de Mídia no ProjectModal:**
+  - *Sintoma:* Ao editar projetos do seed com caminhos relativos válidos (ex: `/samples/neurosync-logo.png`, `/samples/cybershield-cover.png`), o formulário bloqueava a submissão exigindo uma URL absoluta (`http://` ou `https://`).
+  - *Causa Raiz:* Os inputs de `logoUrl` e `coverImageUrl` utilizavam `type="url"`, ativando a validação nativa de restrição do HTML5 que exige URLs absolutas com esquema, interceptando a submissão antes do disparo do manipulador React `onSubmit`.
+  - *Correção:* Criado o utilitário `frontend/src/utils/mediaValidation.js` com a função `isValidMediaUrl(val)`, aceitando caminhos relativos internos (`/samples/*`, `/branding/*`), URLs absolutas HTTP/HTTPS ou valores vazios (campos opcionais). No `ProjectModal.jsx`, os inputs foram convertidos para `type="text"` e o `<form>` recebeu o atributo `noValidate` para desativar a interceptação nativa do navegador.
+  - *Validação:* 12 testes unitários de caminhos/URLs aprovados; edições de todos os projetos do seed executadas com sucesso sem alterar logo/banner, alterando apenas título, alterando track, com URLs absolutas e com campos vazios.
+- **Refinamento de UX — Destaque Visual de Foco no ProjectModal:**
+  - *Sintoma:* Durante edição rápida de projetos, todos os campos de formulário eram visualmente muito semelhantes em foco, tornando difícil identificar qual campo estava ativo.
+  - *Correção:* Aplicado estado de foco de alto contraste em todos os 7 campos (`title`, `pitchLeader`, `track`, `description`, `orderIndex`, `logoUrl`, `coverImageUrl`): fundo branco (`focus:bg-white`), texto escuro de alta legibilidade (`focus:text-gray-900`), borda de destaque cênico Arena Voice (`focus:border-red-600`), anel de brilho suave (`focus:ring-2 focus:ring-red-500/40`), sombra suave (`focus:shadow-lg focus:shadow-red-500/10`) e transição suave (`transition-all duration-200 ease-in-out`).
+  - *Validação:* Atende aos critérios WCAG AAA de contraste (> 16:1) no estado ativo, mantém a identidade visual da mesa do operador e compilação de produção limpa (`npm run build`).
+

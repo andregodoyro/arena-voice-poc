@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FolderKanban,
   RefreshCw,
@@ -9,24 +9,157 @@ import {
   CheckCircle2,
   Sparkles,
   Loader2,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
 import { useOperatorContext } from '../../contexts/OperatorContext';
+import { projectsApi } from '../../api/projectsApi';
 import { CurrentProjectCard } from '../../components/operator/CurrentProjectCard';
 import { ProjectList } from '../../components/operator/ProjectList';
+import { ProjectModal } from '../../components/operator/ProjectModal';
+import { ConfirmDialog } from '../../components/operator/ConfirmDialog';
 import { isPendingProject, isCompletedProject } from '../../utils/projectStatus';
 
 /**
- * OperatorProjectsTab — Aba de Gestão e Visualização da Fila de Projetos (/operator/projects).
+ * OperatorProjectsTab — Aba de Gestão Operacional da Fila de Projetos (/operator/projects).
  * 
- * Milestone 2C.2: Visualização dos dados de projetos em modo READ-ONLY.
- * Consome o OperatorContext, exibindo o card do projeto ativo, resumo métrico e lista ordenada.
+ * Milestone 2C.3: Criação, Edição, Exclusão (com proteção 409 - ADR-006)
+ * e Seleção Atômica Cênica (ADR-005).
  */
 export function OperatorProjectsTab() {
   const { currentProject, projects, loading, error, refresh } = useOperatorContext();
 
+  // Estados de modais e ações operacionais
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+  const [isSubmittingModal, setIsSubmittingModal] = useState(false);
+
+  const [projectToDelete, setProjectToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const [processingProjectId, setProcessingProjectId] = useState(null);
+  const [actionFeedback, setActionFeedback] = useState(null);
+
+  // Auto-dismiss do feedback após 5 segundos
+  useEffect(() => {
+    if (!actionFeedback) return;
+    const timer = setTimeout(() => {
+      setActionFeedback(null);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [actionFeedback]);
+
+  // Contadores métricos
   const totalProjects = projects.length;
   const pendingCount = projects.filter((p) => isPendingProject(p.status)).length;
   const completedCount = projects.filter((p) => isCompletedProject(p.status)).length;
+
+  // ── HANDLERS OPERACIONAIS ────────────────────────────────────────────────
+
+  const handleOpenCreate = () => {
+    setEditingProject(null);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (project) => {
+    setEditingProject(project);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    if (isSubmittingModal) return;
+    setIsModalOpen(false);
+    setEditingProject(null);
+  };
+
+  const handleSubmitModal = async (payload) => {
+    setIsSubmittingModal(true);
+    try {
+      if (editingProject) {
+        await projectsApi.updateProject(editingProject.id, payload);
+        setActionFeedback({
+          type: 'success',
+          message: `Projeto "${payload.title}" atualizado com sucesso!`,
+        });
+      } else {
+        await projectsApi.createProject(payload);
+        setActionFeedback({
+          type: 'success',
+          message: `Projeto "${payload.title}" cadastrado com sucesso!`,
+        });
+      }
+      setIsModalOpen(false);
+      setEditingProject(null);
+      await refresh();
+    } catch (err) {
+      setActionFeedback({
+        type: 'error',
+        message: err.message || 'Falha ao salvar dados do projeto no servidor.',
+      });
+    } finally {
+      setIsSubmittingModal(false);
+    }
+  };
+
+  const handleRequestDelete = (project) => {
+    setProjectToDelete(project);
+  };
+
+  const handleCancelDelete = () => {
+    if (isDeleting) return;
+    setProjectToDelete(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!projectToDelete || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await projectsApi.deleteProject(projectToDelete.id);
+      setActionFeedback({
+        type: 'success',
+        message: `Projeto "${projectToDelete.title}" removido com sucesso.`,
+      });
+      setProjectToDelete(null);
+      await refresh();
+    } catch (err) {
+      // Salvaguarda ADR-006: se o backend rejeitar com 409 Conflict, exibe aviso específico
+      if (err.status === 409 || err.message?.toLowerCase().includes('cannot delete')) {
+        setActionFeedback({
+          type: 'error',
+          message:
+            'Aviso de Salvaguarda (ADR-006): Não é possível excluir o projeto atualmente em apresentação no palco.',
+        });
+      } else {
+        setActionFeedback({
+          type: 'error',
+          message: err.message || 'Falha ao excluir o projeto do servidor.',
+        });
+      }
+      setProjectToDelete(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleSelectProject = async (project) => {
+    if (processingProjectId) return; // Proteção contra duplo clique
+    setProcessingProjectId(project.id);
+    try {
+      await projectsApi.selectProject(project.id);
+      setActionFeedback({
+        type: 'success',
+        message: `Projeto "${project.title}" colocado no palco com sucesso!`,
+      });
+      await refresh();
+    } catch (err) {
+      setActionFeedback({
+        type: 'error',
+        message: err.message || 'Falha ao selecionar o projeto para o palco.',
+      });
+    } finally {
+      setProcessingProjectId(null);
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col space-y-6">
@@ -38,7 +171,7 @@ export function OperatorProjectsTab() {
             <span>Fila de Projetos e Startups</span>
           </h2>
           <p className="text-xs text-gray-400 mt-1">
-            Visualização autoritativa da ordem cênica e status dos pitches para o palco.
+            Gestão operacional de pitches: cadastro, edição, exclusão e promoção ao palco cênico.
           </p>
         </div>
 
@@ -54,11 +187,12 @@ export function OperatorProjectsTab() {
             <span className="hidden sm:inline">Atualizar</span>
           </button>
 
-          {/* Botão de Novo Projeto (Read-Only no 2C.2, será ativado no 2C.3) */}
+          {/* Botão de Novo Projeto (Ativado no Milestone 2C.3) */}
           <button
-            disabled
-            className="px-4 py-2 rounded-xl border border-white/10 bg-white/5 text-gray-500 text-xs font-semibold flex items-center gap-2 cursor-not-allowed opacity-60"
-            title="Cadastro de projetos será habilitado na Fase 2C.3"
+            onClick={handleOpenCreate}
+            disabled={loading}
+            className="px-4 py-2 rounded-xl border border-red-500/40 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-red-950/40 transition-all disabled:opacity-50"
+            title="Cadastrar um novo pitch na fila"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Novo Projeto</span>
@@ -66,7 +200,35 @@ export function OperatorProjectsTab() {
         </div>
       </div>
 
-      {/* ── FEEDBACK DE ERRO ─────────────────────────────────────────────────── */}
+      {/* ── FEEDBACK DE AÇÃO OPERACIONAL (TOAST / BANNER) ────────────────────── */}
+      {actionFeedback && (
+        <div
+          className={`glass-panel rounded-xl p-3.5 border text-xs flex items-center justify-between gap-3 animate-fade-in ${
+            actionFeedback.type === 'success'
+              ? 'border-emerald-500/30 bg-emerald-950/30 text-emerald-300'
+              : 'border-red-500/30 bg-red-950/30 text-red-300'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {actionFeedback.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+            )}
+            <span>{actionFeedback.message}</span>
+          </div>
+
+          <button
+            onClick={() => setActionFeedback(null)}
+            className="text-gray-400 hover:text-white p-1 rounded transition-colors shrink-0"
+            title="Dispensar aviso"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* ── FEEDBACK DE ERRO GERAL DO CONTEXTO ───────────────────────────────── */}
       {error && (
         <div className="glass-panel rounded-xl p-4 border border-red-500/30 bg-red-950/20 text-red-400 flex items-start justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
@@ -159,15 +321,42 @@ export function OperatorProjectsTab() {
             <CurrentProjectCard project={currentProject} />
           </div>
 
-          {/* ── LISTA DE PROJETOS ORDENADA ───────────────────────────────────── */}
+          {/* ── LISTA DE PROJETOS ORDENADA COM AÇÕES ─────────────────────────── */}
           <div className="pt-2">
             <ProjectList
               projects={projects}
               currentProjectId={currentProject?.id}
+              processingProjectId={processingProjectId}
+              onEdit={handleOpenEdit}
+              onDelete={handleRequestDelete}
+              onSelect={handleSelectProject}
             />
           </div>
         </>
       )}
+
+      {/* ── MODAL DE CADASTRO E EDIÇÃO ───────────────────────────────────────── */}
+      <ProjectModal
+        key={editingProject?.id || (isModalOpen ? 'open-new' : 'closed')}
+        isOpen={isModalOpen}
+        project={editingProject}
+        isSubmitting={isSubmittingModal}
+        onClose={handleCloseModal}
+        onSubmit={handleSubmitModal}
+      />
+
+      {/* ── DIÁLOGO DE CONFIRMAÇÃO DE EXCLUSÃO ────────────────────────────────── */}
+      <ConfirmDialog
+        isOpen={Boolean(projectToDelete)}
+        title="Excluir Projeto"
+        message={`Deseja realmente excluir o projeto "${projectToDelete?.title}"? Esta ação não poderá ser desfeita.`}
+        confirmLabel="Excluir Definitivamente"
+        cancelLabel="Cancelar"
+        isDestructive={true}
+        isLoading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
     </div>
   );
 }

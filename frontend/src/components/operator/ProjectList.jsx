@@ -6,9 +6,16 @@ import { isCurrentProject } from '../../utils/projectStatus';
 /**
  * ProjectList — Lista ordenada de projetos da arena.
  * 
- * Ordena por orderIndex crescente e renderiza os cards de projetos.
+ * Ordena por orderIndex crescente e repassa ações operacionais para os cards.
  */
-export function ProjectList({ projects = [], currentProjectId = null }) {
+export function ProjectList({
+  projects = [],
+  currentProjectId = null,
+  processingProjectId = null,
+  onEdit,
+  onDelete,
+  onSelect,
+}) {
   if (!projects || projects.length === 0) {
     return (
       <div className="glass-panel rounded-2xl p-10 border border-white/10 bg-white/[0.01] flex flex-col items-center justify-center text-center space-y-3">
@@ -48,11 +55,17 @@ export function ProjectList({ projects = [], currentProjectId = null }) {
             project.id === currentProjectId ||
             isCurrentProject(project.status);
 
+          const isProcessing = processingProjectId === project.id;
+
           return (
             <ProjectCard
               key={project.id}
               project={project}
               isCurrent={isCurrent}
+              isProcessing={isProcessing}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onSelect={onSelect}
             />
           );
         })}

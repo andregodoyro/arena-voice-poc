@@ -34,7 +34,7 @@ export async function request(path, options = {}) {
       let errorDetail = '';
       try {
         const errorJson = await response.json();
-        errorDetail = errorJson.detail || errorJson.message || errorJson.title || JSON.stringify(errorJson);
+        errorDetail = errorJson.error || errorJson.detail || errorJson.message || errorJson.title || JSON.stringify(errorJson);
       } catch {
         errorDetail = await response.text();
       }
