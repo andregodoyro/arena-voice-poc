@@ -332,3 +332,111 @@
 
 
 
+
+---
+
+### [2026-10-27] — Milestone 2D.1: Infraestrutura de Dados, Contexto e HUD Cênico (Data Infrastructure & Stage HUD)
+- **Status:** ✅ Concluído
+- **Objetivo:** Conectar o telão público cênico (`/stage`) ao ecossistema autoritativo e em tempo real construído na Fase 2, passando a consumir `currentProject`, `currentEvent` e `branding` através do `OperatorContext`, evoluindo o `StageHUD` para projetar a identidade institucional do evento ativo e criando o card broadcast `StageProjectBanner` com tratamento robusto de fallback visual e estética glassmorphism contemplativa.
+- **Arquitetura Criada / Modificada:**
+  - `StageProjectBanner.jsx` (Novo Componente): Componente de visualização broadcast do pitch atualmente em apresentação no palco cênico. Renderiza título da startup, líder do pitch, trilha temática com badge estilizada, logotipo e imagem de capa com fallback visual robusto. Caso o projeto não possua imagens ou ocorra falha de carregamento (`onError`), renderiza um pictograma geométrico moderno com as cores da trilha/branding, garantindo funcionamento 100% offline e sem imagens quebradas. Se não houver projeto selecionado (`currentProject == null`), apresenta estado elegante de prontidão (*"Palco em Espera — Aguardando início da próxima apresentação"*).
+  - `StageHUD.jsx`: Evoluído para incorporar os metadados do evento ativo no cabeçalho superior (título, tagline, logotipo com fallback visual e bordas luminosas na cor primária do evento ativo) e integrar o `StageProjectBanner` no rodapé da visualização. Mantém o placar cênico consolidado (`X / 5`) e preserva o princípio estrito de superfície 100% contemplativa com `pointer-events-none` (ADR-009).
+  - `StagePage.jsx`: Atualizado para extrair `currentProject` e `currentEvent` do `useOperatorContext()` e repassar como props reativas para o `StageHUD`. Mantém o `StudioCanvas` e o pipeline 3D intactos, preservando a estabilidade da cena Three.js.
+- **Arquivos Principais:**
+  - `frontend/src/components/stage/StageProjectBanner.jsx` (Criado)
+  - `frontend/src/components/stage/StageHUD.jsx` (Modificado)
+  - `frontend/src/pages/StagePage.jsx` (Modificado)
+- **Decisões Importantes:**
+  - **Desacoplamento Cênico Estrito (ADR-009):** O HUD 2D opera exclusivamente como camada de informação e projeção cênica; nenhum botão, formulário ou link foi adicionado à visão do telão público.
+  - **Offline First e Imunidade a Imagens Quebradas:** Nenhuma imagem depende de internet externa. Erros de carregamento de URL são capturados silenciosamente e substituídos por um avatar estilizado com as cores da identidade visual.
+  - **Isolamento de Escopo da Subfase 2D.1:** Nenhuma alteração foi realizada na geometria do Three.js, no palco procedural ou nos materiais das cadeiras, deixando essas transformações para os micro-marcos dedicados seguintes (2D.2 e 2D.3).
+  - **Zero Alteração em Contratos de Backend:** Os contratos SignalR existentes (`CurrentProjectChanged` e `EventBrandingUpdated`) alimentam diretamente a reatividade do telão.
+- **Testes & Validação:**
+  - Compilação de produção (`npm run build`): **100% verde** (2540 módulos transformados em 4.53s).
+  - Suíte completa de testes automatizados de regressão:
+    - `test-api.cjs`: **48 PASS / 0 FAIL**
+    - `test-projects-api.cjs`: **53 PASS / 0 FAIL**
+    - `test-signalr-e2e.cjs`: **55 PASS / 0 FAIL**
+    - **Total: 156 testes aprovados (100% verde)**.
+- **Impacto Futuro:** Concluiu com precisão a infraestrutura de dados e a camada 2D do telão. O telão agora sabe exatamente qual evento e qual startup estão no palco, reagindo instantaneamente a seleções no cockpit do operador. O próximo passo é a higienização visual da cena 3D (Milestone 2D.2 — remoção de pedestais de microfone, letreiros e textos musicais legados).
+
+---
+
+### [2026-10-27] — Milestone 2D.2: Higienização Visual e Purga de Elementos Legados (Visual Sanitization & Legacy Purge)
+- **Status:** ✅ Concluído
+- **Objetivo:** Higienizar a cena 3D eliminando todos os resquícios estéticos e funcionais da prova de conceito original baseada no programa "The Voice" e contexto musical/artístico. Desacoplar o telão de modelos 3D externos obsoletos (`studio.glb`), erradicar elementos de cantor (pedestal de microfone e praticável de performance) e unificar o vocabulário da banca de jurados para a linguagem corporativa e institucional de banca avaliadora de inovação.
+- **Arquitetura Criada / Modificada:**
+  - `StudioScene.jsx`:
+    - Removidos completamente os componentes legados `GLTFStudio` e `GLTFErrorBoundary`, bem como a chamada `useGLTF.preload('/studio.glb')`, eliminando requisições 404 e carregamento de malhas 3D externas desnecessárias no runtime.
+    - Removido o componente de letreiro flutuante `StudioTitle` (*"THE VOICE / ESTÚDIO INTERATIVO 3D"*).
+    - Removido o pedestal de microfone com base metálica e o mini praticável do vocalista, substituídos por uma área neutra de pitch corporativo (`<circleGeometry args={[3.2, 64]} />`) com anel sutil integrado ao piso escuro do palco.
+    - Purgados imports inertes e dependências mortas do bundle: `useGLTF`, `Float`, `Text` de `@react-three/drei`, além de `useRef` e `Suspense`.
+  - `Chair.jsx`:
+    - Substituída a inscrição no encosto traseiro de `{isTurned ? '★ EU QUERO VOCÊ ★' : '— de costas —'}` para `{isTurned ? '★ APOIADO ★' : '— EM AVALIAÇÃO —'}` utilizando Troika 3D text.
+    - Atualizados todos os JSDocs e comentários internos para substituir referências a "toward the singer" e "botão EU QUERO VOCÊ" por termos de avaliação e banca corporativa ("toward the pitch stage", "APOIADO").
+  - `frontend/public/studio.glb`:
+    - Excluído o asset GLTF legado de 1.9 MB (modelo do Sketchfab "The Voice Studio"), reduzindo o footprint de disco e eliminando tráfego de rede inútil.
+  - `ProceduralStage`:
+    - Preservada a geometria de disco principal, anel perimetral, parede curva de fundo e tubos LED, mantendo a cena 100% estável e pronta para a modelagem procedural do anfiteatro no Milestone 2D.3.
+- **Arquivos Principais:**
+  - `frontend/src/components/StudioScene.jsx` (Modificado — Purga de microfone, letreiro, GLTF loader e dependências mortas)
+  - `frontend/src/components/Chair.jsx` (Modificado — Textos 3D traseiros atualizados para "★ APOIADO ★" / "— EM AVALIAÇÃO —")
+  - `frontend/public/studio.glb` (Excluído — 1.9 MB purgados)
+- **Decisões Importantes:**
+  - **Eliminação Definitiva do Contexto Musical:** O Arena Voice firma sua identidade própria como arena corporativa de inovação, separando-se de qualquer imitação do programa de entretenimento de canto.
+  - **Cena 100% Procedural e Leve:** A remoção do `studio.glb` e do `useGLTF` reduziu o tamanho do bundle de produção do Vite em ~74 kB e garantiu renderização instantânea a 60 FPS sem dependência de download de malhas externas.
+  - **Isolamento Estrito de Escopo:** Nenhuma alteração de cenografia (arquibancadas, anfiteatro em semicírculo ou arcos cênicos) foi antecipada nesta etapa; o palco existente foi mantido com um disco neutro de pitch para servir de base limpa para o Milestone 2D.3.
+- **Testes & Validação:**
+  - Compilação do Backend (`dotnet build`): **0 Warnings, 0 Errors**.
+  - Compilação de produção do Frontend (`npm run build`): **100% verde** (2539 módulos transformados em 4.58s).
+  - Suíte completa de testes automatizados de regressão:
+    - `test-api.cjs`: **48 PASS / 0 FAIL**
+    - `test-projects-api.cjs`: **53 PASS / 0 FAIL**
+    - `test-signalr-e2e.cjs`: **55 PASS / 0 FAIL**
+    - **Total: 156 testes aprovados (100% verde)**.
+- **Impacto Futuro:** A cena 3D do telão está purgada de todo e qualquer artefato legado e pronta para receber a cenografia procedural completa do anfiteatro e arquibancadas no **Milestone 2D.3 (Arena e Anfiteatro Procedural)**.
+
+---
+
+### [2026-10-27] — Milestone 2D.3: Cenografia da Arena e Escala de Anfiteatro (Arena Scenography & Amphitheater Scale)
+- **Status:** ✅ Concluído
+- **Objetivo:** Estabelecer a arquitetura cênica definitiva do espaço 3D do telão (`/stage`), transformando a cena em uma arena de inovação corporativa de grande escala com estética de anfiteatro contemporâneo (keynote summit / demo day premium). Introduzir palco central laqueado de alta reflexão, pódio de pitch demarcado para a startup, arquibancadas semicirculares procedurais em 4 patamares com balizamento luminoso, portal cênico com 3 arcos concêntricos em profundidade, atmosfera com neblina expandida e enquadramento institucional de câmera, preservando rigorosamente o posicionamento e a cinemática GSAP das 5 cadeiras da banca.
+- **Arquitetura Criada / Modificada:**
+  - `CentralPitchStage` (em `StudioScene.jsx`):
+    - Plataforma principal com disco laqueado escuro reflexivo (`#080912`, roughness 0.15, metalness 0.9, envMapIntensity 1.3), chanfro de acabamento e anéis de contorno perimetral.
+    - Pódio central de pitch da startup (`Pitch Spotlight Zone`) em $[0, 0.03, -2.8]$ com disco elevado, anel de demarcação de oratória e retícula geométrica central de alinhamento institucional.
+    - Iluminação spot dedicada (`spotLight`) posicionada em $[0, 11, 2]$ com cone suave focado no pódio da startup, gerando o clássico destaque cênico de palcos de inovação sem ofuscar a banca.
+    - Grade geométrica sutil com linhas de piso técnico corporativo no plano $Z$.
+  - `AmphitheaterTiers` (em `StudioScene.jsx`):
+    - Arquibancada semicircular procedural contínua abrangendo as laterais e o fundo da arena (leque de $14.4^\circ$ a $165.6^\circ$).
+    - 4 patamares/tiers concêntricos escalonados em elevação ($Y = 0.45, 1.15, 1.95, 2.85$) com espelhos verticais (risers) e frisos de balizamento luminoso de piso de segurança de auditório.
+    - Fileiras de assentos contínuos estilizados de auditório corporativo (`#14172b`), conferindo a textura e a monumentalidade de um grande anfiteatro sem criar milhares de geometrias de cadeiras individuais.
+    - Parapeito/balustrada arquitetural de coroamento no topo da arquibancada ($Y = 3.65$).
+  - `ScenicArches` (em `StudioScene.jsx`):
+    - Portal arquitetural de fundo composto por 3 arcos tubulares concêntricos em perspectiva profunda ($Z = -8.5, -11.0, -13.5$) com colunas verticais estruturais metálicas escuras (`#131628`).
+    - Guarnições internas de iluminação linear arquitetural embutidas nos arcos para enquadramento visual da área de pitch.
+    - Painel acústico semicircular de fundo (corporate curved slat backdrop) a $Z = -15.5$.
+    - Pontos de luz cênica de preenchimento e contorno volumétrico da estrutura.
+  - `StudioCanvas.jsx`:
+    - Câmera institucional reconfigurada para `position: [0, 6.4, 20.2]`, `fov: 45`, `near: 0.1`, `far: 120`.
+    - OrbitControls ajustado com `target: [0, 2.2, -1.8]`, `minDistance: 8`, `maxDistance: 32` e restrição polar suave (`maxPolarAngle: Math.PI / 2.15`), permitindo enquadrar harmoniosamente as 5 cadeiras da banca em primeiro plano, o pódio do pitch em plano intermediário e os arcos com a arquibancada ao fundo.
+    - Neblina atmosférica expandida de `[16, 38]` para `['#030408', 20, 52]`, proporcionando gradação suave de profundidade até o topo do anfiteatro.
+    - `ContactShadows` expandido para escala 34.
+  - `Chair.jsx` & Mecânica das Cadeiras:
+    - 100% preservadas em posicionamento (`ARC_RADIUS = 6.8`, `ARC_Z_BASE = 4.6`), orientação angular (`baseRotY`), cinemática de rotação GSAP e inscrições ("★ APOIADO ★" / "— EM AVALIAÇÃO —").
+- **Arquivos Principais:**
+  - `frontend/src/components/StudioScene.jsx` (Modificado — Cenografia da arena: CentralPitchStage, AmphitheaterTiers, ScenicArches e iluminação)
+  - `frontend/src/components/StudioCanvas.jsx` (Modificado — Câmera de evento corporativo, fog expandido e controles)
+- **Decisões de Arquitetura e Performance:**
+  - **Eficiência Poligonal Extrema (Low-Poly Procedural):** Toda a arquibancada e arcos foram modelados com primitivas nativas do Three.js (`ringGeometry`, `cylinderGeometry`, `torusGeometry`) com segmentação otimizada (48-64 segmentos radiais), sem carregar malhas externas e gerando menos de 4.000 vértices para todo o cenário.
+  - **Draw Calls e Reuso de Materiais:** Materiais padrão (`MeshStandardMaterial` e `MeshBasicMaterial`) compartilhando shaders PBR e cores corporativas neutras, garantindo 60 FPS estáveis em navegadores Edge/Chrome em notebooks corporativos e TVs 4K.
+  - **Fronteira Rígida com o Milestone 2D.4:** Nenhuma cor dinâmica (`primaryColor`, `secondaryColor`) ou reatividade SignalR foi vinculada aos materiais 3D nesta etapa, mantendo a paleta cênica neutra/arquitetural pronta para ser dinamicamente energizada no Milestone 2D.4.
+- **Testes & Validação:**
+  - Compilação do Backend (`dotnet build`): **0 Warnings, 0 Errors**.
+  - Compilação de produção do Frontend (`npm run build`): **100% verde** (2540 módulos em 4.11s).
+  - Suíte completa de testes automatizados:
+    - `test-api.cjs`: **48 PASS / 0 FAIL**
+    - `test-projects-api.cjs`: **53 PASS / 0 FAIL**
+    - `test-signalr-e2e.cjs`: **55 PASS / 0 FAIL**
+    - **Total: 156 testes aprovados (100% verde)**.
+- **Impacto Futuro:** A arena possui agora a escala, o enquadramento e a atmosfera de um anfiteatro corporativo de inovação. Desbloqueia a implementação do **Milestone 2D.4 (Neons Dinâmicos e Theming Reativo)**, onde o branding ativo do evento assumirá o controle das iluminações cênicas, arcos e contornos da arena.

@@ -2,7 +2,7 @@
 ## Plataforma Arena Voice / Arena de Inovação
 
 > **Status:** Documento Vivo de Registro e Alinhamento da Fase 2  
-> **Última Atualização:** Outubro de 2026 (Encerramento do Milestone 2B e Planejamento do 2C)
+> **Última Atualização:** Outubro de 2026 (Execução do Milestone 2D.3)
 
 ---
 
@@ -67,7 +67,7 @@ A Fase 2 foi desenhada para elevar o Arena Voice de um protótipo de hardware de
 
 ## 5. Planejamento Aprovado do Milestone 2C (Operator UI)
 
-O Milestone 2C construirá a interface administrativa e operacional do Arena Voice sob o prefixo `/operator`, utilizando **Navegação por Abas (Tabbed Layout)**:
+O Milestone 2C construiu a interface administrativa e operacional do Arena Voice sob o prefixo `/operator`, utilizando **Navegação por Abas (Tabbed Layout)**:
 
 1. **Aba Cockpit (`/operator/cockpit`):**
    - Banner do pitch ativo no palco (título, líder, trilha e cronômetro de apresentação).
@@ -101,5 +101,10 @@ O Milestone 2C construirá a interface administrativa e operacional do Arena Voi
   - [x] **2C.3:** Project Management (`ProjectModal`, Criar, Editar, Excluir com 409, Selecionar atômico).
   - [x] **2C.4:** Event Management (`EventForm`, `ColorSwatch`, `ColorPreviewCard`, preview de neons cênicos).
   - [x] **2C.5:** Realtime Integration (`CurrentProjectChanged`, `EventBrandingUpdated`, resync).
-- [ ] **Milestone 2D:** Projeção Cênica e Neons Dinâmicos no Telão 3D (`/stage`).
+- [ ] **Milestone 2D:** Projeção Cênica e Neons Dinâmicos no Telão 3D (`/stage`) — Em Andamento:
+  - [x] **2D.1:** Infraestrutura de Dados, Contexto e HUD Cênico (`StagePage`, `StageHUD`, `StageProjectBanner`, consumo autoritativo de `currentProject`, `currentEvent` e `branding`).
+  - [x] **2D.2:** Higienização Visual e Purga de Elementos Legados (Remoção de microfones, letreiros, studio.glb e textos musicais).
+  - [x] **2D.3:** Cenografia da Arena e Escala de Anfiteatro (Palco escuro laqueado, arquibancada procedural e arcos cênicos).
+  - [ ] **2D.4:** Neons Dinâmicos e Theming Reativo (Reatividade SignalR de `primaryColor` e `secondaryColor`).
+  - [ ] **2D.5:** Homologação Integrada, Resync e Fechamento do 2D.
 - [ ] **Milestone 2E:** Validação Integrada, Documentação Final e Tag `v0.2.0-phase2`.
