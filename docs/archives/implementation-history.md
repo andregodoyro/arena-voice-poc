@@ -486,4 +486,40 @@
     - `test-projects-api.cjs`: **53 PASS / 0 FAIL**
     - `test-signalr-e2e.cjs`: **55 PASS / 0 FAIL**
     - **Total: 156 testes aprovados (100% verde)**.
-- **Impacto Futuro:** O Milestone 2D.4 concluiu a experiência dinâmica, cênica e reativa do telão 3D. A arena agora respira e responde instantaneamente ao branding do evento ativo e à dinâmica de apoio da banca. O próximo passo autorizado será o **Milestone 2D.5 (Homologação Integrada, Resync e Fechamento do 2D)**.
+- **Impacto Futuro:** O Milestone 2D.4 concluiu a experiência dinâmica, cênica e reativa do telão 3D. A arena agora respira e responde instantaneamente ao branding do evento ativo e à dinâmica de apoio da banca.
+
+---
+
+### [2026-11-04] — Milestone 2D.5: Homologação Integrada, Resiliência e Fechamento do Milestone 2D (Integrated Validation, Resilience, Homologation & Milestone Closure)
+- **Status:** ✅ Concluído
+- **Objetivo:** Executar a bateria definitiva de homologação ponta a ponta da plataforma Arena Voice após a implementação da cenografia corporativa (2D.3) e theming reativo (2D.4). Validar concorrência, conformidade estrita de contratos SignalR, resiliência de rede e reconexão (ADR-002), hidratação a frio (F5), consistência visual Full HD em múltiplos navegadores (Edge e Chrome), auditoria de dívida técnica e encerramento formal do Milestone 2D.
+- **Arquitetura & Instrumentação Realizada:**
+  - `tests/homologation-2d5.cjs`: Suíte dedicada automatizada de homologação com 35 asserções rigorosas cobrindo os 5 cenários operacionais:
+    - **Cenário 1 — Fluxo Normal Concorrente:** Validação do ciclo completo de virada individual, reset geral, alternância de projetos e atualização de paleta de branding com sincronização entre operadores e telão público.
+    - **Cenário 2 — Contratos SignalR Estritos:** Garantia de payloads canônicos para `ChairTurned` (`{ chairId, timestamp, source }`), `ChairsReset` (`{ resetBy, timestamp }`), `CurrentProjectChanged` (`{ project, timestamp }`) e `EventBrandingUpdated` (`{ eventId, branding }`).
+    - **Cenário 3 — Dinâmica Cênica de Unanimidade:** Verificação do gatilho 5/5 de apoio da banca, disparo de celebração institucional de aura concêntrica e recuperação limpa ao estado baseline após reset geral.
+    - **Cenário 4 — Resiliência de Reconexão e Protocolo Snapshot-First (ADR-002):** Simulação de corte abrupto de conexão de rede/socket durante viradas ativas, religamento do cliente e validação da restauração determinística do estado completo via REST snapshot sem dessincronização.
+    - **Cenário 5 — Hidratação a Frio / Recarga F5:** Simulação de carregamento inicial limpo de novos clientes consumindo `/api/state`, `/api/projects` e `/api/events/current` com 100% de coerência de estado entre memória do backend e telão.
+  - **Cenário 6 — Validação Visual Real Desktop Full HD (1920x1080):**
+    - Execução via headless rendering com captura de evidências em `docs/assets/milestone-2d5-homologation/`:
+      - `chrome_operator_fhd.png`: Cockpit do Operador em Full HD com painéis de controle, grid de cadeiras e gestão de projetos.
+      - `edge_stage_fhd.png`: Telão 3D no Microsoft Edge com iluminação cênica, branding ativo, pódio e anfiteatro.
+      - `chrome_stage_fhd.png`: Telão 3D no Google Chrome confirmando consistência cromática, nitidez de materiais PBR e 60 FPS.
+- **Auditoria Técnica e Classificação de Dívidas Técnicas:**
+  - **P0 (Bloqueantes para Produção):** Zero (0). A plataforma é 100% determinística, sem memory leaks nem perdas de contrato.
+  - **P1 (Melhorias de Arquitetura):**
+    - *Code-Splitting do Bundle Frontend:* O bundle de produção do Vite compila em um único chunk principal de ~1.5 MB devido à combinação de Three.js, React Router e SignalR Client. Recomenda-se implementar lazy loading de rotas (`React.lazy` para `/stage` e `/operator`) na Fase 3.
+  - **P2 (Conveniência e Experiência):**
+    - *Upload Direto de Logos e Mídia:* O branding atual manipula paletas hexadecimais reativas (`primaryColor`, `secondaryColor`) e URLs de imagem. Na Fase 3, viabilizar endpoint multipart para upload direto de logos customizados pelo operador.
+    - *Transições de Rota Suaves:* Adicionar micro-transições visuais em fade durante navegações manuais entre páginas administrativas.
+- **Testes & Validação:**
+  - Compilação do Frontend (`npm run build`): **100% verde** (2540 módulos compilados em 4.41s, 0 erros, 0 warnings).
+  - Compilação do Backend (`dotnet build`): **0 Warnings, 0 Errors**.
+  - Suíte completa de testes automatizados (4 suítes):
+    - `test-api.cjs`: **48 PASS / 0 FAIL**
+    - `test-projects-api.cjs`: **53 PASS / 0 FAIL**
+    - `test-signalr-e2e.cjs`: **55 PASS / 0 FAIL**
+    - `tests/homologation-2d5.cjs`: **35 PASS / 0 FAIL**
+    - **Total Consolidado: 191 testes aprovados (100% verde)**.
+- **Veredito de Homologação:** 🟢 **APROVADO** (Homologado para ambiente real de eventos).
+- **Impacto Futuro:** O Milestone 2D está formalmente encerrado com todas as metas batidas. A plataforma Arena Voice está pronta para o **Milestone 2E (Fechamento da Fase 2, Tagging `v0.2.0-phase2` e Consolidação Final)**.
