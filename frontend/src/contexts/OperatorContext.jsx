@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { projectsApi } from '../api/projectsApi';
 import { eventsApi } from '../api/eventsApi';
 import { isCurrentProject } from '../utils/projectStatus';
@@ -16,19 +16,21 @@ const DEFAULT_CHAIRS = [
 ];
 
 /**
- * OperatorProvider — Provedor de Estado Operacional e Integração Realtime (Milestone 2C.5).
+ * OperatorProvider — Provedor de Estado Operacional e Integração Realtime (Milestone 2C.5 / 3A).
  * 
  * Centraliza a única conexão SignalR do sistema e orquestra o estado autoritativo:
  * - ADR-001 (Backend Authoritative): O backend dita o estado final em todas as circunstâncias.
  * - ADR-002 (Snapshot First): O estado inicial e o resync pós-reconexão vêm do snapshot REST.
  * - ADR-003 (ActiveContext): O projeto e evento ativos são refletidos ponta a ponta.
  * - ADR-004 (Rich SignalR Payloads): Consome os metadados ricos enviados pelo Hub.
+ * - Milestone 3A (Event Lifecycle): Gerencia o catálogo de eventos e a reatividade de ativação.
  */
 export function OperatorProvider({ children }) {
-  // ── Estado Institucional e de Projetos (Fase 2) ──────────────────────────
+  // ── Estado Institucional e de Projetos (Fase 2 & Fase 3A) ──────────────────
   const [currentEvent, setCurrentEvent] = useState(null);
   const [currentProject, setCurrentProject] = useState(null);
   const [projects, setProjects] = useState([]);
+  const [eventsList, setEventsList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -70,19 +72,21 @@ export function OperatorProvider({ children }) {
     setEventsHistory((prev) => [eventItem, ...prev].slice(0, 20));
   }, []);
 
-  // ── Busca de Snapshot Autoritativo (ADR-002) ─────────────────────────────
+  // ── Busca de Snapshot Autoritativo (ADR-002 / Milestone 3A) ──────────────
   const fetchOperationalData = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true);
     try {
-      const [stateData, projectsData, eventData] = await Promise.all([
+      const [stateData, projectsData, eventData, allEvents] = await Promise.all([
         eventsApi.getState(),
         projectsApi.getProjects(true),
         eventsApi.getCurrentEvent(),
+        eventsApi.getEvents().catch(() => []),
       ]);
 
       const projectList = Array.isArray(projectsData) ? projectsData : [];
       setProjects(projectList);
       setCurrentEvent(eventData || stateData?.currentEvent || null);
+      setEventsList(Array.isArray(allEvents) ? allEvents : []);
 
       if (stateData?.currentProject) {
         setCurrentProject(stateData.currentProject);
@@ -115,28 +119,30 @@ export function OperatorProvider({ children }) {
 
   // ── Sincronização em Tempo Real (Milestone 2C.5.2: Projetos) ─────────────
   const handleCurrentProjectChanged = useCallback((payload) => {
-    if (!payload?.project) return;
+    if (!payload) return;
     const newCurrent = payload.project;
     const prevProject = payload.previousProject;
 
-    console.log('[OperatorContext] Sincronizando novo projeto ativo no palco:', newCurrent.title);
+    console.log('[OperatorContext] Sincronizando novo projeto ativo no palco:', newCurrent?.title || 'Nenhum');
 
     // 1. Aceleração visual imediata (Reatividade instantânea)
-    setCurrentProject(newCurrent);
-    setProjects((prevList) => {
-      return prevList.map((p) => {
-        if (p.id === newCurrent.id) {
-          return { ...p, ...newCurrent, status: 1 };
-        }
-        if (prevProject && p.id === prevProject.id) {
-          return { ...p, ...prevProject, status: 2 };
-        }
-        if (p.status === 1 && p.id !== newCurrent.id) {
-          return { ...p, status: 2 };
-        }
-        return p;
+    setCurrentProject(newCurrent || null);
+    if (newCurrent) {
+      setProjects((prevList) => {
+        return prevList.map((p) => {
+          if (p.id === newCurrent.id) {
+            return { ...p, ...newCurrent, status: 1 };
+          }
+          if (prevProject && p.id === prevProject.id) {
+            return { ...p, ...prevProject, status: 2 };
+          }
+          if (p.status === 1 && p.id !== newCurrent.id) {
+            return { ...p, status: 2 };
+          }
+          return p;
+        });
       });
-    });
+    }
 
     // 2. Re-hidratação autoritativa silenciosa em background (ADR-002)
     fetchOperationalData(false);
@@ -164,6 +170,20 @@ export function OperatorProvider({ children }) {
     fetchOperationalData(false);
   }, [fetchOperationalData]);
 
+  // ── Sincronização em Tempo Real (Milestone 3A: Mudança de Evento Ativo) ──
+  const handleActiveEventChanged = useCallback((payload) => {
+    if (!payload?.event) return;
+
+    console.log('[OperatorContext] Sincronizando mudança de evento ativo na arena:', payload.event.title);
+
+    // 1. Aceleração visual imediata
+    setCurrentEvent(payload.event);
+    setCurrentProject(null); // Projeto no palco é resetado para a nova fila
+
+    // 2. Re-hidratação autoritativa completa em background
+    fetchOperationalData(false);
+  }, [fetchOperationalData]);
+
   // ── Reconexão e Resync Hardening (Milestone 2C.5.5) ──────────────────────
   const handleReconnected = useCallback(async () => {
     console.log('[OperatorContext] Reconexão detectada. Executando resync autoritativo completo...');
@@ -177,12 +197,13 @@ export function OperatorProvider({ children }) {
     }
   }, [fetchOperationalData]);
 
-  // ── Instância Única de SignalR (Milestone 2C.5.1: Foundation) ───────────
+  // ── Instância Única de SignalR (Milestone 2C.5.1: Foundation / 3A) ───────
   const { connectionStatus, connectionError, backendUrl } = useSignalR({
     onChairTurned: (chairId, source) => turnChair(chairId, source),
     onChairsReset: resetAllChairs,
     onCurrentProjectChanged: handleCurrentProjectChanged,
     onEventBrandingUpdated: handleEventBrandingUpdated,
+    onActiveEventChanged: handleActiveEventChanged,
     onReconnected: handleReconnected,
     initialBackendUrl: getBackendUrl(),
   });
@@ -212,6 +233,7 @@ export function OperatorProvider({ children }) {
     currentEvent,
     currentProject,
     projects,
+    eventsList,
     loading,
     error,
     refresh,

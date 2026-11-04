@@ -554,4 +554,46 @@
   - Suíte consolidada: **191 testes aprovados (100% verde)**.
   - Compilação Backend: **0 Warnings, 0 Errors**.
   - Compilação Frontend: **100% verde**.
-- **Impacto Futuro:** A Fase 2 está oficialmente concluída. O projeto está preparado para a abertura do planejamento da **Fase 3 (Dynamic Round Management, Pitch Timers & Multi-Evaluator Governance)**.
+- **Impacto Futuro:** A Fase 2 está oficialmente concluída. O projeto está preparado para a abertura da **Fase 3 (Event Governance, Pitch Dynamics & Evaluator Experience)**.
+
+---
+
+### [2026-11-04] — Milestone 3A: Ciclo de Vida e Gestão Completa de Eventos (Event Lifecycle & Management)
+- **Status:** ✅ Concluído
+- **Objetivo:** Implementar a gestão completa do ciclo de vida de eventos da plataforma Arena Voice (1 Arena Física, $N$ Eventos Históricos, 1 Evento Ativo por vez). Introduzir modelo explícito de 5 estados (`Draft`, `Ready`, `Active`, `Finished`, `Archived`), regra atômica de ativação não-destrutiva (onde o evento ativo anterior retorna para `Ready`), ações explícitas de encerramento (`finish`) e arquivamento protegido (`archive` com 409 Conflict se ativo), duplicação de eventos, catálogo visual no cockpit com filtros e reatividade SignalR.
+- **Arquitetura & Implementação Realizada:**
+  - **Domínio & Modelos:**
+    - `EventStatus.cs`: Expandido para 5 estados formais: `Draft = 0`, `Ready = 1`, `Active = 2`, `Finished = 3`, `Archived = 4`.
+    - `CreateEventDto.cs` & `UpdateEventDto.cs`: Suporte à criação com validação de cores hexadecimais, título (3-150 caracteres) e atualização de status.
+    - `ArenaProjectStore.cs`: Métodos sob lock thread-safe (`GetAllEvents`, `ActivateEvent`, `FinishEvent`, `ArchiveEvent`, `DuplicateEvent`).
+    - *Ajuste Estratégico 1 (Ativação Não-Destrutiva):* A ativação atômica transiciona o evento ativo anterior para `Ready` (e não `Finished`), preservando a reversibilidade operacional.
+    - *Encerramento Explícito:* `Finished` ocorre exclusivamente via ação explícita (`POST /api/events/{id}/finish`).
+    - *Proteção de Arquivamento:* Rejeição com `HTTP 409 Conflict` se houver tentativa de arquivar o evento atualmente ativo na arena.
+  - **Superfície de APIs (8 Endpoints):**
+    - `GET /api/events`: Catálogo geral com filtro por query param `?status=...`.
+    - `GET /api/events/{id}`: Detalhamento por ID com 404.
+    - `POST /api/events`: Criação validada com status padrão `Draft`.
+    - `PUT /api/events/{id}`: Edição de dados e branding com bloqueio de promoção direta a `Active`.
+    - `POST /api/events/{id}/activate`: Ativação atômica na arena física, neutralização de cadeiras (0°) e broadcast SignalR (`ActiveEventChanged`, `EventBrandingUpdated`, `ChairsReset`).
+    - `POST /api/events/{id}/finish`: Encerramento formal do evento.
+    - `POST /api/events/{id}/archive`: Arquivamento protegido contra o evento ativo.
+    - `POST /api/events/{id}/duplicate`: Clonagem para novo ciclo em `Draft`.
+  - **Painel do Operador (React 19):**
+    - `eventsApi.js`: Métodos para todos os endpoints do ciclo de vida.
+    - `useSignalR.js` & `OperatorContext.jsx`: Listener para `ActiveEventChanged` mantendo catálogo e fila sincronizados.
+    - `EventCard.jsx`: Card com badges de status coloridos, mini-preview das cores do branding e botões contextuais (*Ativar no Palco*, *Editar*, *Duplicar*, *Encerrar*, *Arquivar*).
+    - `EventModal.jsx`: Modal completo com `ColorSwatch`, paletas cênicas, datas e `ColorPreviewCard`.
+    - `OperatorEventTab.jsx`: Painel transformado em catálogo executivo com destaque para o Evento Ativo e abas de filtros por status (`Todos`, `Ativo`, `Prontos`, `Rascunhos`, `Encerrados`, `Arquivados`).
+  - **Testes Automatizados:**
+    - `tests/test-events-api.cjs`: Suíte com 38 asserções cobrindo CRUD, validações, ativação não-destrutiva, 409 Conflict e filtros.
+- **Testes & Validação:**
+  - Compilação do Frontend (`npm run build`): **100% verde** (2542 módulos em 4.18s, 0 erros).
+  - Compilação do Backend (`dotnet build`): **0 Warnings, 0 Errors**.
+  - Bateria Geral de Testes (5 suítes automatizadas):
+    - `test-events-api.cjs` (Milestone 3A): **38 PASS / 0 FAIL**
+    - `test-api.cjs` (REST Base): **48 PASS / 0 FAIL**
+    - `test-projects-api.cjs` (Projetos): **53 PASS / 0 FAIL**
+    - `test-signalr-e2e.cjs` (SignalR): **55 PASS / 0 FAIL**
+    - `homologation-2d5.cjs` (Resiliência): **35 PASS / 0 FAIL**
+    - **Total Consolidado: 229 testes aprovados (100% verde)**.
+- **Impacto Futuro:** O Milestone 3A estabelece a governança definitiva de eventos na arena. A plataforma está pronta para o **Milestone 3B (Pitch Lifecycle & Official Timers - Máquina de Estados de Rodada e Cronômetro Sincronizado)**.

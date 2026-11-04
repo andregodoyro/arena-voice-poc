@@ -29,8 +29,11 @@ Este documento é a **fonte oficial de índice de marcos**, permitindo rastrear 
 | **2** | **2C** | Operator Project & Event Management UI | ✅ Concluído | Mesa Técnica Completa & Realtime Sync (2C.1 a 2C.5) | Frontend Build OK / 156 testes | main |
 | **2** | **2D** | Stage Projection & Dynamic Experience | ✅ Concluído | Telão 3D institucional, anfiteatro, pódio de pitch, neons e branding dinâmico (2D.1 a 2D.5) | 191 testes (156 base + 35 homolog) | main |
 | **2** | **2E** | Phase 2 Validation & Closure | ✅ Concluído | Homologação integrada, governança, release notes e fechamento | 191 testes / Build verde | `v0.2.0-phase2` |
-| **3** | **-** | Dynamic Round Management | 📅 Futuro | Ciclos de votação, cronômetro e bloqueio de cadeiras | Planejado | - |
-| **4** | **-** | Multi-Evaluator Governance | 📅 Futuro | Gestão de jurados e cadeiras nominais | Planejado | - |
+| **3** | **3A** | Event Lifecycle & Management | ✅ Concluído | 5 estados (Draft, Ready, Active, Finished, Archived), ativação não-destrutiva, catálogo no cockpit | 229 testes (191 base + 38 events) | main |
+| **3** | **3B** | Pitch Lifecycle & Timers | 📅 Próximo | Máquina de estados da rodada e cronômetro sincronizado via SignalR | Planejado | - |
+| **3** | **3C** | Chair Lockout & Security | 📅 Futuro | Bloqueio autoritativo de virada de cadeiras pós-cronômetro | Planejado | - |
+| **3** | **3D** | Evaluator Governance & Scorecards | 📅 Futuro | Jurados nominais nas 5 cadeiras e notas quantitativas | Planejado | - |
+| **3** | **3E** | Analytics, Reporting & Phase 3 Closure | 📅 Futuro | Ata executiva em PDF/CSV e tag v0.3.0-phase3 | Planejado | - |
 
 ---
 
@@ -54,6 +57,13 @@ Este documento é a **fonte oficial de índice de marcos**, permitindo rastrear 
   - **2D.4 (Neons Dinâmicos & Theming Reativo):** Conexão em tempo real de `primaryColor` e `secondaryColor` aos materiais emissores do palco, arcos e pódio com interpolação suave via GSAP (1.0s a 1.2s), protagonismo das cadeiras (spotlight de 45, botão emissivo, halo secundário e pedestal glow), e efeito especial de celebração institucional de Unanimidade (5 de 5 cadeiras apoiando).
   - **2D.5 (Homologação Integrada, Resiliência & Fechamento):** Validação dos 6 cenários operacionais, teste de queda/reconexão com protocolo Snapshot-First (ADR-002), suíte formal de homologação com 35 verificações (191 testes no total, 100% verde), inspeção em Edge/Chrome Full HD e fechamento oficial do marco.
 - **2E (Phase 2 Validation & Closure):** Auditoria integral de governança, consolidação das 4 suítes de testes automatizados (191 testes 100% verdes), homologação das decisões de arquitetura (ADR-001 a ADR-008), catalogação das dívidas técnicas (P0: 0), geração das release notes profissionais da Fase 2, encerramento formal da Fase 2 e emissão da tag `v0.2.0-phase2`.
+
+### Fase 3 — Event Governance, Pitch Dynamics & Evaluator Experience (Em Andamento)
+- **3A (Event Lifecycle & Management):** Implementação da governança e catálogo de eventos com modelo explícito de 5 estados (`Draft`, `Ready`, `Active`, `Finished`, `Archived`). Introdução de ativação atômica não-destrutiva (evento ativo anterior retorna para `Ready`), ações explícitas de encerramento (`finish`) e arquivamento protegido com `HTTP 409 Conflict`, duplicação para novos ciclos em `Draft`, 8 novos endpoints REST, reatividade SignalR com `ActiveEventChanged` e painel com abas de filtros por status e `ColorSwatch` no cockpit do operador. Suíte automatizada expandida para 229 testes (100% verdes).
+- **3B (Pitch Lifecycle & Timers):** Máquina de estados de rodada de pitch (`Waiting`, `PitchRunning`, `Q&A`, `VotingClosed`) e cronômetro cênico sincronizado via SignalR no HUD do telão e cockpit (Planejado).
+- **3C (Chair Lockout & Security):** Bloqueio autoritativo de virada de cadeiras pós-cronômetro (`HTTP 423 Locked`) e feedback para o microcontrolador ESP32 (Planejado).
+- **3D (Evaluator Governance & Nominals):** Cadastro nominal e fotos dos jurados nas 5 cadeiras e scorecards qualitativos (Planejado).
+- **3E (Analytics & Phase 3 Closure):** Exportação de ata executiva em PDF/CSV, homologação integrada e emissão da tag `v0.3.0-phase3` (Planejado).
 
 ---
 

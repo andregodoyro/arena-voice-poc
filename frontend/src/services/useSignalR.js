@@ -2,12 +2,12 @@ import { useEffect, useState, useRef } from 'react';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 
 /**
- * useSignalR — Hook dedicado para gerenciamento da conexão WebSocket/SignalR (Milestone 2C.5).
+ * useSignalR — Hook dedicado para gerenciamento da conexão WebSocket/SignalR (Milestone 2C.5 / 3A).
  * 
  * Unifica o transporte em tempo real do Arena Voice:
  * - Ciclo de vida: 'CONECTADO', 'RECONECTANDO', 'RESSINCRONIZANDO', 'DESCONECTADO'
  * - Eventos de Hardware/Cadeiras: ChairTurned, ChairSupported, ChairsReset
- * - Eventos de Gestão/Domínio: CurrentProjectChanged, EventBrandingUpdated
+ * - Eventos de Gestão/Domínio: CurrentProjectChanged, EventBrandingUpdated, ActiveEventChanged
  * - Políticas de reconexão automática com backoff exponencial
  */
 export function useSignalR({
@@ -15,6 +15,7 @@ export function useSignalR({
   onChairsReset,
   onCurrentProjectChanged,
   onEventBrandingUpdated,
+  onActiveEventChanged,
   onReconnecting,
   onReconnected,
   onClose,
@@ -37,6 +38,7 @@ export function useSignalR({
     onChairsReset,
     onCurrentProjectChanged,
     onEventBrandingUpdated,
+    onActiveEventChanged,
     onReconnecting,
     onReconnected,
     onClose,
@@ -47,6 +49,7 @@ export function useSignalR({
     onChairsReset,
     onCurrentProjectChanged,
     onEventBrandingUpdated,
+    onActiveEventChanged,
     onReconnecting,
     onReconnected,
     onClose,
@@ -179,6 +182,14 @@ export function useSignalR({
       console.log('[SignalR Evento] EventBrandingUpdated recebido para o evento:', data?.eventId);
       if (callbacksRef.current.onEventBrandingUpdated) {
         callbacksRef.current.onEventBrandingUpdated(data);
+      }
+    });
+
+    // 6. Ativação / Mudança de Evento Ativo (Milestone 3A)
+    connection.on('ActiveEventChanged', (data) => {
+      console.log('[SignalR Evento] ActiveEventChanged recebido:', data?.event?.title);
+      if (callbacksRef.current.onActiveEventChanged) {
+        callbacksRef.current.onActiveEventChanged(data);
       }
     });
 

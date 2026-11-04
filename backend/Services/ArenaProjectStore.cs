@@ -141,8 +141,15 @@ public class ArenaProjectStore : IArenaProjectStore
         }
     }
 
-    public IReadOnlyList<Event> GetAllEvents() =>
-        _events.Values.OrderByDescending(e => e.ScheduledDate).ToList();
+    public IReadOnlyList<Event> GetAllEvents(EventStatus? statusFilter = null)
+    {
+        var query = _events.Values.AsEnumerable();
+        if (statusFilter.HasValue)
+        {
+            query = query.Where(e => e.Status == statusFilter.Value);
+        }
+        return query.OrderByDescending(e => e.ScheduledDate).ToList();
+    }
 
     public Event? GetEventById(string eventId) =>
         _events.TryGetValue(eventId, out var evt) ? evt : null;
@@ -164,6 +171,110 @@ public class ArenaProjectStore : IArenaProjectStore
         evt.UpdatedAt = DateTimeOffset.UtcNow;
         _events[evt.Id] = evt;
         return true;
+    }
+
+    public ActivateEventResult ActivateEvent(string eventId, EventStatus previousEventStatus = EventStatus.Ready)
+    {
+        if (!_events.TryGetValue(eventId, out var targetEvent))
+        {
+            return new ActivateEventResult(false, null, null, "Evento não encontrado.");
+        }
+
+        lock (_contextLock)
+        {
+            // Idempotência: se já é o evento ativo, retorna sucesso
+            if (_currentEventId == eventId && targetEvent.Status == EventStatus.Active)
+            {
+                return new ActivateEventResult(true, targetEvent, null);
+            }
+
+            Event? prevEvent = null;
+            if (_currentEventId != null && _events.TryGetValue(_currentEventId, out var prev))
+            {
+                if (prev.Id != eventId)
+                {
+                    prev.Status = previousEventStatus; // Transiciona para Ready por padrão
+                    prev.UpdatedAt = DateTimeOffset.UtcNow;
+                    prevEvent = prev;
+                }
+            }
+
+            // Atualiza status do novo evento ativo
+            targetEvent.Status = EventStatus.Active;
+            targetEvent.UpdatedAt = DateTimeOffset.UtcNow;
+
+            _currentEventId = targetEvent.Id;
+            _currentProjectId = null; // Reseta projeto ativo para o novo evento
+            _lastUpdated = DateTimeOffset.UtcNow;
+
+            return new ActivateEventResult(true, targetEvent, prevEvent);
+        }
+    }
+
+    public Event? FinishEvent(string eventId)
+    {
+        if (!_events.TryGetValue(eventId, out var evt))
+        {
+            return null;
+        }
+
+        lock (_contextLock)
+        {
+            evt.Status = EventStatus.Finished;
+            evt.UpdatedAt = DateTimeOffset.UtcNow;
+            _lastUpdated = DateTimeOffset.UtcNow;
+            return evt;
+        }
+    }
+
+    public ArchiveEventResult ArchiveEvent(string eventId)
+    {
+        if (!_events.TryGetValue(eventId, out var evt))
+        {
+            return new ArchiveEventResult(false, null, false, "Evento não encontrado.");
+        }
+
+        lock (_contextLock)
+        {
+            if (_currentEventId == eventId)
+            {
+                return new ArchiveEventResult(false, null, true, "Não é possível arquivar o evento atualmente ativo na arena. Ative outro evento antes de arquivar.");
+            }
+
+            evt.Status = EventStatus.Archived;
+            evt.UpdatedAt = DateTimeOffset.UtcNow;
+            return new ArchiveEventResult(true, evt, false);
+        }
+    }
+
+    public Event? DuplicateEvent(string eventId)
+    {
+        if (!_events.TryGetValue(eventId, out var source))
+        {
+            return null;
+        }
+
+        var clonedId = $"evt-{Guid.NewGuid():N}"[..12];
+        var cloned = new Event
+        {
+            Id = clonedId,
+            Title = $"{source.Title} (Cópia)",
+            Description = source.Description,
+            ScheduledDate = source.ScheduledDate.AddDays(7),
+            Status = EventStatus.Draft,
+            Branding = new BrandingConfig
+            {
+                PrimaryColor = source.Branding.PrimaryColor,
+                SecondaryColor = source.Branding.SecondaryColor,
+                LogoUrl = source.Branding.LogoUrl,
+                Tagline = source.Branding.Tagline
+            },
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        _events[cloned.Id] = cloned;
+        return cloned;
     }
 
     public bool DeleteEvent(string eventId)
@@ -260,6 +371,58 @@ public class ArenaProjectStore : IArenaProjectStore
         };
         _events[defaultEvent.Id] = defaultEvent;
         _currentEventId = defaultEvent.Id;
+
+        // Catálogo e governança de eventos (Milestone 3A)
+        var readyEvent = new Event
+        {
+            Id = "evt-hackathon-ferrolab",
+            Title = "Hackathon FerroLab",
+            Description = "Maratona de inovação tecnológica focada em inteligência artificial e automação industrial.",
+            ScheduledDate = DateTimeOffset.UtcNow.AddDays(7),
+            Status = EventStatus.Ready,
+            Branding = new BrandingConfig
+            {
+                PrimaryColor = "#00b4d8",
+                SecondaryColor = "#ffb703",
+                LogoUrl = "/samples/ferrolab-logo.png",
+                Tagline = "Forjando o futuro da indústria com inteligência artificial."
+            }
+        };
+        _events[readyEvent.Id] = readyEvent;
+
+        var draftEvent = new Event
+        {
+            Id = "evt-startup-challenge",
+            Title = "Startup Challenge 2027",
+            Description = "Competição de novos modelos de negócio e aceleração de venture capital.",
+            ScheduledDate = DateTimeOffset.UtcNow.AddDays(21),
+            Status = EventStatus.Draft,
+            Branding = new BrandingConfig
+            {
+                PrimaryColor = "#7209b7",
+                SecondaryColor = "#4cc9f0",
+                LogoUrl = "/samples/challenge-logo.png",
+                Tagline = "A próxima geração de unicórnios começa aqui."
+            }
+        };
+        _events[draftEvent.Id] = draftEvent;
+
+        var archivedEvent = new Event
+        {
+            Id = "evt-innovation-summit-2025",
+            Title = "Innovation Summit 2025",
+            Description = "Edição anterior do summit executivo de liderança e pitches corporativos.",
+            ScheduledDate = DateTimeOffset.UtcNow.AddDays(-180),
+            Status = EventStatus.Archived,
+            Branding = new BrandingConfig
+            {
+                PrimaryColor = "#2b2d42",
+                SecondaryColor = "#8d99ae",
+                LogoUrl = "/samples/summit-logo.png",
+                Tagline = "Histórico oficial dos pitches homologados."
+            }
+        };
+        _events[archivedEvent.Id] = archivedEvent;
 
         var projects = new[]
         {
