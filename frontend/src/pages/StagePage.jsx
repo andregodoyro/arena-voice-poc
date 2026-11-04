@@ -38,8 +38,8 @@ export function StagePage({
 
   return (
     <main style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
-      {/* 3D Canvas Layer — Preservada sem alterações na geometria nesta subfase 2D.1 */}
-      <StudioCanvas chairs={chairs} />
+      {/* 3D Canvas Layer — Projeção Cênica Reativa com Branding Dinâmico (Milestone 2D.4) */}
+      <StudioCanvas chairs={chairs} branding={currentEvent?.branding} />
 
       {/* 2D HUD Cênico — Projeta Evento, Projeto Atual e Placar da Banca */}
       <StageHUD

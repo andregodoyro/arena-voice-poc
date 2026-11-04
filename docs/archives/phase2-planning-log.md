@@ -2,7 +2,7 @@
 ## Plataforma Arena Voice / Arena de Inovação
 
 > **Status:** Documento Vivo de Registro e Alinhamento da Fase 2  
-> **Última Atualização:** Outubro de 2026 (Execução do Milestone 2D.3)
+> **Última Atualização:** Novembro de 2026 (Execução do Milestone 2D.4)
 
 ---
 
@@ -105,6 +105,6 @@ O Milestone 2C construiu a interface administrativa e operacional do Arena Voice
   - [x] **2D.1:** Infraestrutura de Dados, Contexto e HUD Cênico (`StagePage`, `StageHUD`, `StageProjectBanner`, consumo autoritativo de `currentProject`, `currentEvent` e `branding`).
   - [x] **2D.2:** Higienização Visual e Purga de Elementos Legados (Remoção de microfones, letreiros, studio.glb e textos musicais).
   - [x] **2D.3:** Cenografia da Arena e Escala de Anfiteatro (Palco escuro laqueado, arquibancada procedural e arcos cênicos).
-  - [ ] **2D.4:** Neons Dinâmicos e Theming Reativo (Reatividade SignalR de `primaryColor` e `secondaryColor`).
+  - [x] **2D.4:** Neons Dinâmicos e Theming Reativo (Reatividade SignalR de `primaryColor` e `secondaryColor`, Celebração de Unanimidade, Iluminação e Cadeiras Conectadas).
   - [ ] **2D.5:** Homologação Integrada, Resync e Fechamento do 2D.
 - [ ] **Milestone 2E:** Validação Integrada, Documentação Final e Tag `v0.2.0-phase2`.

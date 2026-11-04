@@ -440,3 +440,50 @@
     - `test-signalr-e2e.cjs`: **55 PASS / 0 FAIL**
     - **Total: 156 testes aprovados (100% verde)**.
 - **Impacto Futuro:** A arena possui agora a escala, o enquadramento e a atmosfera de um anfiteatro corporativo de inovação. Desbloqueia a implementação do **Milestone 2D.4 (Neons Dinâmicos e Theming Reativo)**, onde o branding ativo do evento assumirá o controle das iluminações cênicas, arcos e contornos da arena.
+
+---
+
+### [2026-11-04] — Milestone 2D.4: Neons Dinâmicos e Theming Reativo (Dynamic Theming & Reactive Stage Experience)
+- **Status:** ✅ Concluído
+- **Objetivo:** Conectar a cenografia 3D do telão público (`/stage`) ao branding do evento ativo (`primaryColor` e `secondaryColor`) e aos eventos SignalR em tempo real (`EventBrandingUpdated` e `ChairTurned`), transformando a arena em um espetáculo corporativo dinâmico, elegante e reativo com transições fluidas interpoladas via GSAP (0.8s a 1.2s), protagonismo cênico nas cadeiras acionadas pela banca de avaliação, efeito de celebração institucional de Unanimidade (5 de 5 cadeiras) e iluminação cênica aprimorada para leitura premium em telas Full HD e 4K.
+- **Arquitetura Criada / Modificada:**
+  - `StudioScene.jsx`:
+    - Conexão direta às propriedades `primaryColor` e `secondaryColor` do evento ativo recebidas via prop `branding`.
+    - `ScenicArches`: O portal de 3 arcos passa a refletir imediatamente o branding (Arco 0 e 2 com a cor primária; Arco 1 com a cor secundária) através de materiais emissores interpolados com GSAP (`duration: 1.2s, ease: 'power2.out'`). Os pontos de luz volumétricos de fundo também interpolam para a paleta ativa.
+    - `CentralPitchStage`:
+      - Fita perimetral de luz de piso do palco da startup reativa à `primaryColor`.
+      - Anel de demarcação do orador do pitch reativo à `secondaryColor`.
+      - Retícula central institucional de alinhamento do apresentador reativa à `primaryColor`.
+      - Refletor spot do pitch calibrado para destaque nítido de oratória corporativa.
+    - `AmphitheaterTiers`: Frisos luminosos de balizamento de segurança dos 4 degraus conectados à cor secundária com opacidade balanceada (0.65).
+    - **Efeito Institucional de Unanimidade (5 de 5 cadeiras):**
+      - Quando a totalidade da banca apoia o projeto (`chairs.every(c => c.isTurned)`), ativa-se uma celebração de prestígio e aprovação executiva (sem fogos ou efeitos carnavalescos).
+      - Uma aura concêntrica luminosa (`UnanimityAura`) no centro do palco expande-se suavemente e pulsa com respiração sinusoidal elegante (`opacity: 0.5 -> 0.75`, `scale: 1.04`).
+      - As luzes volumétricas dos arcos cênicos recebem reforço momentâneo com elevação de intensidade (top: 3.8 -> 7.5; laterais: 2.5 -> 5.5).
+      - A iluminação global da arena é suavemente enriquecida (+33%). Ao haver reset ou desativação, todos os parâmetros regressam perfeitamente ao estado normal via GSAP.
+  - `Chair.jsx`:
+    - Conectado à prop `branding` repassada por `StudioScene`.
+    - Ao virar (`isTurned`):
+      - O spotlight individual sobre a cadeira tem intensidade ampliada (de 6 para 45) e adota a `primaryColor` do evento.
+      - O botão central do console ganha brilho emissivo em `primaryColor` (`emissiveIntensity: 4.5`).
+      - O estofamento em couro do assento e encosto transmuta-se para a cor primária do evento com interpolação suave via GSAP.
+      - O halo ao redor do botão ilumina-se com a `secondaryColor`.
+      - Um novo anel de realce cênico no pedestal ilumina-se em `primaryColor`.
+      - O texto 3D `★ APOIADO ★` assume a cor primária de destaque.
+    - Quando o operador altera o branding via cockpit (`EventBrandingUpdated`), cadeiras que já se encontram viradas interpolam em tempo real suas cores para a nova paleta do evento sem necessidade de recarga de página.
+  - `StudioCanvas.jsx` & `StagePage.jsx`:
+    - `StagePage.jsx` extrai `currentEvent?.branding` do `OperatorContext` e o injeta no `StudioCanvas`.
+    - `StudioCanvas.jsx` recebe `branding` e calibra o `hemisphereLight` (sky: `#2c3758`, ground: `#0a0d18`, intensity: 0.85) e neblina (`fog`) para legibilidade e profundidade cristalinas.
+- **Decisões de Arquitetura e Performance:**
+  - **Zero Re-renderings Desnecessários no Canvas:** As transições de cores e intensidades manipulam os canais nativos do Three.js (`material.color.r/g/b`, `light.intensity`) via tweens do GSAP sem re-instanciar malhas ou disparar ciclos desnecessários do React.
+  - **Reatividade Pura SignalR:** O fluxo `EventBrandingUpdated` dispara a atualização em cascata via `OperatorContext`, refletindo no telão 3D instantaneamente com suavidade cinematográfica.
+  - **60 FPS Preservados:** Nenhum pós-processamento pesado foi adicionado; todas as cores usam shaders PBR nativos do Three.js, compatíveis com Edge e Chrome em Full HD e 4K.
+- **Testes & Validação:**
+  - Compilação do Frontend (`npm run build`): **100% verde** (2540 módulos compilados em 4.41s).
+  - Compilação do Backend (`dotnet build`): **0 Warnings, 0 Errors**.
+  - Suíte completa de testes automatizados com isolamento de estado (ADR-008):
+    - `test-api.cjs`: **48 PASS / 0 FAIL**
+    - `test-projects-api.cjs`: **53 PASS / 0 FAIL**
+    - `test-signalr-e2e.cjs`: **55 PASS / 0 FAIL**
+    - **Total: 156 testes aprovados (100% verde)**.
+- **Impacto Futuro:** O Milestone 2D.4 concluiu a experiência dinâmica, cênica e reativa do telão 3D. A arena agora respira e responde instantaneamente ao branding do evento ativo e à dinâmica de apoio da banca. O próximo passo autorizado será o **Milestone 2D.5 (Homologação Integrada, Resync e Fechamento do 2D)**.

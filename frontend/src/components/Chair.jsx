@@ -6,7 +6,11 @@ import * as THREE from 'three';
 /**
  * Chair Component — Individual interactive 3D judge chair.
  * 
- * Milestone 2D.2: Higienização Visual e Purga de Elementos Legados.
+ * Milestone 2D.4: Dynamic Theming & Reactive Stage Experience.
+ * - Conectado ao branding dinâmico do evento (primaryColor e secondaryColor);
+ * - Protagonismo visual no acionamento (spotlight reforçado, halo emissivo, console glow);
+ * - Interpolação fluida com GSAP (1.0s - 1.2s) em trocas de branding em tempo real;
+ * - Preservação da cinemática de rotação e inscrições institucionais da banca.
  *
  * Props:
  *  - id          : number  — unique chair identifier (1..5)
@@ -14,200 +18,258 @@ import * as THREE from 'three';
  *  - isTurned    : boolean — whether chair is rotated 180° toward the stage/pitch
  *  - position    : [x,y,z] — world position of this chair
  *  - baseRotY    : number  — initial Y rotation (for arc curvature)
+ *  - branding    : object  — { primaryColor, secondaryColor }
  */
-export function Chair({ id, name, isTurned, position, baseRotY = 0 }) {
-  // Refs to Three.js objects for direct GSAP animation (bypassing React render cycle)
-  const groupRef       = useRef(); // rotates during GSAP tween
-  const spotRef        = useRef(); // spotlight intensity/color
-  const buttonMatRef   = useRef(); // red button emissive material
-  const seatMatRef     = useRef(); // seat cushion color
-  const backMatRef     = useRef(); // backrest color
-  const haloRef        = useRef(); // halo ring meshBasicMaterial
+export function Chair({
+  id,
+  name,
+  isTurned,
+  position,
+  baseRotY = 0,
+  branding = {},
+}) {
+  const primaryColor = branding?.primaryColor || '#ef233c';
+  const secondaryColor = branding?.secondaryColor || '#3a86ff';
+
+  // Refs para objetos Three.js manipulados diretamente via GSAP
+  const groupRef        = useRef(); // rotação da cadeira
+  const spotRef         = useRef(); // spotlight individual da cadeira
+  const buttonMatRef    = useRef(); // material emissivo do botão de apoio
+  const seatMatRef      = useRef(); // estofamento do assento
+  const backMatRef      = useRef(); // estofamento do encosto
+  const haloRef         = useRef(); // anel de luz do console do botão
+  const pedestalHaloRef = useRef(); // anel de realce cênico no pedestal
 
   useEffect(() => {
     if (!groupRef.current) return;
 
-    // ── GSAP chair rotation (0 → π = 180° when turned) ───────────────────────
+    // ── 1. Rotação GSAP da Cadeira (0 → π = 180° quando acionada) ─────────────
     gsap.to(groupRef.current.rotation, {
       y: isTurned ? Math.PI + baseRotY : baseRotY,
       duration: 1.5,
       ease: 'power2.inOut',
     });
 
-    // ── Spotlight intensity & color transition ─────────────────────────────────
+    // ── 2. Spotlight Individual: Intensidade e Cor do Branding ───────────────
     if (spotRef.current) {
+      // Quando apoiada, ganha protagonismo com 45 de intensidade; em repouso mantém 6
       gsap.to(spotRef.current, {
-        intensity: isTurned ? 35 : 5,
+        intensity: isTurned ? 45 : 6,
         duration: 1.2,
         ease: 'power2.out',
       });
-      // Smoothly lerp spotlight color
-      const targetColor = new THREE.Color(isTurned ? '#ff1a40' : '#4a78ff');
+
+      const targetSpotColor = new THREE.Color(isTurned ? primaryColor : '#4a78ff');
       gsap.to(spotRef.current.color, {
-        r: targetColor.r,
-        g: targetColor.g,
-        b: targetColor.b,
+        r: targetSpotColor.r,
+        g: targetSpotColor.g,
+        b: targetSpotColor.b,
         duration: 1.2,
+        ease: 'power2.out',
       });
     }
 
-    // ── Button emissive glow ──────────────────────────────────────────────────
+    // ── 3. Botão de Apoio: Glow Emissivo com a Cor Primária ───────────────────
     if (buttonMatRef.current) {
-      const btnTarget = new THREE.Color(isTurned ? '#ff0033' : '#330000');
-      gsap.to(buttonMatRef.current.color,     { r: btnTarget.r, g: btnTarget.g, b: btnTarget.b, duration: 0.8 });
-      gsap.to(buttonMatRef.current.emissive,  { r: btnTarget.r, g: btnTarget.g, b: btnTarget.b, duration: 0.8 });
-      gsap.to(buttonMatRef.current, { emissiveIntensity: isTurned ? 4.0 : 0.2, duration: 0.8 });
+      const btnTarget = new THREE.Color(isTurned ? primaryColor : '#251018');
+      gsap.to(buttonMatRef.current.color, {
+        r: btnTarget.r,
+        g: btnTarget.g,
+        b: btnTarget.b,
+        duration: 0.9,
+      });
+      gsap.to(buttonMatRef.current.emissive, {
+        r: btnTarget.r,
+        g: btnTarget.g,
+        b: btnTarget.b,
+        duration: 0.9,
+      });
+      gsap.to(buttonMatRef.current, {
+        emissiveIntensity: isTurned ? 4.5 : 0.2,
+        duration: 0.9,
+      });
     }
 
-    // ── Seat/backrest color shift ─────────────────────────────────────────────
-    const leatherOn  = new THREE.Color('#d90429');
-    const leatherOff = new THREE.Color('#6b0714');
+    // ── 4. Estofamento em Couro: Transição Harmonizada ao Branding ───────────
+    const leatherOn = new THREE.Color(primaryColor);
+    const leatherOff = new THREE.Color('#1c2030');
     [seatMatRef, backMatRef].forEach((ref) => {
       if (!ref.current) return;
       gsap.to(ref.current.color, {
         r: isTurned ? leatherOn.r : leatherOff.r,
         g: isTurned ? leatherOn.g : leatherOff.g,
         b: isTurned ? leatherOn.b : leatherOff.b,
-        duration: 1.0,
+        duration: 1.1,
+        ease: 'power2.out',
       });
     });
 
-    // ── Halo ring visibility ──────────────────────────────────────────────────
+    // ── 5. Halo do Console: Realce com a Cor Secundária ───────────────────────
     if (haloRef.current) {
-      const haloTarget = new THREE.Color(isTurned ? '#ff4d6d' : '#220000');
+      const haloTarget = new THREE.Color(isTurned ? secondaryColor : '#1e2436');
       gsap.to(haloRef.current.color, {
-        r: haloTarget.r, g: haloTarget.g, b: haloTarget.b, duration: 0.6,
+        r: haloTarget.r,
+        g: haloTarget.g,
+        b: haloTarget.b,
+        duration: 0.8,
+      });
+      gsap.to(haloRef.current, {
+        opacity: isTurned ? 1.0 : 0.25,
+        duration: 0.8,
       });
     }
-  }, [isTurned, baseRotY]);
 
-  // Colors (initial / reactive via GSAP after mount)
-  const leatherColor = isTurned ? '#d90429' : '#6b0714';
-  const btnColor     = isTurned ? '#ff0033' : '#330000';
+    // ── 6. Anel de Destaque no Pedestal ───────────────────────────────────────
+    if (pedestalHaloRef.current) {
+      const pedTarget = new THREE.Color(isTurned ? primaryColor : '#101422');
+      gsap.to(pedestalHaloRef.current.color, {
+        r: pedTarget.r,
+        g: pedTarget.g,
+        b: pedTarget.b,
+        duration: 1.0,
+      });
+      gsap.to(pedestalHaloRef.current, {
+        opacity: isTurned ? 0.9 : 0.15,
+        duration: 1.0,
+      });
+    }
+  }, [isTurned, baseRotY, primaryColor, secondaryColor]);
+
+  const leatherInitialColor = isTurned ? primaryColor : '#1c2030';
+  const btnInitialColor = isTurned ? primaryColor : '#251018';
 
   return (
     <group position={position}>
-      {/* ── Per-Chair Overhead Spotlight ───────────────────────────────────── */}
+      {/* ── Per-Chair Overhead Spotlight Cênico ─────────────────────────────── */}
       <spotLight
         ref={spotRef}
-        position={[0, 7, 1]}
-        angle={0.45}
-        penumbra={0.6}
-        intensity={5}
-        distance={22}
-        color="#4a78ff"
+        position={[0, 7.5, 1]}
+        angle={0.48}
+        penumbra={0.65}
+        intensity={isTurned ? 45 : 6}
+        distance={24}
+        color={isTurned ? primaryColor : '#4a78ff'}
         castShadow
         shadow-mapSize={[1024, 1024]}
         shadow-bias={-0.0001}
       />
 
-      {/* ── Chair group (GSAP rotates this) ─────────────────────────────────── */}
-      <group
-        ref={groupRef}
-        rotation={[0, baseRotY, 0]}
-      >
+      {/* ── Grupo Giratório da Cadeira (GSAP anima a rotação) ──────────────── */}
+      <group ref={groupRef} rotation={[0, baseRotY, 0]}>
         {/* BASE PEDESTAL */}
         <mesh position={[0, 0.22, 0]} castShadow receiveShadow>
           <cylinderGeometry args={[0.78, 1.0, 0.44, 32]} />
           <meshStandardMaterial color="#101018" metalness={0.9} roughness={0.18} />
         </mesh>
 
-        {/* CHROME CENTER PILLAR */}
+        {/* Anel de realce de apoio no topo do pedestal */}
+        <mesh position={[0, 0.442, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.72, 0.82, 32]} />
+          <meshBasicMaterial
+            ref={pedestalHaloRef}
+            color={isTurned ? primaryColor : '#101422'}
+            transparent
+            opacity={isTurned ? 0.9 : 0.15}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+
+        {/* PILAR CENTRAL CROMADO */}
         <mesh position={[0, 0.74, 0]} castShadow>
           <cylinderGeometry args={[0.16, 0.16, 0.6, 24]} />
           <meshStandardMaterial color="#b0b0c8" metalness={0.98} roughness={0.05} />
         </mesh>
 
-        {/* SEAT PLATFORM */}
+        {/* PLATAFORMA DO ASSENTO */}
         <mesh position={[0, 1.18, 0]} castShadow receiveShadow>
           <boxGeometry args={[1.38, 0.22, 1.38]} />
           <meshStandardMaterial color="#0c0c18" roughness={0.5} metalness={0.3} />
         </mesh>
 
-        {/* SEAT CUSHION — color controlled by GSAP */}
+        {/* ALMOFADA DO ASSENTO — Cor interpolada via GSAP */}
         <mesh position={[0, 1.38, 0.06]} castShadow receiveShadow>
           <boxGeometry args={[1.18, 0.24, 1.18]} />
           <meshStandardMaterial
             ref={seatMatRef}
-            color={leatherColor}
+            color={leatherInitialColor}
             roughness={0.28}
             metalness={0.08}
           />
         </mesh>
 
-        {/* HIGH BACKREST OUTER SHELL */}
+        {/* CASCA EXTERNA DO ENCOSTO */}
         <mesh position={[0, 2.42, -0.52]} castShadow receiveShadow>
           <boxGeometry args={[1.38, 2.18, 0.3]} />
           <meshStandardMaterial color="#0a0a14" roughness={0.6} />
         </mesh>
 
-        {/* INNER BACKREST CUSHION — color controlled by GSAP */}
+        {/* ALMOFADA DO ENCOSTO — Cor interpolada via GSAP */}
         <mesh position={[0, 2.42, -0.4]} castShadow receiveShadow>
           <boxGeometry args={[1.18, 1.95, 0.14]} />
           <meshStandardMaterial
             ref={backMatRef}
-            color={leatherColor}
+            color={leatherInitialColor}
             roughness={0.3}
           />
         </mesh>
 
-        {/* HEADREST PAD */}
+        {/* APOIO DE CABEÇA */}
         <mesh position={[0, 3.58, -0.42]} castShadow>
           <boxGeometry args={[0.92, 0.48, 0.2]} />
-          <meshStandardMaterial color={leatherColor} roughness={0.3} />
+          <meshStandardMaterial color={leatherInitialColor} roughness={0.3} />
         </mesh>
 
-        {/* LEFT ARMREST */}
+        {/* BRAÇO ESQUERDO */}
         <mesh position={[-0.74, 1.68, 0]} castShadow>
           <boxGeometry args={[0.2, 0.16, 1.28]} />
           <meshStandardMaterial color="#181820" metalness={0.75} roughness={0.25} />
         </mesh>
 
-        {/* RIGHT ARMREST */}
+        {/* BRAÇO DIREITO */}
         <mesh position={[0.74, 1.68, 0]} castShadow>
           <boxGeometry args={[0.2, 0.16, 1.28]} />
           <meshStandardMaterial color="#181820" metalness={0.75} roughness={0.25} />
         </mesh>
 
-        {/* ── FRONT CONSOLE (Botão de Apoio da Banca) ─────────────────────────── */}
+        {/* ── CONSOLE FRONTAL (Botão de Apoio da Banca) ─────────────────────── */}
         <group position={[0, 0, 0.9]}>
-          {/* Console body */}
+          {/* Corpo do console */}
           <mesh position={[0, 0.58, 0]} castShadow>
             <cylinderGeometry args={[0.44, 0.54, 1.16, 32]} />
             <meshStandardMaterial color="#10101c" metalness={0.85} roughness={0.18} />
           </mesh>
 
-          {/* Big Red GSAP-animated Button */}
+          {/* Botão de Apoio Animado com GSAP */}
           <mesh position={[0, 1.18, 0]} castShadow>
             <cylinderGeometry args={[0.35, 0.35, 0.13, 32]} />
             <meshStandardMaterial
               ref={buttonMatRef}
-              color={btnColor}
-              emissive={btnColor}
-              emissiveIntensity={isTurned ? 4.0 : 0.2}
+              color={btnInitialColor}
+              emissive={btnInitialColor}
+              emissiveIntensity={isTurned ? 4.5 : 0.2}
               roughness={0.18}
               metalness={0.1}
             />
           </mesh>
 
-          {/* Halo ring around button */}
+          {/* Halo luminoso ao redor do botão */}
           <mesh position={[0, 1.12, 0]} rotation={[Math.PI / 2, 0, 0]}>
             <ringGeometry args={[0.35, 0.42, 32]} />
             <meshBasicMaterial
               ref={haloRef}
-              color={isTurned ? '#ff4d6d' : '#220000'}
+              color={isTurned ? secondaryColor : '#1e2436'}
               side={THREE.DoubleSide}
               transparent
-              opacity={0.9}
+              opacity={isTurned ? 1.0 : 0.25}
             />
           </mesh>
         </group>
 
-        {/* ── Floating 3D Name & Status Labels ────────────────────────────── */}
+        {/* ── Labels 3D Flutuantes (Avaliador e Status) ────────────────────── */}
         <group position={[0, 4.2, -0.35]}>
           <Text
             fontSize={0.32}
-            color={isTurned ? '#ff6b8a' : '#e0e0e0'}
+            color={isTurned ? '#ffffff' : '#e0e0e0'}
             anchorX="center"
             anchorY="middle"
             outlineWidth={0.04}
@@ -219,7 +281,7 @@ export function Chair({ id, name, isTurned, position, baseRotY = 0 }) {
           <Text
             position={[0, -0.42, 0]}
             fontSize={0.19}
-            color={isTurned ? '#ffd166' : '#4a4a6a'}
+            color={isTurned ? primaryColor : '#4a4a6a'}
             anchorX="center"
             anchorY="middle"
             outlineWidth={0.025}

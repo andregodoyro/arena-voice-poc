@@ -9,11 +9,10 @@ import { StudioScene } from './StudioScene';
  * Configura renderizador (sRGB, sombras suaves), câmera institucional de keynote,
  * controles de visualização e atmosfera de profundidade cênica.
  * 
- * Milestone 2D.3 (Ajuste de Composição):
- * Suporta visualização institucional padrão e calibrações de enquadramento
- * via query parameter (?view=frontal|left|right|wide) para inspeção e validação visual cênica.
+ * Milestone 2D.4: Dynamic Theming & Reactive Stage Experience.
+ * Integra branding dinâmico reativo e iluminação cênica aprimorada.
  */
-export function StudioCanvas({ chairs = [] }) {
+export function StudioCanvas({ chairs = [], branding = {} }) {
   // Configuração dinâmica de enquadramento institucional
   const cameraConfig = useMemo(() => {
     let viewMode = 'frontal';
@@ -102,12 +101,12 @@ export function StudioCanvas({ chairs = [] }) {
           target={cameraConfig.target}
         />
 
-        {/* ── Ambiente & Iluminação Cênica Integrada ─────────────────────── */}
-        <hemisphereLight skyColor="#242c4c" groundColor="#080912" intensity={0.75} />
+        {/* ── Ambiente & Iluminação Cênica Integrada (2D.4 Legibilidade) ─── */}
+        <hemisphereLight skyColor="#2c3758" groundColor="#0a0d18" intensity={0.85} />
 
         {/* ── Cena Principal dentro de Suspense ───────────────────────────── */}
         <Suspense fallback={null}>
-          <StudioScene chairs={chairs} />
+          <StudioScene chairs={chairs} branding={branding} />
 
           {/* Sombra de contato no piso da arena */}
           <ContactShadows
