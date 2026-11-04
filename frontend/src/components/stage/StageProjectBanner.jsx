@@ -12,7 +12,16 @@ import { Rocket, User, Layers, Radio, Sparkles } from 'lucide-react';
  * - Zero botões, zero links e totalmente pointer-events-none (ADR-009);
  * - Reativo em tempo real via SignalR (CurrentProjectChanged).
  */
-export function StageProjectBanner({ project, branding }) {
+const PITCH_STAGE_CONFIG = {
+  Waiting: { label: 'Aguardando Pitch', color: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
+  PitchRunning: { label: 'Pitch ao Vivo', color: 'bg-red-500/25 text-red-300 border-red-500/60 animate-pulse' },
+  QA: { label: 'Perguntas e Respostas (Q&A)', color: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
+  VotingOpen: { label: 'Votação Aberta', color: 'bg-emerald-500/25 text-emerald-300 border-emerald-500/60 animate-pulse' },
+  VotingClosed: { label: 'Votação Encerrada', color: 'bg-purple-500/20 text-purple-300 border-purple-500/40' },
+  Finished: { label: 'Apresentação Concluída', color: 'bg-gray-500/20 text-gray-300 border-gray-500/40' },
+};
+
+export function StageProjectBanner({ project, branding, pitchState = null }) {
   const [logoFailed, setLogoFailed] = useState(false);
   const [coverFailed, setCoverFailed] = useState(false);
 
@@ -120,6 +129,18 @@ export function StageProjectBanner({ project, branding }) {
                   <span>{project.track}</span>
                 </span>
               )}
+
+              {/* Badge de Estágio do Pitch (Milestone 3B) */}
+              {(() => {
+                const stageName = pitchState?.stageName || pitchState?.stage || 'Waiting';
+                const config = PITCH_STAGE_CONFIG[stageName] || PITCH_STAGE_CONFIG.Waiting;
+                return (
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border shadow-sm ${config.color}`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                    {config.label}
+                  </span>
+                );
+              })()}
             </div>
 
             {/* Título da Startup / Pitch */}

@@ -12,6 +12,8 @@ public class ArenaProjectStore : IArenaProjectStore
 
     private string? _currentEventId;
     private string? _currentProjectId;
+    private PitchStage _pitchStage = PitchStage.Waiting;
+    private DateTimeOffset? _pitchStageStartedAt = DateTimeOffset.UtcNow;
     private DateTimeOffset _lastUpdated = DateTimeOffset.UtcNow;
 
     public ArenaProjectStore()
@@ -27,6 +29,8 @@ public class ArenaProjectStore : IArenaProjectStore
             {
                 CurrentEventId = _currentEventId,
                 CurrentProjectId = _currentProjectId,
+                PitchStage = _pitchStage,
+                PitchStageStartedAt = _pitchStageStartedAt,
                 LastUpdated = _lastUpdated
             };
         }
@@ -108,9 +112,12 @@ public class ArenaProjectStore : IArenaProjectStore
                 return new SelectProjectResult(false, null, null, "O projeto não pertence ao evento ativo.");
             }
 
-            // Idempotência: se já é o projeto ativo, retorna sucesso sem reexecutar transição
+            // Idempotência: se já é o projeto ativo, retorna sucesso e reinicializa pitch para Waiting
             if (_currentProjectId == projectId)
             {
+                _pitchStage = PitchStage.Waiting;
+                _pitchStageStartedAt = DateTimeOffset.UtcNow;
+                _lastUpdated = DateTimeOffset.UtcNow;
                 return new SelectProjectResult(true, nextProject, null);
             }
 
@@ -135,6 +142,8 @@ public class ArenaProjectStore : IArenaProjectStore
 
             _currentProjectId = projectId;
             _currentEventId = nextProject.EventId;
+            _pitchStage = PitchStage.Waiting;
+            _pitchStageStartedAt = DateTimeOffset.UtcNow;
             _lastUpdated = DateTimeOffset.UtcNow;
 
             return new SelectProjectResult(true, nextProject, prevProject);
@@ -351,6 +360,132 @@ public class ArenaProjectStore : IArenaProjectStore
 
         return new DeleteProjectResult(Success: true, IsActiveProject: false, NotFound: false);
     }
+
+    public PitchStateDto GetPitchState()
+    {
+        lock (_contextLock)
+        {
+            var elapsed = _pitchStageStartedAt.HasValue
+                ? (DateTimeOffset.UtcNow - _pitchStageStartedAt.Value).TotalSeconds
+                : 0.0;
+
+            var allowed = GetAllowedTransitions(_pitchStage);
+
+            return new PitchStateDto(
+                _currentProjectId,
+                _pitchStage,
+                _pitchStage.ToString(),
+                (int)_pitchStage,
+                _pitchStageStartedAt,
+                Math.Round(elapsed, 1),
+                allowed
+            );
+        }
+    }
+
+    public PitchTransitionResult TransitionPitch(PitchStage targetStage)
+    {
+        lock (_contextLock)
+        {
+            if (string.IsNullOrEmpty(_currentProjectId))
+            {
+                return new PitchTransitionResult(
+                    Success: false,
+                    PreviousStage: _pitchStage,
+                    CurrentStage: _pitchStage,
+                    StartedAt: _pitchStageStartedAt,
+                    ErrorMessage: "Nenhum projeto ativo selecionado no momento.",
+                    NoActiveProject: true
+                );
+            }
+
+            if (_pitchStage == PitchStage.Finished)
+            {
+                return new PitchTransitionResult(
+                    Success: false,
+                    PreviousStage: _pitchStage,
+                    CurrentStage: _pitchStage,
+                    StartedAt: _pitchStageStartedAt,
+                    ErrorMessage: "A apresentação já está no estado Finished (terminal). Selecione o próximo projeto para iniciar nova rodada.",
+                    IsInvalidTransition: true
+                );
+            }
+
+            if (!IsValidTransition(_pitchStage, targetStage))
+            {
+                return new PitchTransitionResult(
+                    Success: false,
+                    PreviousStage: _pitchStage,
+                    CurrentStage: _pitchStage,
+                    StartedAt: _pitchStageStartedAt,
+                    ErrorMessage: $"Transição inválida de '{_pitchStage}' para '{targetStage}'.",
+                    IsInvalidTransition: true
+                );
+            }
+
+            var prev = _pitchStage;
+            _pitchStage = targetStage;
+            _pitchStageStartedAt = DateTimeOffset.UtcNow;
+            _lastUpdated = DateTimeOffset.UtcNow;
+
+            if (targetStage == PitchStage.Finished && _currentProjectId != null && _projects.TryGetValue(_currentProjectId, out var project))
+            {
+                project.Status = ProjectStatus.Completed;
+                project.PresentationEndedAt ??= DateTimeOffset.UtcNow;
+                project.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+
+            return new PitchTransitionResult(
+                Success: true,
+                PreviousStage: prev,
+                CurrentStage: _pitchStage,
+                StartedAt: _pitchStageStartedAt
+            );
+        }
+    }
+
+    public PitchResetResult ResetPitch()
+    {
+        lock (_contextLock)
+        {
+            _pitchStage = PitchStage.Waiting;
+            _pitchStageStartedAt = DateTimeOffset.UtcNow;
+            _lastUpdated = DateTimeOffset.UtcNow;
+
+            return new PitchResetResult(
+                Success: true,
+                CurrentStage: _pitchStage,
+                StartedAt: _pitchStageStartedAt.Value,
+                ProjectId: _currentProjectId
+            );
+        }
+    }
+
+    private static IReadOnlyList<string> GetAllowedTransitions(PitchStage stage) => stage switch
+    {
+        PitchStage.Waiting => new[] { nameof(PitchStage.PitchRunning) },
+        PitchStage.PitchRunning => new[] { nameof(PitchStage.QA), nameof(PitchStage.VotingOpen), nameof(PitchStage.Waiting) },
+        PitchStage.QA => new[] { nameof(PitchStage.VotingOpen), nameof(PitchStage.PitchRunning) },
+        PitchStage.VotingOpen => new[] { nameof(PitchStage.VotingClosed), nameof(PitchStage.QA) },
+        PitchStage.VotingClosed => new[] { nameof(PitchStage.Finished), nameof(PitchStage.VotingOpen) },
+        PitchStage.Finished => Array.Empty<string>(),
+        _ => Array.Empty<string>()
+    };
+
+    private static bool IsValidTransition(PitchStage from, PitchStage to) => (from, to) switch
+    {
+        (PitchStage.Waiting, PitchStage.PitchRunning) => true,
+        (PitchStage.PitchRunning, PitchStage.QA) => true,
+        (PitchStage.PitchRunning, PitchStage.VotingOpen) => true,
+        (PitchStage.PitchRunning, PitchStage.Waiting) => true,
+        (PitchStage.QA, PitchStage.VotingOpen) => true,
+        (PitchStage.QA, PitchStage.PitchRunning) => true,
+        (PitchStage.VotingOpen, PitchStage.VotingClosed) => true,
+        (PitchStage.VotingOpen, PitchStage.QA) => true,
+        (PitchStage.VotingClosed, PitchStage.Finished) => true,
+        (PitchStage.VotingClosed, PitchStage.VotingOpen) => true,
+        _ => false
+    };
 
     private void SeedInitialData()
     {

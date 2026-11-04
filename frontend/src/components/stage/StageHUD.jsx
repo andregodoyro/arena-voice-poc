@@ -13,7 +13,7 @@ import { StageProjectBanner } from './StageProjectBanner';
  * - Placar consolidado de cadeiras viradas ("X / 5") com feedback luminoso;
  * - Sem botões interativos, sem Modo Dev, sem termos técnicos ou controles de rede (ADR-009).
  */
-export function StageHUD({ chairs = [], currentProject = null, currentEvent = null }) {
+export function StageHUD({ chairs = [], currentProject = null, currentEvent = null, pitchState = null }) {
   const [eventLogoFailed, setEventLogoFailed] = useState(false);
 
   // Reseta o estado do logo caso o evento mude
@@ -134,7 +134,7 @@ export function StageHUD({ chairs = [], currentProject = null, currentEvent = nu
 
       {/* ── FOOTER CÊNICO: Banner do Projeto Atual no Palco ──────────────────── */}
       <footer className="w-full flex items-end justify-between">
-        <StageProjectBanner project={currentProject} branding={currentEvent?.branding} />
+        <StageProjectBanner project={currentProject} branding={currentEvent?.branding} pitchState={pitchState} />
       </footer>
     </div>
   );

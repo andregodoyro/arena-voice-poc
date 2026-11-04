@@ -596,4 +596,53 @@
     - `test-signalr-e2e.cjs` (SignalR): **55 PASS / 0 FAIL**
     - `homologation-2d5.cjs` (Resiliência): **35 PASS / 0 FAIL**
     - **Total Consolidado: 229 testes aprovados (100% verde)**.
-- **Impacto Futuro:** O Milestone 3A estabelece a governança definitiva de eventos na arena. A plataforma está pronta para o **Milestone 3B (Pitch Lifecycle & Official Timers - Máquina de Estados de Rodada e Cronômetro Sincronizado)**.
+- **Impacto Futuro:** O Milestone 3A estabelece a governança definitiva de eventos na arena. A plataforma está pronta para o **Milestone 3B (Pitch Lifecycle Engine - Máquina de Estados Operacional do Pitch)**.
+
+---
+
+### [2026-11-04] — Milestone 3B: Máquina de Estados Operacional do Pitch (Pitch Lifecycle Engine)
+- **Status:** ✅ Concluído
+- **Objetivo:** Implementar a máquina de estados operacional da apresentação (pitch) no Arena Voice com 6 estágios formais (`Waiting = 0`, `PitchRunning = 1`, `QA = 2`, `VotingOpen = 3`, `VotingClosed = 4`, `Finished = 5`). O ciclo do pitch reside estritamente em `ActiveContext` (`PitchStage`, `PitchStageStartedAt`) respeitando a hierarquia `Event` -> `Project` -> `ActiveContext.PitchStage`. Validação rigorosa de transições com rejeição `HTTP 422 Unprocessable Entity` para transições inválidas, estado `Finished` estritamente terminal (onde o retorno para `Waiting` ocorre exclusivamente via seleção de novo projeto), conclusão automática do projeto para `ProjectStatus.Completed` com `presentationEndedAt` preenchido ao atingir `Finished`, reset de pitch (`POST /api/pitch/reset`) que neutraliza as cadeiras (0°) e retorna a `Waiting` mantendo o projeto selecionado, enriquecimento do snapshot `GET /api/state`, evento canônico SignalR `PitchStageChanged`, Stepper visual e controle operacional no cockpit do operador, e badge cênico do estágio no telão público (`StageProjectBanner`).
+- **Arquitetura & Implementação Realizada:**
+  - **Domínio & Modelos:**
+    - `PitchStage.cs`: Enum com `[JsonConverter(typeof(JsonStringEnumConverter))]` contendo os 6 estados: `Waiting = 0`, `PitchRunning = 1`, `QA = 2`, `VotingOpen = 3`, `VotingClosed = 4`, `Finished = 5`.
+    - `ActiveContext.cs`: Enriquecido com `PitchStage PitchStage` e `DateTimeOffset? PitchStageStartedAt`.
+    - `PitchTransitionDto.cs`: DTO canônico com `TargetStage`.
+    - `IArenaProjectStore.cs` & `ArenaProjectStore.cs`: Métodos thread-safe `GetPitchState()`, `TransitionPitch(PitchStage targetStage)` e `ResetPitch()`.
+    - Matriz de transições formais:
+      - `Waiting` -> `PitchRunning`
+      - `PitchRunning` -> `QA`, `VotingOpen`, `Waiting`
+      - `QA` -> `VotingOpen`, `PitchRunning`
+      - `VotingOpen` -> `VotingClosed`, `QA`
+      - `VotingClosed` -> `Finished`, `VotingOpen`
+      - `Finished`: estritamente **TERMINAL** (rejeita qualquer transição adicional com HTTP 422).
+    - Seleção de Projeto (`POST /api/projects/{id}/select`): Ao selecionar um projeto, define automaticamente `Status = ProjectStatus.Current`, `PitchStage = PitchStage.Waiting`, `PitchStageStartedAt = UtcNow`, reseta todas as cadeiras físicas para `false` (0°), e dispara `ChairsReset` e `PitchStageChanged`.
+    - Conclusão do Projeto em `Finished`: Ao transicionar para `Finished`, o projeto ativo recebe automaticamente `Status = ProjectStatus.Completed` e `PresentationEndedAt = UtcNow`.
+  - **Superfície de APIs (3 Endpoints Canônicos):**
+    - `GET /api/pitch/state`: Retorna estado atual da máquina de estados (`projectId`, `stage`, `stageName`, `stageCode`, `stageStartedAt`, `elapsedSeconds`, `allowedTransitions`).
+    - `POST /api/pitch/transition`: Endpoint canônico de transição de estágio com normalização robusta de strings (tolerante a `"Q&A"`, `"QA"`, etc.). Retorna `HTTP 422 Unprocessable Entity` para transições não permitidas.
+    - `POST /api/pitch/reset`: Reseta todas as 5 cadeiras para 0° e retorna a `Waiting`, mantendo o projeto atual no palco.
+    - Enriquecimento de Snapshot: `GET /api/state` enriched com propriedade `"pitchState"`.
+  - **Tempo Real & SignalR:**
+    - Evento canônico único: `PitchStageChanged` (`projectId`, `previousStage`, `currentStage`, `stage`, `stageCode`, `stageStartedAt`, `timestamp`).
+  - **Frontend & Telão Cênico:**
+    - `pitchApi.js`: Cliente REST para os 3 endpoints de pitch.
+    - `useSignalR.js`: Suporte a `onPitchStageChanged`.
+    - `OperatorContext.jsx`: Gerenciamento do estado `pitchState`, reatividade em tempo real e ações `transitionPitch` e `resetPitch`.
+    - `PitchLifecycleControl.jsx`: Stepper visual de 6 etapas no cockpit do operador com indicador de progresso, botão primário contextual de avanço de estágio e botão de Reset de Pitch.
+    - `OperatorCockpitTab.jsx`: Integrado com `PitchLifecycleControl` acima do placar e da grade de cadeiras.
+    - `StageProjectBanner.jsx` & `StageHUD.jsx`: Badge cênico com status operacional da apresentação no telão público (`Aguardando Pitch`, `Pitch ao Vivo`, `Perguntas e Respostas (Q&A)`, `Votação Aberta`, `Votação Encerrada`, `Apresentação Concluída`).
+  - **Testes Automatizados:**
+    - `tests/test-pitch-lifecycle.cjs`: Suíte autônoma com setup dinâmico (zero IDs fixos / seed independence) contendo 76 asserções rigorosas cobrindo inicialização em `Waiting`, fluxo feliz completo, conclusão do projeto em `Finished`, rejeições HTTP 422 para estado terminal e pulos de etapa, transições de retorno, reset de pitch com limpeza de cadeiras, e transmissão SignalR em tempo real.
+- **Testes & Validação:**
+  - Compilação do Frontend (`npm run build`): **100% verde** (2544 módulos transformados em 4.16s, 0 erros).
+  - Compilação do Backend (`dotnet build`): **0 Warnings, 0 Errors**.
+  - Bateria Completa de Testes (6 suítes automatizadas):
+    - `test-pitch-lifecycle.cjs` (Milestone 3B): **76 PASS / 0 FAIL**
+    - `test-events-api.cjs` (Milestone 3A): **38 PASS / 0 FAIL**
+    - `test-api.cjs` (REST Base): **48 PASS / 0 FAIL**
+    - `test-projects-api.cjs` (Projetos): **53 PASS / 0 FAIL**
+    - `test-signalr-e2e.cjs` (SignalR): **55 PASS / 0 FAIL**
+    - `homologation-2d5.cjs` (Resiliência): **35 PASS / 0 FAIL**
+    - **Total Consolidado: 305 testes aprovados (100% verde, ZERO regressões)**.
+- **Impacto Futuro:** O Milestone 3B consolida a máquina de estados operacional do pitch da arena. A plataforma está pronta para a introdução de cronômetros sincronizados e regras de tempo no **Milestone 3C (Pitch Timers & Clock Synchronization)**.

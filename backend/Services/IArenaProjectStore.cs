@@ -11,6 +11,33 @@ public record ActivateEventResult(bool Success, Event? ActivatedEvent, Event? Pr
 
 public record ArchiveEventResult(bool Success, Event? ArchivedEvent, bool IsActiveEvent, string? ErrorMessage = null);
 
+public record PitchTransitionResult(
+    bool Success,
+    PitchStage PreviousStage,
+    PitchStage CurrentStage,
+    DateTimeOffset? StartedAt,
+    string? ErrorMessage = null,
+    bool IsInvalidTransition = false,
+    bool NoActiveProject = false
+);
+
+public record PitchResetResult(
+    bool Success,
+    PitchStage CurrentStage,
+    DateTimeOffset StartedAt,
+    string? ProjectId
+);
+
+public record PitchStateDto(
+    string? ProjectId,
+    PitchStage Stage,
+    string StageName,
+    int StageCode,
+    DateTimeOffset? StageStartedAt,
+    double ElapsedSeconds,
+    IReadOnlyList<string> AllowedTransitions
+);
+
 public interface IArenaProjectStore
 {
     // Contexto de Sessão Ativa
@@ -31,6 +58,11 @@ public interface IArenaProjectStore
     Event? FinishEvent(string eventId);
     ArchiveEventResult ArchiveEvent(string eventId);
     Event? DuplicateEvent(string eventId);
+
+    // Pitch Lifecycle (Milestone 3B)
+    PitchStateDto GetPitchState();
+    PitchTransitionResult TransitionPitch(PitchStage targetStage);
+    PitchResetResult ResetPitch();
 
     // Projetos
     IReadOnlyList<Project> GetProjectsByEvent(string eventId, bool includeCompleted = false);

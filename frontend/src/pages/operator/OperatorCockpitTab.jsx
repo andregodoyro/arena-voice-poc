@@ -3,6 +3,7 @@ import { RotateCcw } from 'lucide-react';
 import { ScoreBoard } from '../../components/operator/ScoreBoard';
 import { ChairGrid } from '../../components/operator/ChairGrid';
 import { ActivityLog } from '../../components/operator/ActivityLog';
+import { PitchLifecycleControl } from '../../components/operator/PitchLifecycleControl';
 import { useOperatorContext } from '../../contexts/OperatorContext';
 
 /**
@@ -38,6 +39,9 @@ export function OperatorCockpitTab({ chairs: propsChairs, events: propsEvents, o
     <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
       {/* Coluna Esquerda: Palco e Cadeiras (2/3 da largura) */}
       <section className="lg:col-span-2 space-y-6">
+        {/* Controle do Pitch Lifecycle (Milestone 3B) */}
+        <PitchLifecycleControl />
+
         {/* Placar Consolidado */}
         <ScoreBoard chairs={chairs} />
 

@@ -131,7 +131,8 @@ app.MapGet("/api/state", (IArenaProjectStore store) => Results.Ok(new
     chairs = chairStates,
     activeCount = chairStates.Count(c => c.Value),
     currentEvent = store.GetCurrentEvent(),
-    currentProject = store.GetCurrentProject()
+    currentProject = store.GetCurrentProject(),
+    pitchState = store.GetPitchState()
 }));
 
 // POST /api/reset â€” Reseta todas as cadeiras e notifica o Voice Studio
@@ -678,12 +679,147 @@ app.MapPost("/api/projects/{id}/select", async (string id, IArenaProjectStore st
         });
     }
 
+    // Reseta cadeiras e dispara PitchStageChanged para Waiting na selecao
+    foreach (var key in chairStates.Keys.ToList())
+    {
+        chairStates[key] = false;
+    }
+    await hubContext.Clients.All.SendAsync("ChairsReset");
+
+    var activePitch = store.GetPitchState();
+    await hubContext.Clients.All.SendAsync("PitchStageChanged", new
+    {
+        projectId = result.CurrentProject?.Id,
+        previousStage = (string?)null,
+        currentStage = activePitch.StageName,
+        stage = activePitch.StageName,
+        stageCode = activePitch.StageCode,
+        stageStartedAt = activePitch.StageStartedAt,
+        timestamp = DateTimeOffset.UtcNow
+    });
+
     return Results.Ok(new
     {
         success = true,
         currentProject = result.CurrentProject,
         previousProject = result.PreviousProject,
         activeContext = store.GetActiveContext()
+    });
+});
+
+// =========================================================================
+// 3. PITCH LIFECYCLE ENGINE (MILESTONE 3B)
+// =========================================================================
+
+// GET /api/pitch/state — Retorna estado atual da máquina de estados do pitch
+app.MapGet("/api/pitch/state", (IArenaProjectStore store) =>
+{
+    return Results.Ok(store.GetPitchState());
+});
+
+// POST /api/pitch/transition — Endpoint canônico de transição de estágio
+app.MapPost("/api/pitch/transition", async (PitchTransitionDto dto, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
+{
+    var raw = dto?.TargetStage ?? string.Empty;
+    var normalized = raw.Trim().Replace("&", "").Replace(" ", "").ToLowerInvariant();
+
+    PitchStage targetStage;
+    if (normalized == "waiting" || normalized == "0")
+        targetStage = PitchStage.Waiting;
+    else if (normalized == "pitchrunning" || normalized == "running" || normalized == "pitch" || normalized == "1")
+        targetStage = PitchStage.PitchRunning;
+    else if (normalized == "qa" || normalized == "qanda" || normalized == "2")
+        targetStage = PitchStage.QA;
+    else if (normalized == "votingopen" || normalized == "voting_open" || normalized == "voteopen" || normalized == "3")
+        targetStage = PitchStage.VotingOpen;
+    else if (normalized == "votingclosed" || normalized == "voting_closed" || normalized == "voteclosed" || normalized == "4")
+        targetStage = PitchStage.VotingClosed;
+    else if (normalized == "finished" || normalized == "complete" || normalized == "completed" || normalized == "5")
+        targetStage = PitchStage.Finished;
+    else
+    {
+        return Results.UnprocessableEntity(new
+        {
+            error = $"Estágio de transição desconhecido ou inválido: '{raw}'.",
+            allowedStages = Enum.GetNames<PitchStage>()
+        });
+    }
+
+    var result = store.TransitionPitch(targetStage);
+    if (!result.Success)
+    {
+        if (result.NoActiveProject)
+        {
+            return Results.BadRequest(new { error = result.ErrorMessage });
+        }
+        if (result.IsInvalidTransition)
+        {
+            return Results.UnprocessableEntity(new
+            {
+                error = result.ErrorMessage,
+                currentStage = result.CurrentStage.ToString(),
+                targetStage = targetStage.ToString()
+            });
+        }
+        return Results.BadRequest(new { error = result.ErrorMessage });
+    }
+
+    var state = store.GetPitchState();
+
+    // Transmite evento canônico SignalR PitchStageChanged
+    await hubContext.Clients.All.SendAsync("PitchStageChanged", new
+    {
+        projectId = state.ProjectId,
+        previousStage = result.PreviousStage.ToString(),
+        currentStage = result.CurrentStage.ToString(),
+        stage = result.CurrentStage.ToString(),
+        stageCode = (int)result.CurrentStage,
+        stageStartedAt = result.StartedAt,
+        timestamp = DateTimeOffset.UtcNow
+    });
+
+    return Results.Ok(new
+    {
+        success = true,
+        previousStage = result.PreviousStage.ToString(),
+        currentStage = result.CurrentStage.ToString(),
+        stageCode = (int)result.CurrentStage,
+        stageStartedAt = result.StartedAt,
+        allowedTransitions = state.AllowedTransitions
+    });
+});
+
+// POST /api/pitch/reset — Reseta cadeiras e retorna estágio para Waiting mantendo projeto
+app.MapPost("/api/pitch/reset", async (IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
+{
+    var resetResult = store.ResetPitch();
+
+    foreach (var key in chairStates.Keys.ToList())
+    {
+        chairStates[key] = false;
+    }
+
+    await hubContext.Clients.All.SendAsync("ChairsReset");
+    await hubContext.Clients.All.SendAsync("PitchStageChanged", new
+    {
+        projectId = resetResult.ProjectId,
+        previousStage = (string?)null,
+        currentStage = resetResult.CurrentStage.ToString(),
+        stage = resetResult.CurrentStage.ToString(),
+        stageCode = (int)resetResult.CurrentStage,
+        stageStartedAt = resetResult.StartedAt,
+        source = "RESET",
+        timestamp = DateTimeOffset.UtcNow
+    });
+
+    return Results.Ok(new
+    {
+        success = true,
+        stage = resetResult.CurrentStage.ToString(),
+        stageCode = (int)resetResult.CurrentStage,
+        stageStartedAt = resetResult.StartedAt,
+        projectId = resetResult.ProjectId,
+        chairs = chairStates
     });
 });
 

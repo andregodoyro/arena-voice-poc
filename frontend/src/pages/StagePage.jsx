@@ -18,16 +18,19 @@ export function StagePage({
   chairs: propsChairs,
   currentProject: propsProject,
   currentEvent: propsEvent,
+  pitchState: propsPitchState,
 }) {
   let contextChairs = [];
   let contextProject = null;
   let contextEvent = null;
+  let contextPitchState = null;
 
   try {
     const context = useOperatorContext();
     contextChairs = context?.chairs || [];
     contextProject = context?.currentProject || null;
     contextEvent = context?.currentEvent || null;
+    contextPitchState = context?.pitchState || null;
   } catch {
     contextChairs = [];
   }
@@ -35,17 +38,19 @@ export function StagePage({
   const chairs = propsChairs || contextChairs;
   const currentProject = propsProject || contextProject;
   const currentEvent = propsEvent || contextEvent;
+  const pitchState = propsPitchState || contextPitchState;
 
   return (
     <main style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
       {/* 3D Canvas Layer — Projeção Cênica Reativa com Branding Dinâmico (Milestone 2D.4) */}
       <StudioCanvas chairs={chairs} branding={currentEvent?.branding} />
 
-      {/* 2D HUD Cênico — Projeta Evento, Projeto Atual e Placar da Banca */}
+      {/* 2D HUD Cênico — Projeta Evento, Projeto Atual, Estágio do Pitch e Placar da Banca */}
       <StageHUD
         chairs={chairs}
         currentProject={currentProject}
         currentEvent={currentEvent}
+        pitchState={pitchState}
       />
     </main>
   );

@@ -16,6 +16,7 @@ export function useSignalR({
   onCurrentProjectChanged,
   onEventBrandingUpdated,
   onActiveEventChanged,
+  onPitchStageChanged,
   onReconnecting,
   onReconnected,
   onClose,
@@ -39,6 +40,7 @@ export function useSignalR({
     onCurrentProjectChanged,
     onEventBrandingUpdated,
     onActiveEventChanged,
+    onPitchStageChanged,
     onReconnecting,
     onReconnected,
     onClose,
@@ -50,6 +52,7 @@ export function useSignalR({
     onCurrentProjectChanged,
     onEventBrandingUpdated,
     onActiveEventChanged,
+    onPitchStageChanged,
     onReconnecting,
     onReconnected,
     onClose,
@@ -190,6 +193,14 @@ export function useSignalR({
       console.log('[SignalR Evento] ActiveEventChanged recebido:', data?.event?.title);
       if (callbacksRef.current.onActiveEventChanged) {
         callbacksRef.current.onActiveEventChanged(data);
+      }
+    });
+
+    // 7. Mudança de Estágio do Pitch (Milestone 3B)
+    connection.on('PitchStageChanged', (data) => {
+      console.log('[SignalR Evento] PitchStageChanged recebido:', data?.stage || data?.currentStage);
+      if (callbacksRef.current.onPitchStageChanged) {
+        callbacksRef.current.onPitchStageChanged(data);
       }
     });
 

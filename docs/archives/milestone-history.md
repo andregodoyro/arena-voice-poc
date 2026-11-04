@@ -30,10 +30,11 @@ Este documento é a **fonte oficial de índice de marcos**, permitindo rastrear 
 | **2** | **2D** | Stage Projection & Dynamic Experience | ✅ Concluído | Telão 3D institucional, anfiteatro, pódio de pitch, neons e branding dinâmico (2D.1 a 2D.5) | 191 testes (156 base + 35 homolog) | main |
 | **2** | **2E** | Phase 2 Validation & Closure | ✅ Concluído | Homologação integrada, governança, release notes e fechamento | 191 testes / Build verde | `v0.2.0-phase2` |
 | **3** | **3A** | Event Lifecycle & Management | ✅ Concluído | 5 estados (Draft, Ready, Active, Finished, Archived), ativação não-destrutiva, catálogo no cockpit | 229 testes (191 base + 38 events) | main |
-| **3** | **3B** | Pitch Lifecycle & Timers | 📅 Próximo | Máquina de estados da rodada e cronômetro sincronizado via SignalR | Planejado | - |
-| **3** | **3C** | Chair Lockout & Security | 📅 Futuro | Bloqueio autoritativo de virada de cadeiras pós-cronômetro | Planejado | - |
-| **3** | **3D** | Evaluator Governance & Scorecards | 📅 Futuro | Jurados nominais nas 5 cadeiras e notas quantitativas | Planejado | - |
-| **3** | **3E** | Analytics, Reporting & Phase 3 Closure | 📅 Futuro | Ata executiva em PDF/CSV e tag v0.3.0-phase3 | Planejado | - |
+| **3** | **3B** | Pitch Lifecycle Engine | ✅ Concluído | Máquina de estados formal (6 estágios), 422 Unprocessable, reset cadeiras, SignalR PitchStageChanged | 305 testes (229 base + 76 pitch) | main |
+| **3** | **3C** | Pitch Timers & Clock Synchronization | 📅 Próximo | Cronômetro sincronizado via SignalR no telão e cockpit (consumidor da máquina de estados) | Planejado | - |
+| **3** | **3D** | Chair Lockout & Security | 📅 Futuro | Bloqueio autoritativo de virada de cadeiras pós-cronômetro | Planejado | - |
+| **3** | **3E** | Evaluator Governance & Scorecards | 📅 Futuro | Jurados nominais nas 5 cadeiras e notas quantitativas | Planejado | - |
+| **3** | **3F** | Analytics, Reporting & Phase 3 Closure | 📅 Futuro | Ata executiva em PDF/CSV e tag v0.3.0-phase3 | Planejado | - |
 
 ---
 
@@ -60,10 +61,11 @@ Este documento é a **fonte oficial de índice de marcos**, permitindo rastrear 
 
 ### Fase 3 — Event Governance, Pitch Dynamics & Evaluator Experience (Em Andamento)
 - **3A (Event Lifecycle & Management):** Implementação da governança e catálogo de eventos com modelo explícito de 5 estados (`Draft`, `Ready`, `Active`, `Finished`, `Archived`). Introdução de ativação atômica não-destrutiva (evento ativo anterior retorna para `Ready`), ações explícitas de encerramento (`finish`) e arquivamento protegido com `HTTP 409 Conflict`, duplicação para novos ciclos em `Draft`, 8 novos endpoints REST, reatividade SignalR com `ActiveEventChanged` e painel com abas de filtros por status e `ColorSwatch` no cockpit do operador. Suíte automatizada expandida para 229 testes (100% verdes).
-- **3B (Pitch Lifecycle & Timers):** Máquina de estados de rodada de pitch (`Waiting`, `PitchRunning`, `Q&A`, `VotingClosed`) e cronômetro cênico sincronizado via SignalR no HUD do telão e cockpit (Planejado).
-- **3C (Chair Lockout & Security):** Bloqueio autoritativo de virada de cadeiras pós-cronômetro (`HTTP 423 Locked`) e feedback para o microcontrolador ESP32 (Planejado).
-- **3D (Evaluator Governance & Nominals):** Cadastro nominal e fotos dos jurados nas 5 cadeiras e scorecards qualitativos (Planejado).
-- **3E (Analytics & Phase 3 Closure):** Exportação de ata executiva em PDF/CSV, homologação integrada e emissão da tag `v0.3.0-phase3` (Planejado).
+- **3B (Pitch Lifecycle Engine):** Implementação da máquina de estados operacional do pitch com 6 estados formais (`Waiting = 0`, `PitchRunning = 1`, `QA = 2`, `VotingOpen = 3`, `VotingClosed = 4`, `Finished = 5`) acoplada a `ActiveContext`, endpoint canônico de transição `POST /api/pitch/transition` com validação rígida e rejeição `HTTP 422 Unprocessable Entity` para pulos ou transições ilegais, estado `Finished` estritamente terminal com conclusão automática do projeto para `ProjectStatus.Completed`, reset de pitch (`POST /api/pitch/reset`) neutralizando as cadeiras para 0°, evento SignalR `PitchStageChanged`, Stepper visual e controles no cockpit do operador, e badge cênico do estágio no telão público (`StageProjectBanner`). Suíte automatizada expandida para 305 testes (100% verdes).
+- **3C (Pitch Timers & Clock Synchronization):** Cronômetro oficial sincronizado via SignalR no telão e cockpit, atuando como consumidor da máquina de estados (Planejado).
+- **3D (Chair Lockout & Security):** Bloqueio autoritativo de virada de cadeiras pós-cronômetro (`HTTP 423 Locked`) e feedback para o hardware (Planejado).
+- **3E (Evaluator Governance & Nominals):** Cadastro nominal e fotos dos jurados nas 5 cadeiras e scorecards qualitativos (Planejado).
+- **3F (Analytics & Phase 3 Closure):** Exportação de ata executiva em PDF/CSV, homologação integrada e emissão da tag `v0.3.0-phase3` (Planejado).
 
 ---
 

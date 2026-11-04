@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { projectsApi } from '../api/projectsApi';
 import { eventsApi } from '../api/eventsApi';
+import { pitchApi } from '../api/pitchApi';
 import { isCurrentProject } from '../utils/projectStatus';
 import { useSignalR } from '../services/useSignalR';
 import { getBackendUrl } from '../api/apiClient';
@@ -31,6 +32,7 @@ export function OperatorProvider({ children }) {
   const [currentProject, setCurrentProject] = useState(null);
   const [projects, setProjects] = useState([]);
   const [eventsList, setEventsList] = useState([]);
+  const [pitchState, setPitchState] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -92,6 +94,11 @@ export function OperatorProvider({ children }) {
         setCurrentProject(stateData.currentProject);
       } else {
         setCurrentProject(projectList.find((p) => isCurrentProject(p.status)) || null);
+      }
+
+      // Sincroniza máquina de estados do pitch (Milestone 3B)
+      if (stateData?.pitchState) {
+        setPitchState(stateData.pitchState);
       }
 
       // Sincroniza estado das cadeiras com o snapshot autoritativo
@@ -184,6 +191,29 @@ export function OperatorProvider({ children }) {
     fetchOperationalData(false);
   }, [fetchOperationalData]);
 
+  // ── Sincronização em Tempo Real (Milestone 3B: Pitch Lifecycle Engine) ──
+  const handlePitchStageChanged = useCallback((payload) => {
+    if (!payload) return;
+    const stageName = payload.stage || payload.currentStage;
+    console.log('[OperatorContext] Sincronizando novo estágio do pitch:', stageName);
+
+    setPitchState((prev) => ({
+      ...prev,
+      stage: stageName,
+      stageName: stageName,
+      stageCode: payload.stageCode ?? prev?.stageCode,
+      stageStartedAt: payload.stageStartedAt ?? new Date().toISOString(),
+      projectId: payload.projectId || prev?.projectId,
+    }));
+
+    if (stageName === 'Waiting' || payload.source === 'RESET') {
+      setChairs((prevChairs) => prevChairs.map((c) => ({ ...c, isTurned: false })));
+    }
+
+    // Re-hidratação silenciosa em background (para allowedTransitions e status)
+    fetchOperationalData(false);
+  }, [fetchOperationalData]);
+
   // ── Reconexão e Resync Hardening (Milestone 2C.5.5) ──────────────────────
   const handleReconnected = useCallback(async () => {
     console.log('[OperatorContext] Reconexão detectada. Executando resync autoritativo completo...');
@@ -197,16 +227,28 @@ export function OperatorProvider({ children }) {
     }
   }, [fetchOperationalData]);
 
-  // ── Instância Única de SignalR (Milestone 2C.5.1: Foundation / 3A) ───────
+  // ── Instância Única de SignalR (Milestone 2C.5.1: Foundation / 3A / 3B) ───
   const { connectionStatus, connectionError, backendUrl } = useSignalR({
     onChairTurned: (chairId, source) => turnChair(chairId, source),
     onChairsReset: resetAllChairs,
     onCurrentProjectChanged: handleCurrentProjectChanged,
     onEventBrandingUpdated: handleEventBrandingUpdated,
     onActiveEventChanged: handleActiveEventChanged,
+    onPitchStageChanged: handlePitchStageChanged,
     onReconnected: handleReconnected,
     initialBackendUrl: getBackendUrl(),
   });
+
+  // ── Despacho Autoritativo do Pitch (Milestone 3B) ─────────────────────────
+  const transitionPitch = useCallback(async (targetStage) => {
+    const result = await pitchApi.transitionPitch(targetStage);
+    return result;
+  }, []);
+
+  const resetPitch = useCallback(async () => {
+    const result = await pitchApi.resetPitch();
+    return result;
+  }, []);
 
   // ── Despacho Autoritativo de Reset de Arena ──────────────────────────────
   const requestResetArena = useCallback(async () => {
@@ -244,6 +286,11 @@ export function OperatorProvider({ children }) {
     turnChair,
     resetAllChairs,
     requestResetArena,
+
+    // Pitch Lifecycle Engine (Milestone 3B)
+    pitchState,
+    transitionPitch,
+    resetPitch,
 
     // Conexão e Resync
     connectionStatus,
