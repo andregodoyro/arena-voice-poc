@@ -209,18 +209,28 @@ export function EventModal({
                 <div>
                   <label className="block text-xs font-semibold text-gray-300 mb-1.5 flex items-center gap-1.5">
                     <Tag className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Status Inicial</span>
+                    <span>{isEditing ? 'Status do Evento' : 'Status Inicial'}</span>
                   </label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(Number(e.target.value))}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-amber-500/50"
-                  >
-                    <option value={EVENT_STATUS.DRAFT}>Rascunho (Draft)</option>
-                    <option value={EVENT_STATUS.READY}>Pronto (Ready)</option>
-                    <option value={EVENT_STATUS.FINISHED}>Encerrado (Finished)</option>
-                    <option value={EVENT_STATUS.ARCHIVED}>Arquivado (Archived)</option>
-                  </select>
+                  {isEditing && (initialEvent?.status === EVENT_STATUS.ACTIVE || initialEvent?.status === 'Active' || initialEvent?.status === 2) ? (
+                    <div className="w-full px-3.5 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        Ativo na Arena
+                      </span>
+                      <span className="text-[10px] text-emerald-500/80 uppercase font-mono tracking-wider">Em Execução</span>
+                    </div>
+                  ) : (
+                    <select
+                      value={status}
+                      onChange={(e) => setStatus(Number(e.target.value))}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-amber-500/50"
+                    >
+                      <option value={EVENT_STATUS.DRAFT}>Rascunho (Draft)</option>
+                      <option value={EVENT_STATUS.READY}>Pronto (Ready)</option>
+                      <option value={EVENT_STATUS.FINISHED}>Encerrado (Finished)</option>
+                      <option value={EVENT_STATUS.ARCHIVED}>Arquivado (Archived)</option>
+                    </select>
+                  )}
                   <p className="text-[10px] text-gray-500 mt-1">
                     * Status "Ativo na Arena" é obtido através do botão Ativar no Palco.
                   </p>
