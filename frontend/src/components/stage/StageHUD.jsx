@@ -16,8 +16,25 @@ import { useStageTimer } from '../../hooks/useStageTimer';
  * - Placar consolidado de cadeiras viradas ("X / 5") com feedback luminoso;
  * - Sem botões interativos, sem Modo Dev, sem termos técnicos ou controles de rede (ADR-009).
  */
-export function StageHUD({ chairs = [], currentProject = null, currentEvent = null, pitchState = null }) {
+export function StageHUD({
+  chairs = [],
+  currentProject = null,
+  currentEvent = null,
+  pitchState = null,
+  jury = [],
+}) {
   const [eventLogoFailed, setEventLogoFailed] = useState(false);
+
+  // Mapeamento da banca de jurados por ChairId (1..5)
+  const juryByChair = React.useMemo(() => {
+    const map = {};
+    if (Array.isArray(jury)) {
+      for (const item of jury) {
+        map[item.chairId] = item.judge;
+      }
+    }
+    return map;
+  }, [jury]);
 
   // Ticker de alta precisão sincronizado com o servidor
   const {
@@ -204,9 +221,73 @@ export function StageHUD({ chairs = [], currentProject = null, currentEvent = nu
         </div>
       </header>
 
-      {/* ── FOOTER CÊNICO: Banner do Projeto Atual no Palco ──────────────────── */}
-      <footer className="w-full flex items-end justify-between">
+      {/* ── FOOTER CÊNICO: Banner do Projeto + Banca de Jurados (5 Cadeiras) ── */}
+      <footer className="w-full flex flex-col lg:flex-row items-end justify-between gap-4">
         <StageProjectBanner project={currentProject} branding={currentEvent?.branding} pitchState={pitchState} />
+
+        {/* ── BARRA DA BANCA DE JURADOS (Milestone 3E) ───────────────────────── */}
+        <div
+          className="glass-panel rounded-2xl px-3 py-2 md:px-4 md:py-2.5 flex items-center gap-2.5 border shadow-2xl backdrop-blur-xl transition-all duration-300"
+          style={{
+            borderColor: `${primaryColor}30`,
+            boxShadow: `0 15px 35px rgba(0, 0, 0, 0.6), 0 0 20px ${primaryColor}15`,
+          }}
+        >
+          {[1, 2, 3, 4, 5].map((chairId) => {
+            const chair = chairs.find((c) => c.id === chairId);
+            const isTurned = Boolean(chair?.isTurned);
+            const judge = juryByChair[chairId];
+
+            return (
+              <div
+                key={chairId}
+                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border transition-all duration-300 ${
+                  isTurned
+                    ? 'bg-emerald-950/40 border-emerald-500/60 shadow-lg shadow-emerald-500/20 scale-105'
+                    : 'bg-black/40 border-white/5 opacity-80'
+                }`}
+              >
+                {/* Foto do Jurado ou Fallback de Cadeira */}
+                <div className="relative">
+                  <img
+                    src={judge?.avatarUrl || '/samples/judges/camila.png'}
+                    alt={judge?.name || `Cadeira ${chairId}`}
+                    onError={(e) => {
+                      e.target.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(judge?.name || `C ${chairId}`);
+                    }}
+                    className={`w-7 h-7 md:w-8 md:h-8 rounded-full object-cover border transition-all ${
+                      isTurned
+                        ? 'border-emerald-400 ring-2 ring-emerald-500/50'
+                        : 'border-white/20 grayscale'
+                    }`}
+                  />
+                  {isTurned && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 border border-black rounded-full flex items-center justify-center animate-pulse">
+                      <span className="w-1.5 h-1.5 bg-black rounded-full" />
+                    </span>
+                  )}
+                </div>
+
+                {/* Nome e Cadeira (Oculta descrição longa no mobile) */}
+                <div className="hidden sm:block text-left">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] font-mono font-bold text-gray-400">#{chairId}</span>
+                    <p
+                      className={`text-xs font-bold leading-tight truncate max-w-[90px] md:max-w-[110px] ${
+                        isTurned ? 'text-emerald-300' : 'text-gray-300'
+                      }`}
+                    >
+                      {judge?.name || `Cadeira ${chairId}`}
+                    </p>
+                  </div>
+                  <p className="text-[9px] text-gray-500 truncate max-w-[90px] md:max-w-[110px]">
+                    {judge?.company || (isTurned ? 'Apoiou o Pitch' : 'Aguardando')}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </footer>
     </div>
   );

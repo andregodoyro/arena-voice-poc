@@ -3,6 +3,7 @@ import { projectsApi } from '../api/projectsApi';
 import { eventsApi } from '../api/eventsApi';
 import { pitchApi } from '../api/pitchApi';
 import { roundsApi } from '../api/roundsApi';
+import { judgesApi } from '../api/judgesApi';
 import { isCurrentProject } from '../utils/projectStatus';
 import { useSignalR } from '../services/useSignalR';
 import { getBackendUrl } from '../api/apiClient';
@@ -36,6 +37,8 @@ export function OperatorProvider({ children }) {
   const [eventsList, setEventsList] = useState([]);
   const [pitchState, setPitchState] = useState(null);
   const [rounds, setRounds] = useState([]);
+  const [judges, setJudges] = useState([]);
+  const [jury, setJury] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -120,6 +123,17 @@ export function OperatorProvider({ children }) {
         setRounds(Array.isArray(roundsData) ? roundsData : []);
       } catch (rErr) {
         console.warn('[OperatorContext] Aviso ao buscar histórico de rodadas:', rErr);
+      }
+
+      // Sincroniza catálogo de jurados e banca do evento ativo (Milestone 3E)
+      if (Array.isArray(stateData?.jury)) {
+        setJury(stateData.jury);
+      }
+      try {
+        const judgesData = await judgesApi.getJudges(true);
+        setJudges(Array.isArray(judgesData) ? judgesData : []);
+      } catch (jErr) {
+        console.warn('[OperatorContext] Aviso ao buscar catálogo de jurados:', jErr);
       }
 
       setError(null);
@@ -253,6 +267,15 @@ export function OperatorProvider({ children }) {
     setRounds((prev) => [payload.round, ...prev.filter((r) => r.id !== payload.round.id)]);
   }, []);
 
+  // ── Sincronização em Tempo Real (Milestone 3E: Judges & Jury) ─────────────
+  const handleEventJuryUpdated = useCallback((payload) => {
+    if (!payload) return;
+    console.log('[OperatorContext] Sincronizando atualização da banca de jurados:', payload);
+    if (Array.isArray(payload.jury)) {
+      setJury(payload.jury);
+    }
+  }, []);
+
   // ── Reconexão e Resync Hardening (Milestone 2C.5.5) ──────────────────────
   const handleReconnected = useCallback(async () => {
     console.log('[OperatorContext] Reconexão detectada. Executando resync autoritativo completo...');
@@ -266,7 +289,7 @@ export function OperatorProvider({ children }) {
     }
   }, [fetchOperationalData]);
 
-  // ── Instância Única de SignalR (Milestone 2C.5.1: Foundation / 3A / 3B / 3D) ─
+  // ── Instância Única de SignalR (Milestone 2C.5.1: Foundation / 3A / 3B / 3D / 3E) ─
   const { connectionStatus, connectionError, backendUrl } = useSignalR({
     onChairTurned: (chairId, source) => turnChair(chairId, source),
     onChairsReset: resetAllChairs,
@@ -276,6 +299,7 @@ export function OperatorProvider({ children }) {
     onPitchStageChanged: handlePitchStageChanged,
     onPitchTimerUpdated: handlePitchTimerUpdated,
     onRoundArchived: handleRoundArchived,
+    onEventJuryUpdated: handleEventJuryUpdated,
     onReconnected: handleReconnected,
     initialBackendUrl: getBackendUrl(),
   });
@@ -353,6 +377,10 @@ export function OperatorProvider({ children }) {
 
     // Histórico de Rodadas (Milestone 3D)
     rounds,
+
+    // Catálogo de Jurados & Banca (Milestone 3E)
+    judges,
+    jury,
 
     // Conexão e Resync
     connectionStatus,

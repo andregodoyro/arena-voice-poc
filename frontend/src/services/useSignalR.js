@@ -226,6 +226,14 @@ export function useSignalR({
       }
     });
 
+    // 10. Atualização da Banca de Jurados do Evento (Milestone 3E: Judges & Jury)
+    connection.on('EventJuryUpdated', (data) => {
+      console.log('[SignalR Evento] EventJuryUpdated recebido para o evento:', data?.eventId);
+      if (callbacksRef.current.onEventJuryUpdated) {
+        callbacksRef.current.onEventJuryUpdated(data);
+      }
+    });
+
     // ── Iniciar Conexão ────────────────────────────────────────────────────
     startConnection();
 

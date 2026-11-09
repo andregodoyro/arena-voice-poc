@@ -5,10 +5,11 @@ import { OperatorLayout } from './components/operator/OperatorLayout';
 import { OperatorCockpitTab } from './pages/operator/OperatorCockpitTab';
 import { OperatorProjectsTab } from './pages/operator/OperatorProjectsTab';
 import { OperatorEventTab } from './pages/operator/OperatorEventTab';
+import { OperatorJuryTab } from './pages/operator/OperatorJuryTab';
 import { OperatorProvider } from './contexts/OperatorContext';
 
 /**
- * App — Orquestrador de Estado, Sincronização e Roteamento (Milestone 2C.5).
+ * App — Orquestrador de Estado, Sincronização e Roteamento (Milestone 2C.5 / 3E).
  * 
  * Centraliza o OperatorProvider com uma única conexão WebSocket ativa para todo o ciclo de vida.
  * Mantém a fonte da verdade compartilhada (snapshot autoritativo + aceleração via SignalR)
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="cockpit" element={<OperatorCockpitTab />} />
           <Route path="projects" element={<OperatorProjectsTab />} />
           <Route path="event" element={<OperatorEventTab />} />
+          <Route path="jury" element={<OperatorJuryTab />} />
         </Route>
 
         {/* Fallback de rotas desconhecidas */}

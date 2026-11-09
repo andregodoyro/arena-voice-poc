@@ -69,6 +69,19 @@ public record PitchStateDto(
     IReadOnlyList<string> AllowedTransitions
 );
 
+public record DeleteJudgeResult(
+    bool Success,
+    bool IsAssignedToActiveEvent,
+    bool NotFound,
+    string? ErrorMessage = null
+);
+
+public record AssignEventJuryResult(
+    bool Success,
+    IReadOnlyList<EventJuryAssignment>? Jury = null,
+    string? ErrorMessage = null
+);
+
 public interface IArenaProjectStore
 {
     // Contexto de Sessão Ativa
@@ -104,11 +117,20 @@ public interface IArenaProjectStore
     IReadOnlyDictionary<int, bool> GetChairStates();
     int GetActiveChairCount();
 
-    // Round History & Result Engine (Milestone 3D)
+    // Histórico de Rodadas (Milestone 3D)
     IReadOnlyList<Round> GetRoundHistory(string? eventId = null);
     Round? GetRoundById(string roundId);
     Round? GetLastRound();
     Round? ArchiveCurrentRound(string reason = "Manual");
+
+    // Catálogo Global de Jurados & Alocação de Banca (Milestone 3E)
+    IReadOnlyList<Judge> GetAllJudges(bool includeInactive = false);
+    Judge? GetJudgeById(string judgeId);
+    Judge AddJudge(Judge judge);
+    bool UpdateJudge(Judge judge);
+    DeleteJudgeResult DeleteJudge(string judgeId);
+    IReadOnlyList<EventJuryAssignment> GetEventJury(string eventId);
+    AssignEventJuryResult AssignEventJury(string eventId, IReadOnlyList<ArenaVoicePocBackend.Domain.DTOs.JuryAssignmentItemDto> assignments);
 
     // Projetos
     IReadOnlyList<Project> GetProjectsByEvent(string eventId, bool includeCompleted = false);

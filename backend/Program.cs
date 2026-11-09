@@ -162,15 +162,24 @@ app.MapPost("/api/support", async (ChairPressRequest request, HttpContext http, 
 // 2. ENDPOINTS AUXILIARES DE DIAGNÓSTICO E RESET
 // =========================================================================
 
-// GET /api/state — Retorna o estado atual das 5 cadeiras e o contexto de evento/projeto/timers
-app.MapGet("/api/state", (IArenaProjectStore store) => Results.Ok(new
+// GET /api/state — Retorna o estado atual das 5 cadeiras e o contexto de evento/projeto/timers/banca
+app.MapGet("/api/state", (IArenaProjectStore store) =>
 {
-    chairs = store.GetChairStates(),
-    activeCount = store.GetActiveChairCount(),
-    currentEvent = store.GetCurrentEvent(),
-    currentProject = store.GetCurrentProject(),
-    pitchState = store.GetPitchState()
-}));
+    var activeContext = store.GetActiveContext();
+    var jury = activeContext.CurrentEventId != null
+        ? store.GetEventJury(activeContext.CurrentEventId)
+        : Array.Empty<EventJuryAssignment>();
+
+    return Results.Ok(new
+    {
+        chairs = store.GetChairStates(),
+        activeCount = store.GetActiveChairCount(),
+        currentEvent = store.GetCurrentEvent(),
+        currentProject = store.GetCurrentProject(),
+        pitchState = store.GetPitchState(),
+        jury = jury
+    });
+});
 
 // POST /api/reset — Reseta todas as cadeiras e notifica o Voice Studio
 app.MapPost("/api/reset", async (IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
@@ -515,6 +524,181 @@ app.MapPost("/api/events/{id}/duplicate", (string id, IArenaProjectStore store) 
     }
 
     return Results.Created($"/api/events/{duplicated.Id}", duplicated);
+});
+
+// =========================================================================
+// GESTÃO DE JURADOS & BANCA DO EVENTO (Milestone 3E)
+// =========================================================================
+
+// GET /api/judges — Catálogo global de jurados
+app.MapGet("/api/judges", (IArenaProjectStore store, bool? includeInactive) =>
+{
+    var judges = store.GetAllJudges(includeInactive ?? false);
+    return Results.Ok(judges);
+});
+
+// GET /api/judges/{id} — Detalhes de um jurado específico
+app.MapGet("/api/judges/{id}", (string id, IArenaProjectStore store) =>
+{
+    var judge = store.GetJudgeById(id);
+    return judge != null
+        ? Results.Ok(judge)
+        : Results.NotFound(new { error = "Jurado não encontrado.", id });
+});
+
+// POST /api/judges — Cadastra novo jurado no catálogo
+app.MapPost("/api/judges", (CreateJudgeDto dto, IArenaProjectStore store) =>
+{
+    if (string.IsNullOrWhiteSpace(dto.Name) || dto.Name.Trim().Length < 3 || dto.Name.Trim().Length > 100)
+    {
+        return Results.BadRequest(new { error = "O nome do jurado é obrigatório e deve ter entre 3 e 100 caracteres." });
+    }
+    if (string.IsNullOrWhiteSpace(dto.Company) || dto.Company.Trim().Length < 2)
+    {
+        return Results.BadRequest(new { error = "A empresa/organização é obrigatória." });
+    }
+    if (string.IsNullOrWhiteSpace(dto.Role) || dto.Role.Trim().Length < 2)
+    {
+        return Results.BadRequest(new { error = "O cargo do jurado é obrigatório." });
+    }
+    if (string.IsNullOrWhiteSpace(dto.AvatarUrl))
+    {
+        return Results.BadRequest(new { error = "A URL do avatar/foto é obrigatória." });
+    }
+
+    var newJudge = new Judge
+    {
+        Name = dto.Name.Trim(),
+        Company = dto.Company.Trim(),
+        Role = dto.Role.Trim(),
+        AvatarUrl = dto.AvatarUrl.Trim(),
+        Bio = dto.Bio?.Trim(),
+        Expertise = dto.Expertise,
+        SocialUrl = dto.SocialUrl?.Trim(),
+        IsActive = dto.IsActive ?? true,
+        Email = dto.Email?.Trim()
+    };
+
+    var created = store.AddJudge(newJudge);
+    return Results.Created($"/api/judges/{created.Id}", created);
+});
+
+// PUT /api/judges/{id} — Atualiza dados cadastrais de um jurado
+app.MapPut("/api/judges/{id}", (string id, UpdateJudgeDto dto, IArenaProjectStore store) =>
+{
+    var existing = store.GetJudgeById(id);
+    if (existing == null)
+    {
+        return Results.NotFound(new { error = "Jurado não encontrado.", id });
+    }
+
+    if (!string.IsNullOrWhiteSpace(dto.Name))
+    {
+        if (dto.Name.Trim().Length < 3 || dto.Name.Trim().Length > 100)
+            return Results.BadRequest(new { error = "O nome do jurado deve ter entre 3 e 100 caracteres." });
+        existing.Name = dto.Name.Trim();
+    }
+
+    if (!string.IsNullOrWhiteSpace(dto.Company))
+    {
+        existing.Company = dto.Company.Trim();
+    }
+
+    if (!string.IsNullOrWhiteSpace(dto.Role))
+    {
+        existing.Role = dto.Role.Trim();
+    }
+
+    if (!string.IsNullOrWhiteSpace(dto.AvatarUrl))
+    {
+        existing.AvatarUrl = dto.AvatarUrl.Trim();
+    }
+
+    if (dto.Bio != null)
+    {
+        existing.Bio = dto.Bio.Trim();
+    }
+
+    if (dto.Expertise != null)
+    {
+        existing.Expertise = dto.Expertise;
+    }
+
+    if (dto.SocialUrl != null)
+    {
+        existing.SocialUrl = dto.SocialUrl.Trim();
+    }
+
+    if (dto.IsActive.HasValue)
+    {
+        existing.IsActive = dto.IsActive.Value;
+    }
+
+    if (dto.Email != null)
+    {
+        existing.Email = dto.Email.Trim();
+    }
+
+    store.UpdateJudge(existing);
+    return Results.Ok(existing);
+});
+
+// DELETE /api/judges/{id} — Remove jurado com proteção contra exclusão de membros da banca ativa
+app.MapDelete("/api/judges/{id}", (string id, IArenaProjectStore store) =>
+{
+    var result = store.DeleteJudge(id);
+    if (result.NotFound)
+    {
+        return Results.NotFound(new { error = result.ErrorMessage, id });
+    }
+    if (result.IsAssignedToActiveEvent)
+    {
+        return Results.Conflict(new { error = result.ErrorMessage, id });
+    }
+
+    return Results.Ok(new { success = true, id, message = "Jurado removido com sucesso." });
+});
+
+// GET /api/events/{id}/jury — Obtém a composição da banca do evento
+app.MapGet("/api/events/{id}/jury", (string id, IArenaProjectStore store) =>
+{
+    var evt = store.GetEventById(id);
+    if (evt == null)
+    {
+        return Results.NotFound(new { error = "Evento não encontrado.", id });
+    }
+
+    var jury = store.GetEventJury(id);
+    return Results.Ok(new EventJuryDto(id, jury.Select(j => new EventJuryMemberDto(j.ChairId, j.Judge!, j.AssignedAt)).ToList()));
+});
+
+// PUT /api/events/{id}/jury — Aloca ou atualiza a banca do evento
+app.MapPut("/api/events/{id}/jury", async (string id, AssignEventJuryDto dto, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
+{
+    var evt = store.GetEventById(id);
+    if (evt == null)
+    {
+        return Results.NotFound(new { error = "Evento não encontrado.", id });
+    }
+
+    var result = store.AssignEventJury(id, dto.Assignments ?? Array.Empty<JuryAssignmentItemDto>());
+    if (!result.Success)
+    {
+        return Results.BadRequest(new { error = result.ErrorMessage, id });
+    }
+
+    var activeContext = store.GetActiveContext();
+    if (activeContext.CurrentEventId == id)
+    {
+        await hubContext.Clients.All.SendAsync("EventJuryUpdated", new
+        {
+            eventId = id,
+            jury = result.Jury,
+            timestamp = DateTimeOffset.UtcNow
+        });
+    }
+
+    return Results.Ok(new EventJuryDto(id, result.Jury!.Select(j => new EventJuryMemberDto(j.ChairId, j.Judge!, j.AssignedAt)).ToList()));
 });
 
 // GET /api/projects — Lista projetos do evento

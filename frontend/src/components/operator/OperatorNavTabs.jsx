@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FolderKanban, Sliders } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Sliders, Users } from 'lucide-react';
 
 /**
  * OperatorNavTabs — Sub-navegação por abas contextuais da mesa técnica.
@@ -9,6 +9,7 @@ import { LayoutDashboard, FolderKanban, Sliders } from 'lucide-react';
  * - /operator/cockpit  -> Telemetria ao vivo das cadeiras, placar e reset
  * - /operator/projects -> Gestão de startups, pitches e seleção de palco
  * - /operator/event    -> Configurações de sessão e identidade visual (branding)
+ * - /operator/jury     -> Gestão da banca avaliadora e catálogo de jurados (Milestone 3E)
  */
 export function OperatorNavTabs() {
   const tabs = [
@@ -29,6 +30,12 @@ export function OperatorNavTabs() {
       label: 'Configurações do Evento',
       icon: Sliders,
       title: 'Identidade visual, branding cênico e dados do evento',
+    },
+    {
+      to: '/operator/jury',
+      label: 'Banca & Jurados',
+      icon: Users,
+      title: 'Banca oficial do evento e catálogo global de jurados',
     },
   ];
 

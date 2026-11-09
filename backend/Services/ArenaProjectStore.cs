@@ -36,6 +36,10 @@ public class ArenaProjectStore : IArenaProjectStore
     private bool _hasReachedVoting = false;
     private DateTimeOffset? _currentRoundStartedAt = DateTimeOffset.UtcNow;
 
+    // Catálogo Global de Jurados & Alocação de Banca (Milestone 3E)
+    private readonly ConcurrentDictionary<string, Judge> _judges = new();
+    private readonly ConcurrentDictionary<string, List<EventJuryAssignment>> _eventJury = new();
+
     public ArenaProjectStore()
     {
         SeedInitialData();
@@ -894,6 +898,157 @@ public class ArenaProjectStore : IArenaProjectStore
         _ => false
     };
 
+    public IReadOnlyList<Judge> GetAllJudges(bool includeInactive = false)
+    {
+        var list = _judges.Values.AsEnumerable();
+        if (!includeInactive)
+        {
+            list = list.Where(j => j.IsActive);
+        }
+        return list.OrderBy(j => j.Name).ToList();
+    }
+
+    public Judge? GetJudgeById(string judgeId)
+    {
+        if (string.IsNullOrWhiteSpace(judgeId)) return null;
+        return _judges.TryGetValue(judgeId.Trim(), out var judge) ? judge : null;
+    }
+
+    public Judge AddJudge(Judge judge)
+    {
+        if (string.IsNullOrWhiteSpace(judge.Id))
+        {
+            judge.Id = $"judge-{Guid.NewGuid().ToString("N")[..8]}";
+        }
+        judge.CreatedAt = DateTimeOffset.UtcNow;
+        judge.UpdatedAt = DateTimeOffset.UtcNow;
+        _judges[judge.Id] = judge;
+        return judge;
+    }
+
+    public bool UpdateJudge(Judge judge)
+    {
+        if (string.IsNullOrWhiteSpace(judge.Id) || !_judges.TryGetValue(judge.Id, out var existing))
+        {
+            return false;
+        }
+
+        judge.CreatedAt = existing.CreatedAt;
+        judge.UpdatedAt = DateTimeOffset.UtcNow;
+        _judges[judge.Id] = judge;
+        return true;
+    }
+
+    public DeleteJudgeResult DeleteJudge(string judgeId)
+    {
+        if (string.IsNullOrWhiteSpace(judgeId) || !_judges.TryGetValue(judgeId, out var judge))
+        {
+            return new DeleteJudgeResult(Success: false, IsAssignedToActiveEvent: false, NotFound: true, ErrorMessage: "Jurado não encontrado.");
+        }
+
+        lock (_contextLock)
+        {
+            if (_currentEventId != null && _eventJury.TryGetValue(_currentEventId, out var activeAssignments))
+            {
+                if (activeAssignments.Any(a => a.JudgeId.Equals(judgeId, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return new DeleteJudgeResult(
+                        Success: false,
+                        IsAssignedToActiveEvent: true,
+                        NotFound: false,
+                        ErrorMessage: "Não é permitido excluir um jurado que está ocupando uma cadeira no evento ativo da Arena."
+                    );
+                }
+            }
+        }
+
+        judge.IsActive = false;
+        judge.UpdatedAt = DateTimeOffset.UtcNow;
+        _judges.TryRemove(judgeId, out _);
+
+        return new DeleteJudgeResult(Success: true, IsAssignedToActiveEvent: false, NotFound: false);
+    }
+
+    public IReadOnlyList<EventJuryAssignment> GetEventJury(string eventId)
+    {
+        if (string.IsNullOrWhiteSpace(eventId)) return Array.Empty<EventJuryAssignment>();
+        var cleanId = eventId.Trim();
+        if (!_eventJury.TryGetValue(cleanId, out var assignments))
+        {
+            return Array.Empty<EventJuryAssignment>();
+        }
+
+        return assignments.Select(a => new EventJuryAssignment
+        {
+            EventId = a.EventId,
+            ChairId = a.ChairId,
+            JudgeId = a.JudgeId,
+            Judge = _judges.TryGetValue(a.JudgeId, out var j) ? j : null,
+            AssignedAt = a.AssignedAt
+        }).OrderBy(a => a.ChairId).ToList();
+    }
+
+    public AssignEventJuryResult AssignEventJury(string eventId, IReadOnlyList<ArenaVoicePocBackend.Domain.DTOs.JuryAssignmentItemDto> assignments)
+    {
+        if (string.IsNullOrWhiteSpace(eventId))
+        {
+            return new AssignEventJuryResult(Success: false, ErrorMessage: "ID do evento é obrigatório.");
+        }
+
+        var cleanEventId = eventId.Trim();
+        if (!_events.ContainsKey(cleanEventId))
+        {
+            return new AssignEventJuryResult(Success: false, ErrorMessage: "Evento não encontrado.");
+        }
+
+        if (assignments == null || assignments.Count == 0)
+        {
+            _eventJury[cleanEventId] = new List<EventJuryAssignment>();
+            return new AssignEventJuryResult(Success: true, Jury: Array.Empty<EventJuryAssignment>());
+        }
+
+        if (assignments.Count > 5)
+        {
+            return new AssignEventJuryResult(Success: false, ErrorMessage: "A banca pode ter no máximo 5 cadeiras alocadas.");
+        }
+
+        if (assignments.Any(a => a.ChairId < 1 || a.ChairId > 5))
+        {
+            return new AssignEventJuryResult(Success: false, ErrorMessage: "ChairId deve estar entre 1 e 5.");
+        }
+
+        if (assignments.Select(a => a.ChairId).Distinct().Count() != assignments.Count)
+        {
+            return new AssignEventJuryResult(Success: false, ErrorMessage: "Não é permitido alocar múltiplos jurados na mesma cadeira.");
+        }
+
+        if (assignments.Select(a => a.JudgeId).Distinct().Count() != assignments.Count)
+        {
+            return new AssignEventJuryResult(Success: false, ErrorMessage: "O mesmo jurado não pode ocupar mais de uma cadeira no mesmo evento.");
+        }
+
+        var validAssignments = new List<EventJuryAssignment>();
+        foreach (var item in assignments)
+        {
+            if (!_judges.TryGetValue(item.JudgeId, out var judge) || !judge.IsActive)
+            {
+                return new AssignEventJuryResult(Success: false, ErrorMessage: $"Jurado com ID '{item.JudgeId}' não encontrado ou inativo.");
+            }
+
+            validAssignments.Add(new EventJuryAssignment
+            {
+                EventId = cleanEventId,
+                ChairId = item.ChairId,
+                JudgeId = item.JudgeId,
+                Judge = judge,
+                AssignedAt = DateTimeOffset.UtcNow
+            });
+        }
+
+        _eventJury[cleanEventId] = validAssignments;
+        return new AssignEventJuryResult(Success: true, Jury: validAssignments.OrderBy(a => a.ChairId).ToList());
+    }
+
     private void SeedInitialData()
     {
         var defaultEvent = new Event
@@ -1085,6 +1240,102 @@ public class ArenaProjectStore : IArenaProjectStore
         }
 
         _currentProjectId = "proj-neurosync-01";
+
+        // Seed: Catálogo Global de Jurados (Milestone 3E)
+        var judges = new[]
+        {
+            new Judge
+            {
+                Id = "judge-camila-01",
+                Name = "Camila Farani",
+                Company = "G2 Capital",
+                Role = "Shark Investor & Chairwoman",
+                AvatarUrl = "/samples/judges/camila.png",
+                Bio = "Investidora-anjo, fundadora da G2 Capital e referência nacional em venture capital e aceleração.",
+                Expertise = new[] { "Venture Capital", "SaaS", "Fintech" },
+                SocialUrl = "https://linkedin.com/in/camilafarani",
+                Email = "camila@g2capital.com.br",
+                IsActive = true,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            },
+            new Judge
+            {
+                Id = "judge-kepler-02",
+                Name = "João Kepler",
+                Company = "Bossanova Investimentos",
+                Role = "Managing Partner",
+                AvatarUrl = "/samples/judges/kepler.png",
+                Bio = "Referência em investimento-anjo e startups early stage na América Latina, autor e conselheiro.",
+                Expertise = new[] { "Early Stage", "Anjo", "Growth" },
+                SocialUrl = "https://linkedin.com/in/joaokepler",
+                Email = "kepler@bossanova.com.br",
+                IsActive = true,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            },
+            new Judge
+            {
+                Id = "judge-paula-03",
+                Name = "Paula Bellizia",
+                Company = "Global Tech Ventures",
+                Role = "VP de Operações LatAm",
+                AvatarUrl = "/samples/judges/paula.png",
+                Bio = "Líder executiva com trajetória destacada na expansão global de plataformas de tecnologia.",
+                Expertise = new[] { "Operações", "Tech", "Escala" },
+                SocialUrl = "https://linkedin.com/in/paulabellizia",
+                Email = "paula@gtv.com",
+                IsActive = true,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            },
+            new Judge
+            {
+                Id = "judge-carlos-04",
+                Name = "Carlos Wizard",
+                Company = "Sforza Holding",
+                Role = "Fundador & Investor",
+                AvatarUrl = "/samples/judges/carlos.png",
+                Bio = "Empreendedor serial e investidor de private equity com foco em modelos de escala e canais.",
+                Expertise = new[] { "Franquias", "Consumo", "M&A" },
+                SocialUrl = "https://linkedin.com/in/carloswizardmartins",
+                Email = "carlos@sforza.com.br",
+                IsActive = true,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            },
+            new Judge
+            {
+                Id = "judge-marina-05",
+                Name = "Marina Silva Rocha",
+                Company = "InovAtiva Ventures",
+                Role = "Diretora de Inovação Aberta",
+                AvatarUrl = "/samples/judges/marina.png",
+                Bio = "Especialista em corporate venture e conexão de ecossistemas de impacto sustentável e IA.",
+                Expertise = new[] { "ESG", "GovTech", "Open Innovation" },
+                SocialUrl = "https://linkedin.com/in/marinarochainov",
+                Email = "marina@inovativalab.org",
+                IsActive = true,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            }
+        };
+
+        foreach (var judge in judges)
+        {
+            _judges[judge.Id] = judge;
+        }
+
+        // Alocação da Banca Oficial do Evento Ativo (Cadeiras 1 a 5)
+        _eventJury[defaultEvent.Id] = new List<EventJuryAssignment>
+        {
+            new() { EventId = defaultEvent.Id, ChairId = 1, JudgeId = "judge-camila-01", Judge = judges[0], AssignedAt = DateTimeOffset.UtcNow },
+            new() { EventId = defaultEvent.Id, ChairId = 2, JudgeId = "judge-kepler-02", Judge = judges[1], AssignedAt = DateTimeOffset.UtcNow },
+            new() { EventId = defaultEvent.Id, ChairId = 3, JudgeId = "judge-paula-03", Judge = judges[2], AssignedAt = DateTimeOffset.UtcNow },
+            new() { EventId = defaultEvent.Id, ChairId = 4, JudgeId = "judge-carlos-04", Judge = judges[3], AssignedAt = DateTimeOffset.UtcNow },
+            new() { EventId = defaultEvent.Id, ChairId = 5, JudgeId = "judge-marina-05", Judge = judges[4], AssignedAt = DateTimeOffset.UtcNow }
+        };
+
         _lastUpdated = DateTimeOffset.UtcNow;
     }
 }
