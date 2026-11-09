@@ -388,6 +388,13 @@ app.MapPut("/api/events/{id}", async (string id, UpdateEventDto dto, IArenaProje
 
     if (dto.Status.HasValue)
     {
+        if (dto.Status.Value == EventStatus.Active)
+        {
+            return Results.BadRequest(new
+            {
+                error = "Não é permitido promover um evento para 'Active' via PUT. Use POST /api/events/{id}/activate para ativação atômica."
+            });
+        }
         evt.Status = dto.Status.Value;
     }
 
