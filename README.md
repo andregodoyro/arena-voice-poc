@@ -228,3 +228,19 @@ node tests/test-timers-lockout.cjs
 node tests/test-round-history.cjs
 node tests/test-judges-jury.cjs
 ```
+
+
+---
+
+## 📚 7. Documentação Técnica do Projeto
+
+Consulte o **[Índice Mestre da Documentação (`docs/README.md`)](docs/README.md)** para acessar a estrutura organizada:
+
+| Área Temática | Documentos Principais |
+| :--- | :--- |
+| **Arquitetura & Decisões** | [Arquitetura Geral (`docs/architecture.md`)](docs/architecture.md) • [Catálogo de ADRs (`docs/decision-records/`)](docs/decision-records/) |
+| **Produto & Visão** | [Roadmap e Planejamento Progressivo (`docs/roadmap.md`)](docs/roadmap.md) |
+| **Infraestrutura & Campo** | [Guia de Hardware ESP32 (`docs/hardware.md`)](docs/hardware.md) • [Guia de Rede e Hotspot (`docs/network.md`)](docs/network.md) |
+| **Histórico Operacional** | [Tabela Mestra de Marcos (`docs/archives/milestone-history.md`)](docs/archives/milestone-history.md) • [Diário Técnico (`docs/archives/implementation-history.md`)](docs/archives/implementation-history.md) |
+| **Retrospectivas** | [Fase 1](docs/archives/retrospectives/phase1-retrospective.md) • [Fase 2](docs/archives/retrospectives/phase2-retrospective.md) • [Fase 3](docs/archives/retrospectives/phase3-retrospective.md) |
+| **Auditorias & Histórico** | [Auditoria Marco 1 (`docs/archives/audits/software-foundation-audit.md`)](docs/archives/audits/software-foundation-audit.md) • [Rascunho Inicial](docs/archives/historical/roadmap-initial.md) |

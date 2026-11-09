@@ -79,8 +79,10 @@ Este documento é a **fonte oficial de índice de marcos**, permitindo rastrear 
 ---
 
 ## 5. Referências Documentais Rápidas
-- **Diário Técnico de Implementação:** [`docs/archives/implementation-history.md`](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/docs/archives/implementation-history.md)
-- **Retrospectiva da Fase 1:** [`docs/archives/phase1-retrospective.md`](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/docs/archives/phase1-retrospective.md)
-- **Log de Planejamento da Fase 2:** [`docs/archives/phase2-planning-log.md`](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/docs/archives/phase2-planning-log.md)
-- **Catálogo de Decisões de Arquitetura (ADRs):** [`docs/archives/decision-records/`](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/docs/archives/decision-records/)
-- **Arquitetura Técnica Completa:** [`docs/architecture.md`](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/docs/architecture.md)
+- **Índice Mestre da Documentação:** [`docs/README.md`](../README.md)
+- **Diário Técnico de Implementação:** [`docs/archives/implementation-history.md`](implementation-history.md)
+- **Retrospectiva da Fase 1:** [`docs/archives/retrospectives/phase1-retrospective.md`](retrospectives/phase1-retrospective.md)
+- **Retrospectiva da Fase 2:** [`docs/archives/retrospectives/phase2-retrospective.md`](retrospectives/phase2-retrospective.md)
+- **Retrospectiva da Fase 3:** [`docs/archives/retrospectives/phase3-retrospective.md`](retrospectives/phase3-retrospective.md)
+- **Catálogo de Decisões de Arquitetura (ADRs):** [`docs/decision-records/`](../decision-records/)
+- **Arquitetura Técnica Completa:** [`docs/architecture.md`](../architecture.md)

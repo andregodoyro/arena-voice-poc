@@ -257,12 +257,13 @@ arena-voice-poc/
 ├── .env                       # Arquivo local (não versionado) com caminhos locais de executáveis
 ├── README.md                  # Documentação rápida de execução e pinout
 ├── docs/
-│   ├── roadmap.md             # Documento mestre de arquitetura e roadmap oficial (v1.1)
-│   ├── software-foundation-audit.md # Auditoria oficial de encerramento do Marco 1
-│   ├── architecture.md        # Documentação técnica inicial de arquitetura
-│   ├── hardware.md            # Pinout e debounce do protótipo ESP32
+│   ├── README.md              # Índice mestre da documentação
+│   ├── architecture.md        # Arquitetura geral, motores e contratos
+│   ├── roadmap.md             # Documento mestre de produto e arquitetura
+│   ├── hardware.md            # Pinout, debounce e protocolo de Lockout
 │   ├── network.md             # Guia de configuração de rede e hotspot Wi-Fi
-│   └── archive/               # Documentações arquivadas de marcos anteriores
+│   ├── decision-records/      # Catálogo formal de ADRs (ADR-001 a ADR-015)
+│   └── archives/              # Acervo histórico, retrospectivas e auditorias
 ├── backend/                   # Backend em ASP.NET Core .NET 10
 │   ├── ArenaVoicePocBackend.csproj
 │   ├── Program.cs             # Minimal API, Hub SignalR e Estado em Memória
@@ -416,10 +417,11 @@ BACKEND_HOST=0.0.0.0
 BACKEND_PORT=5000
 VITE_BACKEND_URL=http://localhost:5000
 VITE_SIGNALR_URL=http://localhost:5000/hubs/arena-poc
-GIT_EXE=C:\Users\ANDREROC\Documents\devtools\portable\git\cmd\git.exe
-NODE_EXE=C:\Users\ANDREROC\Documents\devtools\portable\node\node.exe
-NPM_EXE=C:\Users\ANDREROC\Documents\devtools\portable\node\npm.cmd
-DOTNET_EXE=C:\Users\ANDREROC\Documents\devtools\portable\dotnet\dotnet.exe
+# Caminhos opcionais para executáveis portáteis (ou deixe vazio se estiverem no PATH):
+GIT_EXE=C:\caminho\para\devtools\portable\git\cmd\git.exe
+NODE_EXE=C:\caminho\para\devtools\portable\node\node.exe
+NPM_EXE=C:\caminho\para\devtools\portable\node\npm.cmd
+DOTNET_EXE=C:\caminho\para\devtools\portable\dotnet\dotnet.exe
 ```
 
 Comandos de inicialização:
@@ -653,7 +655,7 @@ MACROBLOCO: ANALYTICS & PRODUCTION HARDENING (FASES 9 E 10)
 ### MARCO 1: Software Foundation / Software Validation
 *Fundação físico-digital e resiliência de software.*
 - **STATUS:** CONCLUÍDO (validado nos cenários automatizados e manuais documentados).
-- **EVIDÊNCIAS:** 48 verificações aprovadas em `test-api.cjs`, 46 verificações aprovadas em `test-signalr-e2e.cjs`, build de frontend aprovado e documento de auditoria `docs/software-foundation-audit.md`.
+- **EVIDÊNCIAS:** 48 verificações aprovadas em `test-api.cjs`, 46 verificações aprovadas em `test-signalr-e2e.cjs`, build de frontend aprovado e documento de auditoria `docs/archives/audits/software-foundation-audit.md`.
 
 ---
 

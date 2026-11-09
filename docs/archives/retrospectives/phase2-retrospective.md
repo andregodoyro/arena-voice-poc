@@ -1,4 +1,4 @@
-# Diário de Planejamento e Decisões — Fase 2 (Event Setup & Project Management)
+# Retrospectiva da Fase 2 (Event Setup & Project Management)
 ## Plataforma Arena Voice / Arena de Inovação
 
 > **Status:** FASE 2 CONCLUÍDA E HOMOLOGADA (Milestones 2A, 2B, 2C, 2D e 2E Concluídos)  
