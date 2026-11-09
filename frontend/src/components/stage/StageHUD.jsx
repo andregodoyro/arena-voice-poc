@@ -1,20 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Flame, Radio } from 'lucide-react';
+import { Sparkles, Flame, Radio, Clock, Pause, AlertTriangle } from 'lucide-react';
 import { StageProjectBanner } from './StageProjectBanner';
+import { useStageTimer } from '../../hooks/useStageTimer';
 
 /**
  * StageHUD — Camada 2D cênica e pública do Telão 3D.
  * 
  * Milestone 2D.1: Infraestrutura de Dados, Contexto e HUD Cênico.
+ * Milestone 3C & 3D: Cronômetro Cênico Principal de Alta Visibilidade.
  * 
  * Foco estrito na experiência do público e da plateia:
  * - Identidade visual do evento ativo (CurrentEvent: título, tagline, logo e branding);
+ * - Cronômetro cênico principal centralizado com tipografia grande e destaque visual;
  * - Ficha cênica do projeto em apresentação no palco (StageProjectBanner);
  * - Placar consolidado de cadeiras viradas ("X / 5") com feedback luminoso;
  * - Sem botões interativos, sem Modo Dev, sem termos técnicos ou controles de rede (ADR-009).
  */
 export function StageHUD({ chairs = [], currentProject = null, currentEvent = null, pitchState = null }) {
   const [eventLogoFailed, setEventLogoFailed] = useState(false);
+
+  // Ticker de alta precisão sincronizado com o servidor
+  const {
+    formattedTime,
+    isTimedStage,
+    isPaused,
+    isUrgent,
+    isExpired,
+    stageLabel,
+  } = useStageTimer(pitchState);
 
   // Reseta o estado do logo caso o evento mude
   useEffect(() => {
@@ -33,7 +46,7 @@ export function StageHUD({ chairs = [], currentProject = null, currentEvent = nu
 
   return (
     <div className="absolute inset-0 pointer-events-none z-10 flex flex-col justify-between p-4 md:p-8 select-none overflow-hidden">
-      {/* ── TOP BAR CÊNICA: Identidade Institucional + Placar ────────────────── */}
+      {/* ── TOP BAR CÊNICA: Identidade Institucional + Cronômetro Principal + Placar ── */}
       <header className="flex items-start justify-between gap-4 w-full">
         {/* Identidade Visual do Evento Ativo */}
         <div
@@ -74,6 +87,65 @@ export function StageHUD({ chairs = [], currentProject = null, currentEvent = nu
             </p>
           </div>
         </div>
+
+        {/* ── CRONÔMETRO CÊNICO PRINCIPAL (CENTRAL BROADCAST HUD) ─────────────── */}
+        {isTimedStage && (
+          <div
+            className={`
+              glass-panel rounded-2xl px-6 py-2.5 md:px-8 md:py-3 flex flex-col items-center justify-center border shadow-2xl backdrop-blur-xl transition-all duration-300
+              ${isExpired
+                ? 'bg-red-950/80 border-red-500/80 shadow-red-500/40 animate-pulse'
+                : isPaused
+                ? 'bg-amber-950/70 border-amber-500/70 shadow-amber-500/30'
+                : isUrgent
+                ? 'bg-orange-950/70 border-orange-500/80 shadow-orange-500/40 animate-pulse'
+                : 'bg-black/60 border-white/15'
+              }
+            `}
+            style={{
+              boxShadow: isExpired
+                ? '0 0 35px rgba(239, 68, 68, 0.6)'
+                : isPaused
+                ? '0 0 25px rgba(245, 158, 11, 0.4)'
+                : isUrgent
+                ? '0 0 30px rgba(249, 115, 22, 0.5)'
+                : `0 15px 35px rgba(0, 0, 0, 0.6), 0 0 20px ${primaryColor}20`,
+            }}
+          >
+            {/* Badge do Estágio e Status */}
+            <div className="flex items-center gap-2 mb-0.5">
+              {isPaused ? (
+                <Pause className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+              ) : isUrgent ? (
+                <AlertTriangle className="w-3.5 h-3.5 text-orange-400 animate-bounce" />
+              ) : (
+                <Clock className="w-3.5 h-3.5 text-emerald-400" />
+              )}
+              <span
+                className={`text-[11px] md:text-xs font-bold uppercase tracking-widest ${
+                  isPaused ? 'text-amber-300' : isUrgent ? 'text-orange-300' : 'text-gray-300'
+                }`}
+              >
+                {isPaused ? 'CRONÔMETRO PAUSADO' : stageLabel}
+              </span>
+            </div>
+
+            {/* Dígitos Grandes em Alta Visibilidade */}
+            <div
+              className={`font-mono text-3xl md:text-5xl font-black tracking-wider leading-none ${
+                isExpired
+                  ? 'text-red-400 drop-shadow-[0_0_15px_rgba(239,68,68,0.9)]'
+                  : isPaused
+                  ? 'text-amber-300 drop-shadow-[0_0_10px_rgba(245,158,11,0.8)]'
+                  : isUrgent
+                  ? 'text-orange-400 drop-shadow-[0_0_15px_rgba(249,115,22,0.9)]'
+                  : 'text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.4)]'
+              }`}
+            >
+              {formattedTime}
+            </div>
+          </div>
+        )}
 
         {/* Placar Cênico Consolidado da Arena */}
         <div
