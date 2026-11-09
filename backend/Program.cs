@@ -1,4 +1,4 @@
-﻿using ArenaVoicePocBackend.Domain.DTOs;
+using ArenaVoicePocBackend.Domain.DTOs;
 using ArenaVoicePocBackend.Domain.Entities;
 using ArenaVoicePocBackend.Domain.Enums;
 using ArenaVoicePocBackend.Hubs;
@@ -10,7 +10,7 @@ using System.Text.RegularExpressions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ConfiguraÃ§Ã£o de host e porta (permite sobrescrita por variÃ¡veis de ambiente)
+// Configuração de host e porta (permite sobrescrita por variáveis de ambiente)
 var hostEnv = Environment.GetEnvironmentVariable("BACKEND_HOST") ?? "0.0.0.0";
 var portEnv = Environment.GetEnvironmentVariable("BACKEND_PORT");
 var port = int.TryParse(portEnv, out var p) ? p : 5000;
@@ -21,7 +21,7 @@ builder.WebHost.ConfigureKestrel(options =>
     options.Listen(bindAddress, port);
 });
 
-// ConfiguraÃ§Ã£o CORS permissiva para desenvolvimento local
+// Configuração CORS permissiva para desenvolvimento local
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -40,116 +40,149 @@ var app = builder.Build();
 
 app.UseCors();
 
-// Estado em memÃ³ria simples para a POC (sem banco de dados)
-var chairStates = new Dictionary<int, bool>
-{
-    { 1, false }, { 2, false }, { 3, false }, { 4, false }, { 5, false }
-};
-
 // =========================================================================
-// 1. ENDPOINT PRINCIPAL: POST /api/chair-press
-// CompatÃ­vel com { "chairId": 1 } e tambÃ©m { "seatNumber": 1 }
+// 1. ENDPOINTS PRINCIPAIS DE CADEIRA: LOCKOUT AUTORITATIVO & HARDWARE BRIDGE
+// Compatível com { "chairId": 1 } e também { "seatNumber": 1 }
 // =========================================================================
-app.MapPost("/api/chair-press", async (ChairPressRequest request, HttpContext http, IHubContext<ArenaPocHub> hubContext) =>
+app.MapPost("/api/chair-press", async (ChairPressRequest request, HttpContext http, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
 {
     int id = request.GetEffectiveChairId();
-
-    // ValidaÃ§Ã£o de seguranÃ§a: o Arena Voice possui 5 cadeiras (1 a 5)
-    if (id < 1 || id > 5)
-    {
-        return Results.BadRequest(new
-        {
-            error = "chairId invÃ¡lido. Deve ser um nÃºmero entre 1 e 5.",
-            received = id
-        });
-    }
-
     var clientIp = http.Connection.RemoteIpAddress?.ToString() ?? "desconhecido";
     var timestamp = DateTimeOffset.UtcNow;
     var horaFormatada = timestamp.ToLocalTime().ToString("HH:mm:ss.fff");
 
-    // Atualiza estado em memÃ³ria
-    chairStates[id] = true;
+    var result = store.TryTurnChair(id, "HTTP_API");
+
+    if (result.IsInvalidChair)
+    {
+        return Results.BadRequest(new
+        {
+            error = result.ErrorMessage ?? "chairId inválido. Deve ser um número entre 1 e 5.",
+            received = id
+        });
+    }
+
+    if (result.IsLocked)
+    {
+        var pitchState = store.GetPitchState();
+        return Results.Conflict(new
+        {
+            accepted = false,
+            error = result.ErrorMessage,
+            currentStage = pitchState.StageName,
+            isVotingAllowed = false,
+            chairId = id
+        });
+    }
 
     Console.WriteLine($"\n=======================================================");
     Console.WriteLine($"[HARDWARE / HTTP] CADEIRA #{id} ACIONADA!");
     Console.WriteLine($" Origem IP:  {clientIp}");
-    Console.WriteLine($" HorÃ¡rio:    {horaFormatada}");
+    Console.WriteLine($" Horário:    {horaFormatada}");
+    Console.WriteLine($" Já virada:  {result.AlreadyTurned}");
     Console.WriteLine($"=======================================================");
 
-    // Dispara evento em tempo real via SignalR para o Voice Studio 3D
-    await hubContext.Clients.All.SendAsync("ChairTurned", new
+    if (!result.AlreadyTurned)
     {
-        chairId = id,
-        timestamp = timestamp,
-        source = "HTTP_API"
-    });
+        // Dispara evento em tempo real via SignalR para o Voice Studio 3D
+        await hubContext.Clients.All.SendAsync("ChairTurned", new
+        {
+            chairId = id,
+            timestamp = timestamp,
+            source = "HTTP_API"
+        });
 
-    // Evento retrocompatÃ­vel
-    await hubContext.Clients.All.SendAsync("ChairSupported", new
-    {
-        seatNumber = id,
-        chairId = id
-    });
+        // Evento retrocompatível
+        await hubContext.Clients.All.SendAsync("ChairSupported", new
+        {
+            seatNumber = id,
+            chairId = id
+        });
+    }
 
     return Results.Ok(new
     {
         accepted = true,
         chairId = id,
+        alreadyTurned = result.AlreadyTurned,
+        activeCount = result.ActiveCount,
         message = $"Cadeira #{id} virada com sucesso no Voice Studio 3D",
         serverTime = horaFormatada
     });
 });
 
-// Alias retrocompatÃ­vel com o repositÃ³rio teste: POST /api/support
-app.MapPost("/api/support", async (ChairPressRequest request, HttpContext http, IHubContext<ArenaPocHub> hubContext) =>
+// Alias retrocompatível: POST /api/support
+app.MapPost("/api/support", async (ChairPressRequest request, HttpContext http, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
 {
     int id = request.GetEffectiveChairId();
-    if (id < 1 || id > 5)
+    var clientIp = http.Connection.RemoteIpAddress?.ToString() ?? "desconhecido";
+    var timestamp = DateTimeOffset.UtcNow;
+    var horaFormatada = timestamp.ToLocalTime().ToString("HH:mm:ss.fff");
+
+    var result = store.TryTurnChair(id, "HTTP_SUPPORT");
+
+    if (result.IsInvalidChair)
     {
         return Results.BadRequest(new { error = "seatNumber deve estar entre 1 e 5." });
     }
 
-    chairStates[id] = true;
-    var timestamp = DateTimeOffset.UtcNow;
+    if (result.IsLocked)
+    {
+        var pitchState = store.GetPitchState();
+        return Results.Conflict(new
+        {
+            accepted = false,
+            error = result.ErrorMessage,
+            currentStage = pitchState.StageName,
+            isVotingAllowed = false,
+            seatNumber = id,
+            chairId = id
+        });
+    }
 
     Console.WriteLine($"[HTTP /api/support] Cadeira #{id} apoiada!");
 
-    await hubContext.Clients.All.SendAsync("ChairTurned", new { chairId = id, timestamp, source = "HTTP_SUPPORT" });
-    await hubContext.Clients.All.SendAsync("ChairSupported", new { seatNumber = id, chairId = id });
+    if (!result.AlreadyTurned)
+    {
+        await hubContext.Clients.All.SendAsync("ChairTurned", new { chairId = id, timestamp, source = "HTTP_SUPPORT" });
+        await hubContext.Clients.All.SendAsync("ChairSupported", new { seatNumber = id, chairId = id });
+    }
 
-    return Results.Ok(new { accepted = true, seatNumber = id, chairId = id });
+    return Results.Ok(new
+    {
+        accepted = true,
+        seatNumber = id,
+        chairId = id,
+        alreadyTurned = result.AlreadyTurned,
+        activeCount = result.ActiveCount
+    });
 });
 
 // =========================================================================
-// 2. ENDPOINTS AUXILIARES DE DIAGNÃ“STICO E RESET
+// 2. ENDPOINTS AUXILIARES DE DIAGNÓSTICO E RESET
 // =========================================================================
 
-// GET /api/state â€” Retorna o estado atual das 5 cadeiras e o contexto de evento/projeto
+// GET /api/state — Retorna o estado atual das 5 cadeiras e o contexto de evento/projeto/timers
 app.MapGet("/api/state", (IArenaProjectStore store) => Results.Ok(new
 {
-    chairs = chairStates,
-    activeCount = chairStates.Count(c => c.Value),
+    chairs = store.GetChairStates(),
+    activeCount = store.GetActiveChairCount(),
     currentEvent = store.GetCurrentEvent(),
     currentProject = store.GetCurrentProject(),
     pitchState = store.GetPitchState()
 }));
 
-// POST /api/reset â€” Reseta todas as cadeiras e notifica o Voice Studio
-app.MapPost("/api/reset", async (IHubContext<ArenaPocHub> hubContext) =>
+// POST /api/reset — Reseta todas as cadeiras e notifica o Voice Studio
+app.MapPost("/api/reset", async (IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
 {
-    foreach (var key in chairStates.Keys.ToList())
-    {
-        chairStates[key] = false;
-    }
-
+    store.ResetChairs();
     Console.WriteLine("[POC] Todas as cadeiras foram resetadas pelo operador.");
     await hubContext.Clients.All.SendAsync("ChairsReset");
 
-    return Results.Ok(new { message = "Todas as cadeiras foram resetadas.", chairs = chairStates });
+    return Results.Ok(new { message = "Todas as cadeiras foram resetadas.", chairs = store.GetChairStates() });
 });
 
-// GET /api/status â€” Health check rÃ¡pido
+// GET /api/status — Health check rápido
 app.MapGet("/api/status", () => Results.Ok(new
 {
     status = "ONLINE",
@@ -159,10 +192,10 @@ app.MapGet("/api/status", () => Results.Ok(new
 }));
 
 // =========================================================================
-// 3. EVENT & PROJECT MANAGEMENT ENDPOINTS (Milestone 2B)
+// 3. EVENT & PROJECT MANAGEMENT ENDPOINTS (Milestone 2B, 3A & 3C)
 // =========================================================================
 
-// GET /api/events/current â€” ObtÃ©m os detalhes e branding do evento atualmente ativo
+// GET /api/events/current — Obtém os detalhes, branding e timers do evento ativo
 app.MapGet("/api/events/current", (IArenaProjectStore store) =>
 {
     var currentEvent = store.GetCurrentEvent();
@@ -171,9 +204,7 @@ app.MapGet("/api/events/current", (IArenaProjectStore store) =>
         : Results.NotFound(new { error = "Nenhum evento ativo encontrado." });
 });
 
-// PUT /api/events/current â€” Atualiza metadados ou branding do evento ativo
-// NOTA ARQUITETURAL: No futuro este endpoint poderÃ¡ evoluir para rotas especializadas
-// (ex: PUT /api/events/current e PUT /api/events/current/branding).
+// PUT /api/events/current — Atualiza metadados, branding ou timers do evento ativo
 app.MapPut("/api/events/current", async (UpdateEventDto dto, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
 {
     var currentEvent = store.GetCurrentEvent();
@@ -185,7 +216,7 @@ app.MapPut("/api/events/current", async (UpdateEventDto dto, IArenaProjectStore 
     if (!string.IsNullOrWhiteSpace(dto.Title))
     {
         if (dto.Title.Trim().Length < 3 || dto.Title.Trim().Length > 150)
-            return Results.BadRequest(new { error = "O tÃ­tulo deve ter entre 3 e 150 caracteres." });
+            return Results.BadRequest(new { error = "O título deve ter entre 3 e 150 caracteres." });
         currentEvent.Title = dto.Title.Trim();
     }
 
@@ -207,9 +238,9 @@ app.MapPut("/api/events/current", async (UpdateEventDto dto, IArenaProjectStore 
         var secondary = dto.Branding.SecondaryColor ?? currentEvent.Branding.SecondaryColor;
 
         if (!hexRegex.IsMatch(primary))
-            return Results.BadRequest(new { error = "primaryColor deve ser uma cor hexadecimal vÃ¡lida (ex: #d90429)." });
+            return Results.BadRequest(new { error = "primaryColor deve ser uma cor hexadecimal válida (ex: #d90429)." });
         if (!hexRegex.IsMatch(secondary))
-            return Results.BadRequest(new { error = "secondaryColor deve ser uma cor hexadecimal vÃ¡lida (ex: #ffd166)." });
+            return Results.BadRequest(new { error = "secondaryColor deve ser uma cor hexadecimal válida (ex: #ffd166)." });
 
         currentEvent.Branding = new BrandingConfig
         {
@@ -219,6 +250,23 @@ app.MapPut("/api/events/current", async (UpdateEventDto dto, IArenaProjectStore 
             Tagline = dto.Branding.Tagline ?? currentEvent.Branding.Tagline
         };
         brandingChanged = true;
+    }
+
+    if (dto.Timers != null)
+    {
+        currentEvent.Timers = new TimerConfig
+        {
+            PitchDurationSeconds = dto.Timers.PitchDurationSeconds.HasValue && dto.Timers.PitchDurationSeconds > 0
+                ? dto.Timers.PitchDurationSeconds.Value
+                : currentEvent.Timers.PitchDurationSeconds,
+            QaDurationSeconds = dto.Timers.QaDurationSeconds.HasValue && dto.Timers.QaDurationSeconds > 0
+                ? dto.Timers.QaDurationSeconds.Value
+                : currentEvent.Timers.QaDurationSeconds,
+            VotingDurationSeconds = dto.Timers.VotingDurationSeconds.HasValue && dto.Timers.VotingDurationSeconds > 0
+                ? dto.Timers.VotingDurationSeconds.Value
+                : currentEvent.Timers.VotingDurationSeconds,
+            LockoutEnabled = dto.Timers.LockoutEnabled ?? currentEvent.Timers.LockoutEnabled
+        };
     }
 
     store.UpdateEvent(currentEvent);
@@ -236,12 +284,7 @@ app.MapPut("/api/events/current", async (UpdateEventDto dto, IArenaProjectStore 
     return Results.Ok(currentEvent);
 });
 
-
-// =========================================================================
-// 3A. EVENT LIFECYCLE & CATALOG MANAGEMENT ENDPOINTS (Milestone 3A)
-// =========================================================================
-
-// GET /api/events — Lista todos os eventos com filtro opcional por status (?status=draft|ready|active|finished|archived)
+// GET /api/events — Lista todos os eventos com filtro opcional por status
 app.MapGet("/api/events", (IArenaProjectStore store, string? status) =>
 {
     EventStatus? filter = null;
@@ -251,12 +294,21 @@ app.MapGet("/api/events", (IArenaProjectStore store, string? status) =>
         {
             filter = parsed;
         }
+        else
+        {
+            return Results.BadRequest(new
+            {
+                error = $"Status inválido: '{status}'. Valores permitidos: Draft, Ready, Active, Finished, Archived.",
+                allowed = Enum.GetNames<EventStatus>()
+            });
+        }
     }
+
     var events = store.GetAllEvents(filter);
     return Results.Ok(events);
 });
 
-// GET /api/events/{id} — Obtém detalhes de um evento específico por ID
+// GET /api/events/{id} — Detalhes de um evento específico
 app.MapGet("/api/events/{id}", (string id, IArenaProjectStore store) =>
 {
     var evt = store.GetEventById(id);
@@ -265,7 +317,7 @@ app.MapGet("/api/events/{id}", (string id, IArenaProjectStore store) =>
         : Results.NotFound(new { error = "Evento não encontrado.", id });
 });
 
-// POST /api/events — Cria novo evento no catálogo
+// POST /api/events — Cria novo evento
 app.MapPost("/api/events", (CreateEventDto dto, IArenaProjectStore store) =>
 {
     if (string.IsNullOrWhiteSpace(dto.Title) || dto.Title.Trim().Length < 3 || dto.Title.Trim().Length > 150)
@@ -294,6 +346,13 @@ app.MapPost("/api/events", (CreateEventDto dto, IArenaProjectStore store) =>
             SecondaryColor = secondary,
             LogoUrl = dto.Branding?.LogoUrl?.Trim() ?? "/branding/event-logo.png",
             Tagline = dto.Branding?.Tagline?.Trim() ?? "O palco onde as melhores ideias conquistam as cadeiras."
+        },
+        Timers = new TimerConfig
+        {
+            PitchDurationSeconds = dto.Timers?.PitchDurationSeconds ?? 180,
+            QaDurationSeconds = dto.Timers?.QaDurationSeconds ?? 120,
+            VotingDurationSeconds = dto.Timers?.VotingDurationSeconds ?? 30,
+            LockoutEnabled = dto.Timers?.LockoutEnabled ?? true
         }
     };
 
@@ -301,7 +360,7 @@ app.MapPost("/api/events", (CreateEventDto dto, IArenaProjectStore store) =>
     return Results.Created($"/api/events/{created.Id}", created);
 });
 
-// PUT /api/events/{id} — Atualiza dados, branding ou status de um evento específico
+// PUT /api/events/{id} — Atualiza evento específico
 app.MapPut("/api/events/{id}", async (string id, UpdateEventDto dto, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
 {
     var evt = store.GetEventById(id);
@@ -329,10 +388,6 @@ app.MapPut("/api/events/{id}", async (string id, UpdateEventDto dto, IArenaProje
 
     if (dto.Status.HasValue)
     {
-        if (dto.Status.Value == EventStatus.Active && evt.Status != EventStatus.Active)
-        {
-            return Results.BadRequest(new { error = "Para ativar um evento na arena, utilize o endpoint específico POST /api/events/{id}/activate." });
-        }
         evt.Status = dto.Status.Value;
     }
 
@@ -358,25 +413,32 @@ app.MapPut("/api/events/{id}", async (string id, UpdateEventDto dto, IArenaProje
         brandingChanged = true;
     }
 
+    if (dto.Timers != null)
+    {
+        evt.Timers = new TimerConfig
+        {
+            PitchDurationSeconds = dto.Timers.PitchDurationSeconds.HasValue && dto.Timers.PitchDurationSeconds > 0
+                ? dto.Timers.PitchDurationSeconds.Value
+                : evt.Timers.PitchDurationSeconds,
+            QaDurationSeconds = dto.Timers.QaDurationSeconds.HasValue && dto.Timers.QaDurationSeconds > 0
+                ? dto.Timers.QaDurationSeconds.Value
+                : evt.Timers.QaDurationSeconds,
+            VotingDurationSeconds = dto.Timers.VotingDurationSeconds.HasValue && dto.Timers.VotingDurationSeconds > 0
+                ? dto.Timers.VotingDurationSeconds.Value
+                : evt.Timers.VotingDurationSeconds,
+            LockoutEnabled = dto.Timers.LockoutEnabled ?? evt.Timers.LockoutEnabled
+        };
+    }
+
     store.UpdateEvent(evt);
 
-    // Se o evento editado for o ativo no palco, propaga atualizações
-    var currentActive = store.GetCurrentEvent();
-    if (currentActive?.Id == id)
+    var activeContext = store.GetActiveContext();
+    if (activeContext.CurrentEventId == id && brandingChanged)
     {
-        if (brandingChanged)
+        await hubContext.Clients.All.SendAsync("EventBrandingUpdated", new
         {
-            await hubContext.Clients.All.SendAsync("EventBrandingUpdated", new
-            {
-                eventId = evt.Id,
-                branding = evt.Branding,
-                timestamp = DateTimeOffset.UtcNow
-            });
-        }
-        await hubContext.Clients.All.SendAsync("ActiveEventChanged", new
-        {
-            @event = evt,
-            previousEventId = (string?)null,
+            eventId = evt.Id,
+            branding = evt.Branding,
             timestamp = DateTimeOffset.UtcNow
         });
     }
@@ -384,112 +446,56 @@ app.MapPut("/api/events/{id}", async (string id, UpdateEventDto dto, IArenaProje
     return Results.Ok(evt);
 });
 
-// POST /api/events/{id}/activate — Ativa um evento como o evento corrente na arena física (evento anterior volta para Ready)
+// POST /api/events/{id}/activate — Ativação atômica de evento
 app.MapPost("/api/events/{id}/activate", async (string id, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
 {
-    var result = store.ActivateEvent(id, EventStatus.Ready);
+    var result = store.ActivateEvent(id);
     if (!result.Success)
     {
-        return Results.NotFound(new { error = result.ErrorMessage ?? "Evento não encontrado.", id });
+        return Results.NotFound(new { error = result.ErrorMessage, id });
     }
 
-    // Neutraliza o estado físico das 5 cadeiras da arena
-    foreach (var key in chairStates.Keys.ToList())
-    {
-        chairStates[key] = false;
-    }
-
-    var timestamp = DateTimeOffset.UtcNow;
-
-    // Emite notificações SignalR em tempo real
     await hubContext.Clients.All.SendAsync("ActiveEventChanged", new
     {
         @event = result.ActivatedEvent,
         previousEventId = result.PreviousEvent?.Id,
-        timestamp
-    });
-
-    if (result.ActivatedEvent?.Branding != null)
-    {
-        await hubContext.Clients.All.SendAsync("EventBrandingUpdated", new
-        {
-            eventId = result.ActivatedEvent.Id,
-            branding = result.ActivatedEvent.Branding,
-            timestamp
-        });
-    }
-
-    // Notifica reset das cadeiras para a nova rodada
-    await hubContext.Clients.All.SendAsync("ChairsReset");
-
-    // Notifica que o projeto no palco foi resetado para a nova fila
-    await hubContext.Clients.All.SendAsync("CurrentProjectChanged", new
-    {
-        project = (Project?)null,
-        previousProjectId = (string?)null,
-        timestamp
+        timestamp = DateTimeOffset.UtcNow
     });
 
     return Results.Ok(new
     {
         success = true,
         activatedEvent = result.ActivatedEvent,
-        previousEvent = result.PreviousEvent,
-        activeContext = store.GetActiveContext(),
-        message = $"Evento '{result.ActivatedEvent?.Title}' ativado com sucesso na arena."
+        previousEvent = result.PreviousEvent
     });
 });
 
-// POST /api/events/{id}/finish — Encerra formalmente um evento (ação explícita de encerramento)
-app.MapPost("/api/events/{id}/finish", async (string id, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
+// POST /api/events/{id}/finish — Encerra formalmente o evento
+app.MapPost("/api/events/{id}/finish", (string id, IArenaProjectStore store) =>
 {
     var finished = store.FinishEvent(id);
-    if (finished == null)
-    {
-        return Results.NotFound(new { error = "Evento não encontrado.", id });
-    }
-
-    var currentActive = store.GetCurrentEvent();
-    if (currentActive?.Id == id)
-    {
-        await hubContext.Clients.All.SendAsync("ActiveEventChanged", new
-        {
-            @event = finished,
-            previousEventId = (string?)null,
-            timestamp = DateTimeOffset.UtcNow
-        });
-    }
-
-    return Results.Ok(new
-    {
-        success = true,
-        finishedEvent = finished,
-        message = $"Evento '{finished.Title}' encerrado com sucesso."
-    });
+    return finished != null
+        ? Results.Ok(new { success = true, finishedEvent = finished })
+        : Results.NotFound(new { error = "Evento não encontrado.", id });
 });
 
-// POST /api/events/{id}/archive — Arquiva um evento histórico (409 Conflict se for o ativo)
+// POST /api/events/{id}/archive — Arquiva evento inativo
 app.MapPost("/api/events/{id}/archive", (string id, IArenaProjectStore store) =>
 {
     var result = store.ArchiveEvent(id);
-    if (result.IsActiveEvent)
-    {
-        return Results.Conflict(new { error = result.ErrorMessage, id });
-    }
     if (!result.Success)
     {
-        return Results.NotFound(new { error = result.ErrorMessage ?? "Evento não encontrado.", id });
+        if (result.IsActiveEvent)
+        {
+            return Results.Conflict(new { error = result.ErrorMessage, id });
+        }
+        return Results.NotFound(new { error = result.ErrorMessage, id });
     }
 
-    return Results.Ok(new
-    {
-        success = true,
-        archivedEvent = result.ArchivedEvent,
-        message = $"Evento '{result.ArchivedEvent?.Title}' arquivado com sucesso."
-    });
+    return Results.Ok(new { success = true, archivedEvent = result.ArchivedEvent });
 });
 
-// POST /api/events/{id}/duplicate — Clona um evento para novo ciclo mantendo branding e metadados
+// POST /api/events/{id}/duplicate — Duplica evento existente como Draft
 app.MapPost("/api/events/{id}/duplicate", (string id, IArenaProjectStore store) =>
 {
     var duplicated = store.DuplicateEvent(id);
@@ -501,7 +507,7 @@ app.MapPost("/api/events/{id}/duplicate", (string id, IArenaProjectStore store) 
     return Results.Created($"/api/events/{duplicated.Id}", duplicated);
 });
 
-// GET /api/projects â€” Lista projetos do evento (suporta ?includeCompleted=true|false e ?eventId=...)
+// GET /api/projects — Lista projetos do evento
 app.MapGet("/api/projects", (IArenaProjectStore store, string? eventId, bool? includeCompleted) =>
 {
     var targetEventId = eventId ?? store.GetActiveContext().CurrentEventId;
@@ -514,16 +520,16 @@ app.MapGet("/api/projects", (IArenaProjectStore store, string? eventId, bool? in
     return Results.Ok(projects);
 });
 
-// GET /api/projects/{id} â€” ObtÃ©m detalhes de um projeto especÃ­fico
+// GET /api/projects/{id} — Obtém detalhes de um projeto específico
 app.MapGet("/api/projects/{id}", (string id, IArenaProjectStore store) =>
 {
     var project = store.GetProjectById(id);
     return project != null
         ? Results.Ok(project)
-        : Results.NotFound(new { error = "Projeto nÃ£o encontrado.", id });
+        : Results.NotFound(new { error = "Projeto não encontrado.", id });
 });
 
-// POST /api/projects â€” Cria novo projeto vinculado ao evento ativo
+// POST /api/projects — Cria novo projeto
 app.MapPost("/api/projects", (CreateProjectDto dto, IArenaProjectStore store) =>
 {
     var currentEvent = store.GetCurrentEvent();
@@ -534,17 +540,17 @@ app.MapPost("/api/projects", (CreateProjectDto dto, IArenaProjectStore store) =>
 
     if (string.IsNullOrWhiteSpace(dto.Title) || dto.Title.Trim().Length < 3 || dto.Title.Trim().Length > 120)
     {
-        return Results.BadRequest(new { error = "O campo title Ã© obrigatÃ³rio e deve ter entre 3 e 120 caracteres." });
+        return Results.BadRequest(new { error = "O campo title é obrigatório e deve ter entre 3 e 120 caracteres." });
     }
 
     if (string.IsNullOrWhiteSpace(dto.PitchLeader) || dto.PitchLeader.Trim().Length < 2 || dto.PitchLeader.Trim().Length > 100)
     {
-        return Results.BadRequest(new { error = "O campo pitchLeader Ã© obrigatÃ³rio e deve ter entre 2 e 100 caracteres." });
+        return Results.BadRequest(new { error = "O campo pitchLeader é obrigatório e deve ter entre 2 e 100 caracteres." });
     }
 
     if (string.IsNullOrWhiteSpace(dto.Track) || dto.Track.Trim().Length < 2 || dto.Track.Trim().Length > 50)
     {
-        return Results.BadRequest(new { error = "O campo track Ã© obrigatÃ³rio e deve ter entre 2 e 50 caracteres." });
+        return Results.BadRequest(new { error = "O campo track é obrigatório e deve ter entre 2 e 50 caracteres." });
     }
 
     var existingProjects = store.GetProjectsByEvent(currentEvent.Id, includeCompleted: true);
@@ -572,13 +578,13 @@ app.MapPost("/api/projects", (CreateProjectDto dto, IArenaProjectStore store) =>
     return Results.Created($"/api/projects/{created.Id}", created);
 });
 
-// PUT /api/projects/{id} â€” Atualiza dados de um projeto existente
+// PUT /api/projects/{id} — Atualiza dados de um projeto existente
 app.MapPut("/api/projects/{id}", async (string id, UpdateProjectDto dto, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
 {
     var project = store.GetProjectById(id);
     if (project == null)
     {
-        return Results.NotFound(new { error = "Projeto nÃ£o encontrado.", id });
+        return Results.NotFound(new { error = "Projeto não encontrado.", id });
     }
 
     if (!string.IsNullOrWhiteSpace(dto.Title))
@@ -623,7 +629,6 @@ app.MapPut("/api/projects/{id}", async (string id, UpdateProjectDto dto, IArenaP
 
     store.UpdateProject(project);
 
-    // Se o projeto editado for o ativo no palco, emite CurrentProjectChanged
     var activeContext = store.GetActiveContext();
     if (activeContext.CurrentProjectId == id)
     {
@@ -638,7 +643,7 @@ app.MapPut("/api/projects/{id}", async (string id, UpdateProjectDto dto, IArenaP
     return Results.Ok(project);
 });
 
-// DELETE /api/projects/{id} â€” Remove um projeto (409 Conflict se for o projeto ativo)
+// DELETE /api/projects/{id} — Remove um projeto
 app.MapDelete("/api/projects/{id}", (string id, IArenaProjectStore store) =>
 {
     var deleteResult = store.DeleteProject(id);
@@ -649,26 +654,25 @@ app.MapDelete("/api/projects/{id}", (string id, IArenaProjectStore store) =>
 
     if (deleteResult.NotFound)
     {
-        return Results.NotFound(new { error = "Projeto nÃ£o encontrado.", id });
+        return Results.NotFound(new { error = "Projeto não encontrado.", id });
     }
 
     return Results.Ok(new { message = "Projeto removido com sucesso.", id });
 });
 
-// POST /api/projects/{id}/select â€” Seleciona projeto ativo com idempotÃªncia e transiÃ§Ã£o atÃ´mica
+// POST /api/projects/{id}/select — Seleciona projeto ativo
 app.MapPost("/api/projects/{id}/select", async (string id, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
 {
     var result = store.SelectProject(id);
     if (!result.Success)
     {
-        if (result.ErrorMessage?.Contains("nÃ£o pertence ao evento ativo") == true)
+        if (result.ErrorMessage?.Contains("não pertence ao evento ativo") == true)
         {
             return Results.BadRequest(new { error = result.ErrorMessage, id });
         }
-        return Results.NotFound(new { error = result.ErrorMessage ?? "Projeto nÃ£o encontrado.", id });
+        return Results.NotFound(new { error = result.ErrorMessage ?? "Projeto não encontrado.", id });
     }
 
-    // Se houve mudanÃ§a de projeto, transmite SignalR CurrentProjectChanged
     if (result.PreviousProject != null || result.CurrentProject != null)
     {
         await hubContext.Clients.All.SendAsync("CurrentProjectChanged", new
@@ -679,11 +683,7 @@ app.MapPost("/api/projects/{id}/select", async (string id, IArenaProjectStore st
         });
     }
 
-    // Reseta cadeiras e dispara PitchStageChanged para Waiting na selecao
-    foreach (var key in chairStates.Keys.ToList())
-    {
-        chairStates[key] = false;
-    }
+    // Notifica reset de cadeiras
     await hubContext.Clients.All.SendAsync("ChairsReset");
 
     var activePitch = store.GetPitchState();
@@ -695,6 +695,11 @@ app.MapPost("/api/projects/{id}/select", async (string id, IArenaProjectStore st
         stage = activePitch.StageName,
         stageCode = activePitch.StageCode,
         stageStartedAt = activePitch.StageStartedAt,
+        durationSeconds = activePitch.DurationSeconds,
+        remainingSeconds = activePitch.RemainingSeconds,
+        isPaused = activePitch.IsPaused,
+        isExpired = activePitch.IsExpired,
+        isVotingAllowed = activePitch.IsVotingAllowed,
         timestamp = DateTimeOffset.UtcNow
     });
 
@@ -708,10 +713,10 @@ app.MapPost("/api/projects/{id}/select", async (string id, IArenaProjectStore st
 });
 
 // =========================================================================
-// 3. PITCH LIFECYCLE ENGINE (MILESTONE 3B)
+// 4. PITCH LIFECYCLE & TIMERS ENGINE (MILESTONE 3B & 3C)
 // =========================================================================
 
-// GET /api/pitch/state — Retorna estado atual da máquina de estados do pitch
+// GET /api/pitch/state — Retorna estado atual da máquina de estados do pitch e timers
 app.MapGet("/api/pitch/state", (IArenaProjectStore store) =>
 {
     return Results.Ok(store.GetPitchState());
@@ -766,7 +771,7 @@ app.MapPost("/api/pitch/transition", async (PitchTransitionDto dto, IArenaProjec
 
     var state = store.GetPitchState();
 
-    // Transmite evento canônico SignalR PitchStageChanged
+    // Transmite evento canônico SignalR PitchStageChanged enriquecido com timers
     await hubContext.Clients.All.SendAsync("PitchStageChanged", new
     {
         projectId = state.ProjectId,
@@ -775,6 +780,11 @@ app.MapPost("/api/pitch/transition", async (PitchTransitionDto dto, IArenaProjec
         stage = result.CurrentStage.ToString(),
         stageCode = (int)result.CurrentStage,
         stageStartedAt = result.StartedAt,
+        durationSeconds = state.DurationSeconds,
+        remainingSeconds = state.RemainingSeconds,
+        isPaused = state.IsPaused,
+        isExpired = state.IsExpired,
+        isVotingAllowed = state.IsVotingAllowed,
         timestamp = DateTimeOffset.UtcNow
     });
 
@@ -785,6 +795,11 @@ app.MapPost("/api/pitch/transition", async (PitchTransitionDto dto, IArenaProjec
         currentStage = result.CurrentStage.ToString(),
         stageCode = (int)result.CurrentStage,
         stageStartedAt = result.StartedAt,
+        durationSeconds = state.DurationSeconds,
+        remainingSeconds = state.RemainingSeconds,
+        isPaused = state.IsPaused,
+        isExpired = state.IsExpired,
+        isVotingAllowed = state.IsVotingAllowed,
         allowedTransitions = state.AllowedTransitions
     });
 });
@@ -793,11 +808,6 @@ app.MapPost("/api/pitch/transition", async (PitchTransitionDto dto, IArenaProjec
 app.MapPost("/api/pitch/reset", async (IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
 {
     var resetResult = store.ResetPitch();
-
-    foreach (var key in chairStates.Keys.ToList())
-    {
-        chairStates[key] = false;
-    }
 
     await hubContext.Clients.All.SendAsync("ChairsReset");
     await hubContext.Clients.All.SendAsync("PitchStageChanged", new
@@ -808,6 +818,11 @@ app.MapPost("/api/pitch/reset", async (IArenaProjectStore store, IHubContext<Are
         stage = resetResult.CurrentStage.ToString(),
         stageCode = (int)resetResult.CurrentStage,
         stageStartedAt = resetResult.StartedAt,
+        durationSeconds = 0,
+        remainingSeconds = 0.0,
+        isPaused = false,
+        isExpired = false,
+        isVotingAllowed = false,
         source = "RESET",
         timestamp = DateTimeOffset.UtcNow
     });
@@ -818,33 +833,150 @@ app.MapPost("/api/pitch/reset", async (IArenaProjectStore store, IHubContext<Are
         stage = resetResult.CurrentStage.ToString(),
         stageCode = (int)resetResult.CurrentStage,
         stageStartedAt = resetResult.StartedAt,
+        durationSeconds = 0,
+        remainingSeconds = 0.0,
+        isPaused = false,
+        isExpired = false,
+        isVotingAllowed = false,
         projectId = resetResult.ProjectId,
-        chairs = chairStates
+        chairs = store.GetChairStates()
+    });
+});
+
+// POST /api/pitch/timer/pause — Pausa o cronômetro do estágio ativo
+app.MapPost("/api/pitch/timer/pause", async (IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
+{
+    var result = store.PausePitchTimer();
+    if (!result.Success)
+    {
+        return Results.BadRequest(new { error = result.ErrorMessage });
+    }
+
+    var state = store.GetPitchState();
+    await hubContext.Clients.All.SendAsync("PitchTimerUpdated", new
+    {
+        projectId = state.ProjectId,
+        stage = state.StageName,
+        stageCode = state.StageCode,
+        isPaused = true,
+        pausedAt = result.PausedAt,
+        durationSeconds = state.DurationSeconds,
+        remainingSeconds = state.RemainingSeconds,
+        isExpired = state.IsExpired,
+        isVotingAllowed = state.IsVotingAllowed,
+        timestamp = DateTimeOffset.UtcNow
+    });
+
+    return Results.Ok(new
+    {
+        success = true,
+        isPaused = true,
+        pausedAt = result.PausedAt,
+        durationSeconds = state.DurationSeconds,
+        remainingSeconds = state.RemainingSeconds,
+        isExpired = state.IsExpired,
+        isVotingAllowed = state.IsVotingAllowed
+    });
+});
+
+// POST /api/pitch/timer/resume — Retoma a contagem do estágio ativo
+app.MapPost("/api/pitch/timer/resume", async (IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
+{
+    var result = store.ResumePitchTimer();
+    if (!result.Success)
+    {
+        return Results.BadRequest(new { error = result.ErrorMessage });
+    }
+
+    var state = store.GetPitchState();
+    await hubContext.Clients.All.SendAsync("PitchTimerUpdated", new
+    {
+        projectId = state.ProjectId,
+        stage = state.StageName,
+        stageCode = state.StageCode,
+        isPaused = false,
+        pausedAt = (DateTimeOffset?)null,
+        durationSeconds = state.DurationSeconds,
+        remainingSeconds = state.RemainingSeconds,
+        isExpired = state.IsExpired,
+        isVotingAllowed = state.IsVotingAllowed,
+        timestamp = DateTimeOffset.UtcNow
+    });
+
+    return Results.Ok(new
+    {
+        success = true,
+        isPaused = false,
+        durationSeconds = state.DurationSeconds,
+        remainingSeconds = state.RemainingSeconds,
+        isExpired = state.IsExpired,
+        isVotingAllowed = state.IsVotingAllowed
+    });
+});
+
+// POST /api/pitch/timer/adjust — Ajusta a duração alocada da rodada (+30s, +60s, +120s)
+app.MapPost("/api/pitch/timer/adjust", async (AdjustPitchTimerDto dto, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
+{
+    if (dto.Seconds == 0)
+    {
+        return Results.BadRequest(new { error = "O valor de 'seconds' para ajuste deve ser diferente de zero." });
+    }
+
+    var result = store.AdjustPitchTimer(dto.Seconds);
+    if (!result.Success)
+    {
+        return Results.BadRequest(new { error = result.ErrorMessage });
+    }
+
+    var state = store.GetPitchState();
+    await hubContext.Clients.All.SendAsync("PitchTimerUpdated", new
+    {
+        projectId = state.ProjectId,
+        stage = state.StageName,
+        stageCode = state.StageCode,
+        isPaused = state.IsPaused,
+        addedSeconds = dto.Seconds,
+        durationSeconds = state.DurationSeconds,
+        remainingSeconds = state.RemainingSeconds,
+        isExpired = state.IsExpired,
+        isVotingAllowed = state.IsVotingAllowed,
+        timestamp = DateTimeOffset.UtcNow
+    });
+
+    return Results.Ok(new
+    {
+        success = true,
+        addedSeconds = dto.Seconds,
+        durationSeconds = state.DurationSeconds,
+        remainingSeconds = state.RemainingSeconds,
+        isPaused = state.IsPaused,
+        isExpired = state.IsExpired,
+        isVotingAllowed = state.IsVotingAllowed
     });
 });
 
 // =========================================================================
-// 4. MAPEAMENTO DO HUB SIGNALR
+// 5. MAPEAMENTO DO HUB SIGNALR
 // =========================================================================
 app.MapHub<ArenaPocHub>("/hubs/arena-poc");
-app.MapHub<ArenaPocHub>("/arenaHub"); // Rota retrocompatÃ­vel
+app.MapHub<ArenaPocHub>("/arenaHub"); // Rota retrocompatível
 
-// ExibiÃ§Ã£o dos IPs locais no console para facilitar configuraÃ§Ã£o do ESP32
+// Exibição dos IPs locais no console para facilitar configuração do ESP32
 Console.WriteLine("=============================================================");
-Console.WriteLine("        ARENA VOICE POC â€” MINIMAL EVENT BRIDGE              ");
+Console.WriteLine("        ARENA VOICE POC — MINIMAL EVENT BRIDGE              ");
 Console.WriteLine("=============================================================");
 Console.WriteLine($" Escutando em: http://{hostEnv}:{port}");
-Console.WriteLine(" Endpoints disponÃ­veis:");
+Console.WriteLine(" Endpoints disponíveis:");
 Console.WriteLine($"   POST http://<IP_DO_PC>:{port}/api/chair-press  (Recebe ESP32)");
-Console.WriteLine($"   POST http://<IP_DO_PC>:{port}/api/support      (RetrocompatÃ­vel)");
+Console.WriteLine($"   POST http://<IP_DO_PC>:{port}/api/support      (Retrocompatível)");
 Console.WriteLine($"   POST http://localhost:{port}/api/reset        (Reset cadeiras)");
 Console.WriteLine($"   GET  http://localhost:{port}/api/state        (Estado atual)");
 Console.WriteLine($"   GET  http://localhost:{port}/api/status       (Health check)");
 Console.WriteLine(" Hubs SignalR:");
 Console.WriteLine($"   WS   http://localhost:{port}/hubs/arena-poc   (Voice Studio)");
-Console.WriteLine($"   WS   http://localhost:{port}/arenaHub         (RetrocompatÃ­vel)");
+Console.WriteLine($"   WS   http://localhost:{port}/arenaHub         (Retrocompatível)");
 Console.WriteLine("-------------------------------------------------------------");
-Console.WriteLine(" EndereÃ§os IP locais desta mÃ¡quina detectados:");
+Console.WriteLine(" Endereços IP locais desta máquina detectados:");
 try
 {
     var host = Dns.GetHostEntry(Dns.GetHostName());

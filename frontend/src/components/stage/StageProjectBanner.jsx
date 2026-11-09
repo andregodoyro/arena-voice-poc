@@ -130,15 +130,54 @@ export function StageProjectBanner({ project, branding, pitchState = null }) {
                 </span>
               )}
 
-              {/* Badge de Estágio do Pitch (Milestone 3B) */}
+              {/* Badge de Estágio do Pitch & Cronômetro Cênico (Milestone 3B & 3C) */}
               {(() => {
                 const stageName = pitchState?.stageName || pitchState?.stage || 'Waiting';
                 const config = PITCH_STAGE_CONFIG[stageName] || PITCH_STAGE_CONFIG.Waiting;
+                const duration = pitchState?.durationSeconds || 0;
+                const isPaused = Boolean(pitchState?.isPaused);
+                const hasTimer = duration > 0 && ['PitchRunning', 'QA', 'VotingOpen'].includes(stageName);
+
+                // Cálculo do tempo restante no telão
+                let remaining = 0;
+                if (hasTimer) {
+                  if (isPaused) {
+                    remaining = Math.max(0, Math.round(pitchState?.remainingSeconds || 0));
+                  } else if (pitchState?.stageStartedAt) {
+                    const elapsed = Math.max(0, (Date.now() - new Date(pitchState.stageStartedAt).getTime()) / 1000);
+                    remaining = Math.max(0, Math.round(duration - elapsed));
+                  }
+                }
+
+                const m = Math.floor(remaining / 60);
+                const s = remaining % 60;
+                const timeStr = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+                const isUrgent = hasTimer && remaining > 0 && remaining <= 15;
+                const isExpired = hasTimer && remaining <= 0;
+
                 return (
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border shadow-sm ${config.color}`}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                    {config.label}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border shadow-sm ${config.color}`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                      {config.label}
+                    </span>
+
+                    {hasTimer && (
+                      <span className={`
+                        inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border shadow-sm transition-all
+                        ${isExpired
+                          ? 'bg-red-500/30 text-red-300 border-red-500/60 animate-pulse'
+                          : isPaused
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          : isUrgent
+                          ? 'bg-orange-500/30 text-orange-300 border-orange-500/60 animate-pulse'
+                          : 'bg-black/40 text-gray-200 border-white/10'
+                        }
+                      `}>
+                        {isPaused ? `PAUSA ${timeStr}` : timeStr}
+                      </span>
+                    )}
+                  </div>
                 );
               })()}
             </div>

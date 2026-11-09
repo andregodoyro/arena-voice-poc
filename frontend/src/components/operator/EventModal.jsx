@@ -35,6 +35,10 @@ export function EventModal({
   const [secondaryColor, setSecondaryColor] = useState('#ffd166');
   const [logoUrl, setLogoUrl] = useState('');
   const [tagline, setTagline] = useState('');
+  const [pitchDuration, setPitchDuration] = useState(180);
+  const [qaDuration, setQaDuration] = useState(120);
+  const [votingDuration, setVotingDuration] = useState(30);
+  const [lockoutEnabled, setLockoutEnabled] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
 
   useEffect(() => {
@@ -60,6 +64,10 @@ export function EventModal({
       setSecondaryColor(initialEvent.branding?.secondaryColor || '#ffd166');
       setLogoUrl(initialEvent.branding?.logoUrl || '');
       setTagline(initialEvent.branding?.tagline || '');
+      setPitchDuration(initialEvent.timers?.pitchDurationSeconds ?? 180);
+      setQaDuration(initialEvent.timers?.qaDurationSeconds ?? 120);
+      setVotingDuration(initialEvent.timers?.votingDurationSeconds ?? 30);
+      setLockoutEnabled(initialEvent.timers?.lockoutEnabled ?? true);
     } else {
       setTitle('');
       setDescription('');
@@ -69,6 +77,10 @@ export function EventModal({
       setSecondaryColor('#ffd166');
       setLogoUrl('/branding/event-logo.png');
       setTagline('O palco onde as melhores ideias conquistam as cadeiras.');
+      setPitchDuration(180);
+      setQaDuration(120);
+      setVotingDuration(30);
+      setLockoutEnabled(true);
     }
     setErrorMsg(null);
   }, [initialEvent, isOpen]);
@@ -92,6 +104,12 @@ export function EventModal({
         secondaryColor,
         logoUrl: logoUrl.trim() || '/branding/event-logo.png',
         tagline: tagline.trim(),
+      },
+      timers: {
+        pitchDurationSeconds: Number(pitchDuration) || 180,
+        qaDurationSeconds: Number(qaDuration) || 120,
+        votingDurationSeconds: Number(votingDuration) || 30,
+        lockoutEnabled: Boolean(lockoutEnabled),
       },
     };
 
@@ -236,6 +254,63 @@ export function EventModal({
                   placeholder="/branding/event-logo.png ou https://..."
                   className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white placeholder-gray-500 text-xs focus:outline-none focus:border-amber-500/50 font-mono"
                 />
+              </div>
+
+              {/* Seção de Timers & Lockout (Milestone 3C) */}
+              <div className="p-3.5 rounded-xl bg-black/30 border border-white/5 space-y-3">
+                <label className="block text-xs font-bold text-gray-300 flex items-center gap-1.5 uppercase tracking-wider">
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Temporizadores Padrão (Segundos)</span>
+                </label>
+
+                <div className="grid grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] text-gray-400 mb-1">Pitch</label>
+                    <input
+                      type="number"
+                      min="10"
+                      max="1800"
+                      value={pitchDuration}
+                      onChange={(e) => setPitchDuration(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-black/50 border border-white/10 text-white text-xs font-mono focus:outline-none focus:border-amber-500/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-gray-400 mb-1">Q&A</label>
+                    <input
+                      type="number"
+                      min="10"
+                      max="1800"
+                      value={qaDuration}
+                      onChange={(e) => setQaDuration(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-black/50 border border-white/10 text-white text-xs font-mono focus:outline-none focus:border-amber-500/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-gray-400 mb-1">Votação</label>
+                    <input
+                      type="number"
+                      min="5"
+                      max="600"
+                      value={votingDuration}
+                      onChange={(e) => setVotingDuration(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-black/50 border border-white/10 text-white text-xs font-mono focus:outline-none focus:border-amber-500/50"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-gray-200 block">Trava de Votação (Lockout)</span>
+                    <span className="text-[10px] text-gray-400 block">Exige estágio "Votação Aberta" para aceitar acionamentos</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={lockoutEnabled}
+                    onChange={(e) => setLockoutEnabled(e.target.checked)}
+                    className="w-4 h-4 rounded text-amber-500 bg-gray-800 border-gray-600 focus:ring-amber-500"
+                  />
+                </div>
               </div>
             </div>
 

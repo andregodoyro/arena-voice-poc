@@ -28,6 +28,25 @@ public record PitchResetResult(
     string? ProjectId
 );
 
+public record PitchTimerActionResult(
+    bool Success,
+    bool IsPaused,
+    DateTimeOffset? PausedAt,
+    double RemainingSeconds,
+    int DurationSeconds,
+    string? ErrorMessage = null
+);
+
+public record ChairPressResult(
+    bool Success,
+    bool IsLocked,
+    bool IsInvalidChair,
+    bool AlreadyTurned,
+    int ChairId,
+    int ActiveCount,
+    string? ErrorMessage = null
+);
+
 public record PitchStateDto(
     string? ProjectId,
     PitchStage Stage,
@@ -35,6 +54,11 @@ public record PitchStateDto(
     int StageCode,
     DateTimeOffset? StageStartedAt,
     double ElapsedSeconds,
+    int DurationSeconds,
+    double RemainingSeconds,
+    bool IsPaused,
+    bool IsExpired,
+    bool IsVotingAllowed,
     IReadOnlyList<string> AllowedTransitions
 );
 
@@ -48,7 +72,7 @@ public interface IArenaProjectStore
     bool SetCurrentProject(string? projectId);
     SelectProjectResult SelectProject(string projectId);
 
-    // Eventos e Ciclo de Vida (Milestone 3A)
+    // Eventos e Ciclo de Vida (Milestone 3A & 3C)
     IReadOnlyList<Event> GetAllEvents(EventStatus? statusFilter = null);
     Event? GetEventById(string eventId);
     Event AddEvent(Event evt);
@@ -59,10 +83,19 @@ public interface IArenaProjectStore
     ArchiveEventResult ArchiveEvent(string eventId);
     Event? DuplicateEvent(string eventId);
 
-    // Pitch Lifecycle (Milestone 3B)
+    // Pitch Lifecycle & Timers (Milestone 3B & 3C)
     PitchStateDto GetPitchState();
     PitchTransitionResult TransitionPitch(PitchStage targetStage);
     PitchResetResult ResetPitch();
+    PitchTimerActionResult PausePitchTimer();
+    PitchTimerActionResult ResumePitchTimer();
+    PitchTimerActionResult AdjustPitchTimer(int addSeconds);
+
+    // Cadeiras da Arena & Lockout (Milestone 3C)
+    ChairPressResult TryTurnChair(int chairId, string source);
+    void ResetChairs();
+    IReadOnlyDictionary<int, bool> GetChairStates();
+    int GetActiveChairCount();
 
     // Projetos
     IReadOnlyList<Project> GetProjectsByEvent(string eventId, bool includeCompleted = false);

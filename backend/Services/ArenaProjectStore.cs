@@ -10,10 +10,24 @@ public class ArenaProjectStore : IArenaProjectStore
     private readonly ConcurrentDictionary<string, Project> _projects = new();
     private readonly object _contextLock = new();
 
+    // Cadeiras físicas da Arena (1 a 5) — Thread-safe
+    private readonly ConcurrentDictionary<int, bool> _chairStates = new(new[]
+    {
+        KeyValuePair.Create(1, false),
+        KeyValuePair.Create(2, false),
+        KeyValuePair.Create(3, false),
+        KeyValuePair.Create(4, false),
+        KeyValuePair.Create(5, false)
+    });
+
     private string? _currentEventId;
     private string? _currentProjectId;
     private PitchStage _pitchStage = PitchStage.Waiting;
     private DateTimeOffset? _pitchStageStartedAt = DateTimeOffset.UtcNow;
+    private int _stageDurationSeconds = 0;
+    private bool _isTimerPaused = false;
+    private DateTimeOffset? _timerPausedAt = null;
+    private double _totalPausedSeconds = 0.0;
     private DateTimeOffset _lastUpdated = DateTimeOffset.UtcNow;
 
     public ArenaProjectStore()
@@ -31,6 +45,10 @@ public class ArenaProjectStore : IArenaProjectStore
                 CurrentProjectId = _currentProjectId,
                 PitchStage = _pitchStage,
                 PitchStageStartedAt = _pitchStageStartedAt,
+                CurrentStageDurationSeconds = _stageDurationSeconds,
+                IsPaused = _isTimerPaused,
+                PausedAt = _timerPausedAt,
+                TotalPausedSeconds = _totalPausedSeconds,
                 LastUpdated = _lastUpdated
             };
         }
@@ -65,7 +83,6 @@ public class ArenaProjectStore : IArenaProjectStore
             _currentEventId = eventId;
             _lastUpdated = DateTimeOffset.UtcNow;
 
-            // Se o projeto atual não pertence ao novo evento, desvincula
             if (_currentProjectId != null && _projects.TryGetValue(_currentProjectId, out var currentProj))
             {
                 if (currentProj.EventId != eventId)
@@ -117,6 +134,11 @@ public class ArenaProjectStore : IArenaProjectStore
             {
                 _pitchStage = PitchStage.Waiting;
                 _pitchStageStartedAt = DateTimeOffset.UtcNow;
+                _stageDurationSeconds = 0;
+                _isTimerPaused = false;
+                _timerPausedAt = null;
+                _totalPausedSeconds = 0.0;
+                ResetChairs();
                 _lastUpdated = DateTimeOffset.UtcNow;
                 return new SelectProjectResult(true, nextProject, null);
             }
@@ -144,6 +166,11 @@ public class ArenaProjectStore : IArenaProjectStore
             _currentEventId = nextProject.EventId;
             _pitchStage = PitchStage.Waiting;
             _pitchStageStartedAt = DateTimeOffset.UtcNow;
+            _stageDurationSeconds = 0;
+            _isTimerPaused = false;
+            _timerPausedAt = null;
+            _totalPausedSeconds = 0.0;
+            ResetChairs();
             _lastUpdated = DateTimeOffset.UtcNow;
 
             return new SelectProjectResult(true, nextProject, prevProject);
@@ -191,7 +218,6 @@ public class ArenaProjectStore : IArenaProjectStore
 
         lock (_contextLock)
         {
-            // Idempotência: se já é o evento ativo, retorna sucesso
             if (_currentEventId == eventId && targetEvent.Status == EventStatus.Active)
             {
                 return new ActivateEventResult(true, targetEvent, null);
@@ -202,18 +228,24 @@ public class ArenaProjectStore : IArenaProjectStore
             {
                 if (prev.Id != eventId)
                 {
-                    prev.Status = previousEventStatus; // Transiciona para Ready por padrão
+                    prev.Status = previousEventStatus;
                     prev.UpdatedAt = DateTimeOffset.UtcNow;
                     prevEvent = prev;
                 }
             }
 
-            // Atualiza status do novo evento ativo
             targetEvent.Status = EventStatus.Active;
             targetEvent.UpdatedAt = DateTimeOffset.UtcNow;
 
             _currentEventId = targetEvent.Id;
-            _currentProjectId = null; // Reseta projeto ativo para o novo evento
+            _currentProjectId = null;
+            _pitchStage = PitchStage.Waiting;
+            _pitchStageStartedAt = DateTimeOffset.UtcNow;
+            _stageDurationSeconds = 0;
+            _isTimerPaused = false;
+            _timerPausedAt = null;
+            _totalPausedSeconds = 0.0;
+            ResetChairs();
             _lastUpdated = DateTimeOffset.UtcNow;
 
             return new ActivateEventResult(true, targetEvent, prevEvent);
@@ -278,6 +310,13 @@ public class ArenaProjectStore : IArenaProjectStore
                 LogoUrl = source.Branding.LogoUrl,
                 Tagline = source.Branding.Tagline
             },
+            Timers = new TimerConfig
+            {
+                PitchDurationSeconds = source.Timers.PitchDurationSeconds,
+                QaDurationSeconds = source.Timers.QaDurationSeconds,
+                VotingDurationSeconds = source.Timers.VotingDurationSeconds,
+                LockoutEnabled = source.Timers.LockoutEnabled
+            },
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         };
@@ -303,6 +342,13 @@ public class ArenaProjectStore : IArenaProjectStore
                 {
                     _currentEventId = null;
                     _currentProjectId = null;
+                    _pitchStage = PitchStage.Waiting;
+                    _pitchStageStartedAt = DateTimeOffset.UtcNow;
+                    _stageDurationSeconds = 0;
+                    _isTimerPaused = false;
+                    _timerPausedAt = null;
+                    _totalPausedSeconds = 0.0;
+                    ResetChairs();
                     _lastUpdated = DateTimeOffset.UtcNow;
                 }
             }
@@ -365,9 +411,33 @@ public class ArenaProjectStore : IArenaProjectStore
     {
         lock (_contextLock)
         {
-            var elapsed = _pitchStageStartedAt.HasValue
-                ? (DateTimeOffset.UtcNow - _pitchStageStartedAt.Value).TotalSeconds
+            var now = DateTimeOffset.UtcNow;
+            double elapsed;
+            if (_pitchStageStartedAt.HasValue)
+            {
+                if (_isTimerPaused && _timerPausedAt.HasValue)
+                {
+                    elapsed = Math.Max(0.0, (_timerPausedAt.Value - _pitchStageStartedAt.Value).TotalSeconds - _totalPausedSeconds);
+                }
+                else
+                {
+                    elapsed = Math.Max(0.0, (now - _pitchStageStartedAt.Value).TotalSeconds - _totalPausedSeconds);
+                }
+            }
+            else
+            {
+                elapsed = 0.0;
+            }
+
+            double remaining = _stageDurationSeconds > 0
+                ? Math.Max(0.0, _stageDurationSeconds - elapsed)
                 : 0.0;
+
+            bool isExpired = _stageDurationSeconds > 0 && remaining <= 0.0;
+
+            var currentEvent = GetCurrentEvent();
+            bool lockoutActive = currentEvent?.Timers?.LockoutEnabled ?? false;
+            bool isVotingAllowed = !lockoutActive || (_pitchStage == PitchStage.VotingOpen && !_isTimerPaused);
 
             var allowed = GetAllowedTransitions(_pitchStage);
 
@@ -378,6 +448,11 @@ public class ArenaProjectStore : IArenaProjectStore
                 (int)_pitchStage,
                 _pitchStageStartedAt,
                 Math.Round(elapsed, 1),
+                _stageDurationSeconds,
+                Math.Round(remaining, 1),
+                _isTimerPaused,
+                isExpired,
+                isVotingAllowed,
                 allowed
             );
         }
@@ -426,6 +501,21 @@ public class ArenaProjectStore : IArenaProjectStore
             var prev = _pitchStage;
             _pitchStage = targetStage;
             _pitchStageStartedAt = DateTimeOffset.UtcNow;
+
+            // Determina a duração alocada com base no TimerConfig do evento ativo
+            var currentEvent = GetCurrentEvent();
+            var timerConfig = currentEvent?.Timers ?? new TimerConfig();
+            _stageDurationSeconds = targetStage switch
+            {
+                PitchStage.PitchRunning => timerConfig.PitchDurationSeconds,
+                PitchStage.QA => timerConfig.QaDurationSeconds,
+                PitchStage.VotingOpen => timerConfig.VotingDurationSeconds,
+                _ => 0
+            };
+
+            _isTimerPaused = false;
+            _timerPausedAt = null;
+            _totalPausedSeconds = 0.0;
             _lastUpdated = DateTimeOffset.UtcNow;
 
             if (targetStage == PitchStage.Finished && _currentProjectId != null && _projects.TryGetValue(_currentProjectId, out var project))
@@ -450,6 +540,11 @@ public class ArenaProjectStore : IArenaProjectStore
         {
             _pitchStage = PitchStage.Waiting;
             _pitchStageStartedAt = DateTimeOffset.UtcNow;
+            _stageDurationSeconds = 0;
+            _isTimerPaused = false;
+            _timerPausedAt = null;
+            _totalPausedSeconds = 0.0;
+            ResetChairs();
             _lastUpdated = DateTimeOffset.UtcNow;
 
             return new PitchResetResult(
@@ -460,6 +555,142 @@ public class ArenaProjectStore : IArenaProjectStore
             );
         }
     }
+
+    public PitchTimerActionResult PausePitchTimer()
+    {
+        lock (_contextLock)
+        {
+            if (_pitchStage == PitchStage.Waiting || _pitchStage == PitchStage.Finished)
+            {
+                return new PitchTimerActionResult(false, _isTimerPaused, _timerPausedAt, 0, _stageDurationSeconds,
+                    $"Não é possível pausar cronômetro no estágio '{_pitchStage}'.");
+            }
+
+            if (_isTimerPaused)
+            {
+                var currentState = GetPitchState();
+                return new PitchTimerActionResult(true, _isTimerPaused, _timerPausedAt, currentState.RemainingSeconds, _stageDurationSeconds);
+            }
+
+            _isTimerPaused = true;
+            _timerPausedAt = DateTimeOffset.UtcNow;
+            _lastUpdated = DateTimeOffset.UtcNow;
+
+            var state = GetPitchState();
+            return new PitchTimerActionResult(true, true, _timerPausedAt, state.RemainingSeconds, _stageDurationSeconds);
+        }
+    }
+
+    public PitchTimerActionResult ResumePitchTimer()
+    {
+        lock (_contextLock)
+        {
+            if (!_isTimerPaused)
+            {
+                var currentState = GetPitchState();
+                return new PitchTimerActionResult(true, false, null, currentState.RemainingSeconds, _stageDurationSeconds);
+            }
+
+            if (_timerPausedAt.HasValue)
+            {
+                var pauseDelta = (DateTimeOffset.UtcNow - _timerPausedAt.Value).TotalSeconds;
+                _totalPausedSeconds += Math.Max(0.0, pauseDelta);
+            }
+
+            _isTimerPaused = false;
+            _timerPausedAt = null;
+            _lastUpdated = DateTimeOffset.UtcNow;
+
+            var state = GetPitchState();
+            return new PitchTimerActionResult(true, false, null, state.RemainingSeconds, _stageDurationSeconds);
+        }
+    }
+
+    public PitchTimerActionResult AdjustPitchTimer(int addSeconds)
+    {
+        lock (_contextLock)
+        {
+            if (_pitchStage == PitchStage.Waiting || _pitchStage == PitchStage.Finished)
+            {
+                return new PitchTimerActionResult(false, _isTimerPaused, _timerPausedAt, 0, _stageDurationSeconds,
+                    $"Não é possível ajustar tempo no estágio '{_pitchStage}'.");
+            }
+
+            _stageDurationSeconds = Math.Max(0, _stageDurationSeconds + addSeconds);
+            _lastUpdated = DateTimeOffset.UtcNow;
+
+            var state = GetPitchState();
+            return new PitchTimerActionResult(true, _isTimerPaused, _timerPausedAt, state.RemainingSeconds, _stageDurationSeconds);
+        }
+    }
+
+    // =========================================================================
+    // CADEIRAS & LOCKOUT AUTORITATIVO (Milestone 3C)
+    // =========================================================================
+
+    public ChairPressResult TryTurnChair(int chairId, string source)
+    {
+        lock (_contextLock)
+        {
+            if (chairId < 1 || chairId > 5)
+            {
+                return new ChairPressResult(
+                    Success: false,
+                    IsLocked: false,
+                    IsInvalidChair: true,
+                    AlreadyTurned: false,
+                    ChairId: chairId,
+                    ActiveCount: GetActiveChairCount(),
+                    ErrorMessage: $"chairId inválido: {chairId}. Deve ser um número entre 1 e 5."
+                );
+            }
+
+            var currentEvent = GetCurrentEvent();
+            bool lockoutActive = currentEvent?.Timers?.LockoutEnabled ?? false;
+
+            if (lockoutActive && (_pitchStage != PitchStage.VotingOpen || _isTimerPaused))
+            {
+                var reason = _isTimerPaused
+                    ? "Votação temporariamente suspensa (cronômetro pausado)."
+                    : $"Votação bloqueada: o estágio atual é '{_pitchStage}' (votos permitidos exclusivamente em 'VotingOpen').";
+
+                return new ChairPressResult(
+                    Success: false,
+                    IsLocked: true,
+                    IsInvalidChair: false,
+                    AlreadyTurned: _chairStates.TryGetValue(chairId, out var turned) && turned,
+                    ChairId: chairId,
+                    ActiveCount: GetActiveChairCount(),
+                    ErrorMessage: reason
+                );
+            }
+
+            bool wasAlready = _chairStates.TryGetValue(chairId, out var current) && current;
+            _chairStates[chairId] = true;
+            _lastUpdated = DateTimeOffset.UtcNow;
+
+            return new ChairPressResult(
+                Success: true,
+                IsLocked: false,
+                IsInvalidChair: false,
+                AlreadyTurned: wasAlready,
+                ChairId: chairId,
+                ActiveCount: GetActiveChairCount()
+            );
+        }
+    }
+
+    public void ResetChairs()
+    {
+        foreach (var key in _chairStates.Keys)
+        {
+            _chairStates[key] = false;
+        }
+    }
+
+    public IReadOnlyDictionary<int, bool> GetChairStates() => _chairStates;
+
+    public int GetActiveChairCount() => _chairStates.Values.Count(c => c);
 
     private static IReadOnlyList<string> GetAllowedTransitions(PitchStage stage) => stage switch
     {
@@ -502,12 +733,19 @@ public class ArenaProjectStore : IArenaProjectStore
                 SecondaryColor = "#ffd166",
                 LogoUrl = "/branding/event-logo.png",
                 Tagline = "O palco onde as melhores ideias conquistam as cadeiras."
+            },
+            Timers = new TimerConfig
+            {
+                PitchDurationSeconds = 180,
+                QaDurationSeconds = 120,
+                VotingDurationSeconds = 30,
+                LockoutEnabled = false // Mantém compatibilidade livre para suítes legadas do Marco 1/2
             }
         };
         _events[defaultEvent.Id] = defaultEvent;
         _currentEventId = defaultEvent.Id;
 
-        // Catálogo e governança de eventos (Milestone 3A)
+        // Catálogo e governança de eventos (Milestone 3A & 3C)
         var readyEvent = new Event
         {
             Id = "evt-hackathon-ferrolab",
@@ -521,6 +759,13 @@ public class ArenaProjectStore : IArenaProjectStore
                 SecondaryColor = "#ffb703",
                 LogoUrl = "/samples/ferrolab-logo.png",
                 Tagline = "Forjando o futuro da indústria com inteligência artificial."
+            },
+            Timers = new TimerConfig
+            {
+                PitchDurationSeconds = 180,
+                QaDurationSeconds = 120,
+                VotingDurationSeconds = 30,
+                LockoutEnabled = true // Evento moderno 3C com Lockout estrito
             }
         };
         _events[readyEvent.Id] = readyEvent;
@@ -538,6 +783,13 @@ public class ArenaProjectStore : IArenaProjectStore
                 SecondaryColor = "#4cc9f0",
                 LogoUrl = "/samples/challenge-logo.png",
                 Tagline = "A próxima geração de unicórnios começa aqui."
+            },
+            Timers = new TimerConfig
+            {
+                PitchDurationSeconds = 180,
+                QaDurationSeconds = 120,
+                VotingDurationSeconds = 30,
+                LockoutEnabled = true
             }
         };
         _events[draftEvent.Id] = draftEvent;
@@ -555,6 +807,13 @@ public class ArenaProjectStore : IArenaProjectStore
                 SecondaryColor = "#8d99ae",
                 LogoUrl = "/samples/summit-logo.png",
                 Tagline = "Histórico oficial dos pitches homologados."
+            },
+            Timers = new TimerConfig
+            {
+                PitchDurationSeconds = 180,
+                QaDurationSeconds = 120,
+                VotingDurationSeconds = 30,
+                LockoutEnabled = true
             }
         };
         _events[archivedEvent.Id] = archivedEvent;

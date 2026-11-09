@@ -10,6 +10,7 @@ public class Event
     public DateTimeOffset ScheduledDate { get; set; }
     public EventStatus Status { get; set; } = EventStatus.Draft;
     public BrandingConfig Branding { get; set; } = new();
+    public TimerConfig Timers { get; set; } = new();
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

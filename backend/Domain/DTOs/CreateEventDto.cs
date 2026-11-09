@@ -9,4 +9,5 @@ public record CreateEventDto
     public DateTimeOffset? ScheduledDate { get; init; }
     public EventStatus? Status { get; init; }
     public UpdateEventBrandingDto? Branding { get; init; }
+    public TimerConfigDto? Timers { get; init; }
 }

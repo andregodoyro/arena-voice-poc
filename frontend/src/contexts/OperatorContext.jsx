@@ -203,6 +203,11 @@ export function OperatorProvider({ children }) {
       stageName: stageName,
       stageCode: payload.stageCode ?? prev?.stageCode,
       stageStartedAt: payload.stageStartedAt ?? new Date().toISOString(),
+      durationSeconds: payload.durationSeconds ?? prev?.durationSeconds,
+      remainingSeconds: payload.remainingSeconds ?? prev?.remainingSeconds,
+      isPaused: payload.isPaused ?? false,
+      isExpired: payload.isExpired ?? false,
+      isVotingAllowed: payload.isVotingAllowed ?? false,
       projectId: payload.projectId || prev?.projectId,
     }));
 
@@ -213,6 +218,22 @@ export function OperatorProvider({ children }) {
     // Re-hidratação silenciosa em background (para allowedTransitions e status)
     fetchOperationalData(false);
   }, [fetchOperationalData]);
+
+  // ── Sincronização em Tempo Real (Milestone 3C: Timers, Pause, Resume, AddTime) ──
+  const handlePitchTimerUpdated = useCallback((payload) => {
+    if (!payload) return;
+    console.log('[OperatorContext] Sincronizando atualização do timer do pitch:', payload);
+
+    setPitchState((prev) => ({
+      ...prev,
+      durationSeconds: payload.durationSeconds ?? prev?.durationSeconds,
+      remainingSeconds: payload.remainingSeconds ?? prev?.remainingSeconds,
+      isPaused: payload.isPaused ?? prev?.isPaused,
+      isExpired: payload.isExpired ?? prev?.isExpired,
+      isVotingAllowed: payload.isVotingAllowed ?? prev?.isVotingAllowed,
+      pausedAt: payload.pausedAt ?? prev?.pausedAt,
+    }));
+  }, []);
 
   // ── Reconexão e Resync Hardening (Milestone 2C.5.5) ──────────────────────
   const handleReconnected = useCallback(async () => {
@@ -235,11 +256,12 @@ export function OperatorProvider({ children }) {
     onEventBrandingUpdated: handleEventBrandingUpdated,
     onActiveEventChanged: handleActiveEventChanged,
     onPitchStageChanged: handlePitchStageChanged,
+    onPitchTimerUpdated: handlePitchTimerUpdated,
     onReconnected: handleReconnected,
     initialBackendUrl: getBackendUrl(),
   });
 
-  // ── Despacho Autoritativo do Pitch (Milestone 3B) ─────────────────────────
+  // ── Despacho Autoritativo do Pitch (Milestone 3B & 3C) ─────────────────────
   const transitionPitch = useCallback(async (targetStage) => {
     const result = await pitchApi.transitionPitch(targetStage);
     return result;
@@ -247,6 +269,21 @@ export function OperatorProvider({ children }) {
 
   const resetPitch = useCallback(async () => {
     const result = await pitchApi.resetPitch();
+    return result;
+  }, []);
+
+  const pausePitchTimer = useCallback(async () => {
+    const result = await pitchApi.pauseTimer();
+    return result;
+  }, []);
+
+  const resumePitchTimer = useCallback(async () => {
+    const result = await pitchApi.resumeTimer();
+    return result;
+  }, []);
+
+  const adjustPitchTimer = useCallback(async (seconds) => {
+    const result = await pitchApi.adjustTimer(seconds);
     return result;
   }, []);
 
@@ -287,10 +324,13 @@ export function OperatorProvider({ children }) {
     resetAllChairs,
     requestResetArena,
 
-    // Pitch Lifecycle Engine (Milestone 3B)
+    // Pitch Lifecycle Engine & Timers (Milestone 3B & 3C)
     pitchState,
     transitionPitch,
     resetPitch,
+    pausePitchTimer,
+    resumePitchTimer,
+    adjustPitchTimer,
 
     // Conexão e Resync
     connectionStatus,

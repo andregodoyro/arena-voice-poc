@@ -8,5 +8,10 @@ public record ActiveContext
     public string? CurrentProjectId { get; init; }
     public PitchStage PitchStage { get; init; } = PitchStage.Waiting;
     public DateTimeOffset? PitchStageStartedAt { get; init; }
+    public int CurrentStageDurationSeconds { get; init; } = 0;
+    public bool IsPaused { get; init; } = false;
+    public DateTimeOffset? PausedAt { get; init; }
+    public double TotalPausedSeconds { get; init; } = 0.0;
+    public bool IsVotingAllowed => PitchStage == PitchStage.VotingOpen && !IsPaused;
     public DateTimeOffset LastUpdated { get; init; } = DateTimeOffset.UtcNow;
 }

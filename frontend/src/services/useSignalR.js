@@ -17,6 +17,7 @@ export function useSignalR({
   onEventBrandingUpdated,
   onActiveEventChanged,
   onPitchStageChanged,
+  onPitchTimerUpdated,
   onReconnecting,
   onReconnected,
   onClose,
@@ -41,6 +42,7 @@ export function useSignalR({
     onEventBrandingUpdated,
     onActiveEventChanged,
     onPitchStageChanged,
+    onPitchTimerUpdated,
     onReconnecting,
     onReconnected,
     onClose,
@@ -53,6 +55,7 @@ export function useSignalR({
     onEventBrandingUpdated,
     onActiveEventChanged,
     onPitchStageChanged,
+    onPitchTimerUpdated,
     onReconnecting,
     onReconnected,
     onClose,
@@ -201,6 +204,14 @@ export function useSignalR({
       console.log('[SignalR Evento] PitchStageChanged recebido:', data?.stage || data?.currentStage);
       if (callbacksRef.current.onPitchStageChanged) {
         callbacksRef.current.onPitchStageChanged(data);
+      }
+    });
+
+    // 8. Atualização do Temporizador do Pitch (Milestone 3C: Timers, Pause, Resume, AddTime)
+    connection.on('PitchTimerUpdated', (data) => {
+      console.log('[SignalR Evento] PitchTimerUpdated recebido:', data);
+      if (callbacksRef.current.onPitchTimerUpdated) {
+        callbacksRef.current.onPitchTimerUpdated(data);
       }
     });
 

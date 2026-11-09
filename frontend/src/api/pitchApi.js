@@ -1,7 +1,7 @@
 import { request } from './apiClient';
 
 /**
- * pitchApi — Endpoints operacionais do Pitch Lifecycle Engine (Milestone 3B).
+ * pitchApi — Endpoints operacionais do Pitch Lifecycle Engine & Timers (Milestone 3B & 3C).
  * 
  * Máquina de estados formal:
  * 0: Waiting
@@ -13,7 +13,7 @@ import { request } from './apiClient';
  */
 export const pitchApi = {
   /**
-   * Obtém o estado atual da máquina de estados do pitch (GET /api/pitch/state).
+   * Obtém o estado atual da máquina de estados do pitch e timers (GET /api/pitch/state).
    */
   getPitchState: () => {
     return request('/api/pitch/state');
@@ -36,6 +36,35 @@ export const pitchApi = {
   resetPitch: () => {
     return request('/api/pitch/reset', {
       method: 'POST',
+    });
+  },
+
+  /**
+   * Pausa o cronômetro do estágio ativo (POST /api/pitch/timer/pause).
+   */
+  pauseTimer: () => {
+    return request('/api/pitch/timer/pause', {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Retoma o cronômetro do estágio ativo (POST /api/pitch/timer/resume).
+   */
+  resumeTimer: () => {
+    return request('/api/pitch/timer/resume', {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Ajusta a duração alocada da rodada atual em segundos (+30, +60, +120) (POST /api/pitch/timer/adjust).
+   * @param {number} seconds - Segundos a adicionar ou remover.
+   */
+  adjustTimer: (seconds) => {
+    return request('/api/pitch/timer/adjust', {
+      method: 'POST',
+      body: JSON.stringify({ seconds }),
     });
   },
 };
