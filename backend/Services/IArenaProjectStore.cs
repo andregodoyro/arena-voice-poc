@@ -3,7 +3,13 @@ using ArenaVoicePocBackend.Domain.Enums;
 
 namespace ArenaVoicePocBackend.Services;
 
-public record SelectProjectResult(bool Success, Project? CurrentProject, Project? PreviousProject, string? ErrorMessage = null);
+public record SelectProjectResult(
+    bool Success,
+    Project? CurrentProject,
+    Project? PreviousProject,
+    string? ErrorMessage = null,
+    Round? ArchivedRound = null
+);
 
 public record DeleteProjectResult(bool Success, bool IsActiveProject, bool NotFound);
 
@@ -18,7 +24,8 @@ public record PitchTransitionResult(
     DateTimeOffset? StartedAt,
     string? ErrorMessage = null,
     bool IsInvalidTransition = false,
-    bool NoActiveProject = false
+    bool NoActiveProject = false,
+    Round? ArchivedRound = null
 );
 
 public record PitchResetResult(
@@ -96,6 +103,12 @@ public interface IArenaProjectStore
     void ResetChairs();
     IReadOnlyDictionary<int, bool> GetChairStates();
     int GetActiveChairCount();
+
+    // Round History & Result Engine (Milestone 3D)
+    IReadOnlyList<Round> GetRoundHistory(string? eventId = null);
+    Round? GetRoundById(string roundId);
+    Round? GetLastRound();
+    Round? ArchiveCurrentRound(string reason = "Manual");
 
     // Projetos
     IReadOnlyList<Project> GetProjectsByEvent(string eventId, bool includeCompleted = false);

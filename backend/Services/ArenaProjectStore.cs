@@ -30,6 +30,12 @@ public class ArenaProjectStore : IArenaProjectStore
     private double _totalPausedSeconds = 0.0;
     private DateTimeOffset _lastUpdated = DateTimeOffset.UtcNow;
 
+    // Histórico de Rodadas (Milestone 3D) — In-memory
+    private readonly List<Round> _roundHistory = new();
+    private bool _isCurrentRoundArchived = false;
+    private bool _hasReachedVoting = false;
+    private DateTimeOffset? _currentRoundStartedAt = DateTimeOffset.UtcNow;
+
     public ArenaProjectStore()
     {
         SeedInitialData();
@@ -132,22 +138,37 @@ public class ArenaProjectStore : IArenaProjectStore
             // Idempotência: se já é o projeto ativo, retorna sucesso e reinicializa pitch para Waiting
             if (_currentProjectId == projectId)
             {
+                Round? archivedOnRestart = null;
+                if (!_isCurrentRoundArchived && _pitchStage != PitchStage.Waiting)
+                {
+                    archivedOnRestart = ArchiveCurrentRoundInternal("ProjectRestart");
+                }
+
                 _pitchStage = PitchStage.Waiting;
                 _pitchStageStartedAt = DateTimeOffset.UtcNow;
                 _stageDurationSeconds = 0;
                 _isTimerPaused = false;
                 _timerPausedAt = null;
                 _totalPausedSeconds = 0.0;
+                _isCurrentRoundArchived = false;
+                _hasReachedVoting = false;
+                _currentRoundStartedAt = DateTimeOffset.UtcNow;
                 ResetChairs();
                 _lastUpdated = DateTimeOffset.UtcNow;
-                return new SelectProjectResult(true, nextProject, null);
+                return new SelectProjectResult(true, nextProject, null, null, archivedOnRestart);
             }
 
             Project? prevProject = null;
+            Round? archivedOnSwitch = null;
 
-            // Conclui projeto anterior, se houver
+            // Conclui e arquiva rodada do projeto anterior, se houver e ainda não arquivada
             if (_currentProjectId != null && _projects.TryGetValue(_currentProjectId, out var prev))
             {
+                if (!_isCurrentRoundArchived)
+                {
+                    archivedOnSwitch = ArchiveCurrentRoundInternal("ProjectSwitch");
+                }
+
                 if (prev.Status == ProjectStatus.Current)
                 {
                     prev.Status = ProjectStatus.Completed;
@@ -170,10 +191,13 @@ public class ArenaProjectStore : IArenaProjectStore
             _isTimerPaused = false;
             _timerPausedAt = null;
             _totalPausedSeconds = 0.0;
+            _isCurrentRoundArchived = false;
+            _hasReachedVoting = false;
+            _currentRoundStartedAt = DateTimeOffset.UtcNow;
             ResetChairs();
             _lastUpdated = DateTimeOffset.UtcNow;
 
-            return new SelectProjectResult(true, nextProject, prevProject);
+            return new SelectProjectResult(true, nextProject, prevProject, null, archivedOnSwitch);
         }
     }
 
@@ -502,6 +526,11 @@ public class ArenaProjectStore : IArenaProjectStore
             _pitchStage = targetStage;
             _pitchStageStartedAt = DateTimeOffset.UtcNow;
 
+            if (targetStage == PitchStage.VotingOpen)
+            {
+                _hasReachedVoting = true;
+            }
+
             // Determina a duração alocada com base no TimerConfig do evento ativo
             var currentEvent = GetCurrentEvent();
             var timerConfig = currentEvent?.Timers ?? new TimerConfig();
@@ -518,18 +547,26 @@ public class ArenaProjectStore : IArenaProjectStore
             _totalPausedSeconds = 0.0;
             _lastUpdated = DateTimeOffset.UtcNow;
 
+            Round? archivedOnFinish = null;
+
             if (targetStage == PitchStage.Finished && _currentProjectId != null && _projects.TryGetValue(_currentProjectId, out var project))
             {
                 project.Status = ProjectStatus.Completed;
                 project.PresentationEndedAt ??= DateTimeOffset.UtcNow;
                 project.UpdatedAt = DateTimeOffset.UtcNow;
+
+                if (!_isCurrentRoundArchived)
+                {
+                    archivedOnFinish = ArchiveCurrentRoundInternal("Finished");
+                }
             }
 
             return new PitchTransitionResult(
                 Success: true,
                 PreviousStage: prev,
                 CurrentStage: _pitchStage,
-                StartedAt: _pitchStageStartedAt
+                StartedAt: _pitchStageStartedAt,
+                ArchivedRound: archivedOnFinish
             );
         }
     }
@@ -544,6 +581,9 @@ public class ArenaProjectStore : IArenaProjectStore
             _isTimerPaused = false;
             _timerPausedAt = null;
             _totalPausedSeconds = 0.0;
+            _isCurrentRoundArchived = false;
+            _hasReachedVoting = false;
+            _currentRoundStartedAt = DateTimeOffset.UtcNow;
             ResetChairs();
             _lastUpdated = DateTimeOffset.UtcNow;
 
@@ -691,6 +731,142 @@ public class ArenaProjectStore : IArenaProjectStore
     public IReadOnlyDictionary<int, bool> GetChairStates() => _chairStates;
 
     public int GetActiveChairCount() => _chairStates.Values.Count(c => c);
+
+    // =========================================================================
+    // ROUND HISTORY & RESULT ENGINE (Milestone 3D)
+    // =========================================================================
+
+    public Round? ArchiveCurrentRound(string reason = "Manual")
+    {
+        lock (_contextLock)
+        {
+            return ArchiveCurrentRoundInternal(reason);
+        }
+    }
+
+    private Round? ArchiveCurrentRoundInternal(string reason)
+    {
+        // Proteção explícita contra double-fire: arquiva cada rodada no máximo 1 vez
+        if (_isCurrentRoundArchived)
+        {
+            return null;
+        }
+
+        if (string.IsNullOrEmpty(_currentProjectId) || !_projects.TryGetValue(_currentProjectId, out var project))
+        {
+            return null;
+        }
+
+        var currentEvent = GetCurrentEvent();
+        var timerConfig = currentEvent?.Timers != null
+            ? new TimerConfig
+            {
+                PitchDurationSeconds = currentEvent.Timers.PitchDurationSeconds,
+                QaDurationSeconds = currentEvent.Timers.QaDurationSeconds,
+                VotingDurationSeconds = currentEvent.Timers.VotingDurationSeconds,
+                LockoutEnabled = currentEvent.Timers.LockoutEnabled
+            }
+            : new TimerConfig();
+
+        var turnedChairs = _chairStates.Where(kvp => kvp.Value).Select(kvp => kvp.Key).OrderBy(k => k).ToList();
+        int turnedCount = turnedChairs.Count;
+        int totalChairs = 5;
+
+        // Result Engine canônico (Milestone 3D)
+        RoundResult result;
+        RoundApprovalMode approvalMode;
+
+        bool hadValidVoting = _hasReachedVoting || _pitchStage >= PitchStage.VotingOpen;
+        if (!hadValidVoting)
+        {
+            result = RoundResult.Inconclusive;
+            approvalMode = RoundApprovalMode.None;
+        }
+        else
+        {
+            if (turnedCount == 5)
+            {
+                result = RoundResult.Approved;
+                approvalMode = RoundApprovalMode.Unanimous;
+            }
+            else if (turnedCount >= 3)
+            {
+                result = RoundResult.Approved;
+                approvalMode = RoundApprovalMode.Majority;
+            }
+            else if (turnedCount >= 1)
+            {
+                result = RoundResult.Rejected;
+                approvalMode = RoundApprovalMode.Minority;
+            }
+            else
+            {
+                result = RoundResult.Rejected;
+                approvalMode = RoundApprovalMode.None;
+            }
+        }
+
+        var endedAt = DateTimeOffset.UtcNow;
+        var startedAt = project.PresentationStartedAt ?? _currentRoundStartedAt ?? endedAt;
+        double duration = Math.Max(0.0, (endedAt - startedAt).TotalSeconds);
+        double effective = Math.Max(0.0, duration - _totalPausedSeconds);
+
+        var round = new Round
+        {
+            Id = Guid.NewGuid().ToString("N")[..8],
+            EventId = currentEvent?.Id ?? project.EventId,
+            ProjectId = project.Id,
+            ProjectTitle = project.Title,
+            PitchLeader = project.PitchLeader,
+            Track = project.Track,
+            StartedAt = startedAt,
+            EndedAt = endedAt,
+            DurationSeconds = Math.Round(duration, 2),
+            EffectiveDurationSeconds = Math.Round(effective, 2),
+            LastStageReached = _pitchStage,
+            TurnedChairs = turnedChairs,
+            TurnedChairCount = turnedCount,
+            TotalChairs = totalChairs,
+            TimerConfig = timerConfig,
+            TotalPausedSeconds = Math.Round(_totalPausedSeconds, 2),
+            ArchivedAt = endedAt,
+            Result = result,
+            ApprovalMode = approvalMode,
+            Notes = $"Archived via {reason}"
+        };
+
+        _roundHistory.Add(round);
+        _isCurrentRoundArchived = true;
+
+        return round;
+    }
+
+    public IReadOnlyList<Round> GetRoundHistory(string? eventId = null)
+    {
+        lock (_contextLock)
+        {
+            return string.IsNullOrWhiteSpace(eventId)
+                ? _roundHistory.ToList()
+                : _roundHistory.Where(r => r.EventId.Equals(eventId.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+    }
+
+    public Round? GetRoundById(string roundId)
+    {
+        if (string.IsNullOrWhiteSpace(roundId)) return null;
+        lock (_contextLock)
+        {
+            return _roundHistory.FirstOrDefault(r => r.Id.Equals(roundId.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    public Round? GetLastRound()
+    {
+        lock (_contextLock)
+        {
+            return _roundHistory.LastOrDefault();
+        }
+    }
 
     private static IReadOnlyList<string> GetAllowedTransitions(PitchStage stage) => stage switch
     {

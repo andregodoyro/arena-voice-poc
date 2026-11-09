@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { projectsApi } from '../api/projectsApi';
 import { eventsApi } from '../api/eventsApi';
 import { pitchApi } from '../api/pitchApi';
+import { roundsApi } from '../api/roundsApi';
 import { isCurrentProject } from '../utils/projectStatus';
 import { useSignalR } from '../services/useSignalR';
 import { getBackendUrl } from '../api/apiClient';
@@ -25,6 +26,7 @@ const DEFAULT_CHAIRS = [
  * - ADR-003 (ActiveContext): O projeto e evento ativos são refletidos ponta a ponta.
  * - ADR-004 (Rich SignalR Payloads): Consome os metadados ricos enviados pelo Hub.
  * - Milestone 3A (Event Lifecycle): Gerencia o catálogo de eventos e a reatividade de ativação.
+ * - Milestone 3D (Round History): Preserva o histórico das rodadas arquivadas em memória.
  */
 export function OperatorProvider({ children }) {
   // ── Estado Institucional e de Projetos (Fase 2 & Fase 3A) ──────────────────
@@ -33,6 +35,7 @@ export function OperatorProvider({ children }) {
   const [projects, setProjects] = useState([]);
   const [eventsList, setEventsList] = useState([]);
   const [pitchState, setPitchState] = useState(null);
+  const [rounds, setRounds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -109,6 +112,14 @@ export function OperatorProvider({ children }) {
             isTurned: stateData.chairs[String(chair.id)] === true,
           }))
         );
+      }
+
+      // Sincroniza histórico de rodadas (Milestone 3D)
+      try {
+        const roundsData = await roundsApi.getRounds();
+        setRounds(Array.isArray(roundsData) ? roundsData : []);
+      } catch (rErr) {
+        console.warn('[OperatorContext] Aviso ao buscar histórico de rodadas:', rErr);
       }
 
       setError(null);
@@ -235,6 +246,13 @@ export function OperatorProvider({ children }) {
     }));
   }, []);
 
+  // ── Sincronização em Tempo Real (Milestone 3D: Round History) ─────────────
+  const handleRoundArchived = useCallback((payload) => {
+    if (!payload?.round) return;
+    console.log('[OperatorContext] Sincronizando rodada arquivada no histórico:', payload.round);
+    setRounds((prev) => [payload.round, ...prev.filter((r) => r.id !== payload.round.id)]);
+  }, []);
+
   // ── Reconexão e Resync Hardening (Milestone 2C.5.5) ──────────────────────
   const handleReconnected = useCallback(async () => {
     console.log('[OperatorContext] Reconexão detectada. Executando resync autoritativo completo...');
@@ -248,7 +266,7 @@ export function OperatorProvider({ children }) {
     }
   }, [fetchOperationalData]);
 
-  // ── Instância Única de SignalR (Milestone 2C.5.1: Foundation / 3A / 3B) ───
+  // ── Instância Única de SignalR (Milestone 2C.5.1: Foundation / 3A / 3B / 3D) ─
   const { connectionStatus, connectionError, backendUrl } = useSignalR({
     onChairTurned: (chairId, source) => turnChair(chairId, source),
     onChairsReset: resetAllChairs,
@@ -257,6 +275,7 @@ export function OperatorProvider({ children }) {
     onActiveEventChanged: handleActiveEventChanged,
     onPitchStageChanged: handlePitchStageChanged,
     onPitchTimerUpdated: handlePitchTimerUpdated,
+    onRoundArchived: handleRoundArchived,
     onReconnected: handleReconnected,
     initialBackendUrl: getBackendUrl(),
   });
@@ -331,6 +350,9 @@ export function OperatorProvider({ children }) {
     pausePitchTimer,
     resumePitchTimer,
     adjustPitchTimer,
+
+    // Histórico de Rodadas (Milestone 3D)
+    rounds,
 
     // Conexão e Resync
     connectionStatus,

@@ -690,6 +690,16 @@ app.MapPost("/api/projects/{id}/select", async (string id, IArenaProjectStore st
         });
     }
 
+    // Notifica arquivamento de rodada anterior (se arquivada durante troca de projeto)
+    if (result.ArchivedRound != null)
+    {
+        await hubContext.Clients.All.SendAsync("RoundArchived", new
+        {
+            round = RoundDto.FromEntity(result.ArchivedRound),
+            timestamp = DateTimeOffset.UtcNow
+        });
+    }
+
     // Notifica reset de cadeiras
     await hubContext.Clients.All.SendAsync("ChairsReset");
 
@@ -795,6 +805,16 @@ app.MapPost("/api/pitch/transition", async (PitchTransitionDto dto, IArenaProjec
         timestamp = DateTimeOffset.UtcNow
     });
 
+    // Se a rodada foi arquivada ao atingir Finished, emite evento SignalR RoundArchived
+    if (result.ArchivedRound != null)
+    {
+        await hubContext.Clients.All.SendAsync("RoundArchived", new
+        {
+            round = RoundDto.FromEntity(result.ArchivedRound),
+            timestamp = DateTimeOffset.UtcNow
+        });
+    }
+
     return Results.Ok(new
     {
         success = true,
@@ -807,7 +827,8 @@ app.MapPost("/api/pitch/transition", async (PitchTransitionDto dto, IArenaProjec
         isPaused = state.IsPaused,
         isExpired = state.IsExpired,
         isVotingAllowed = state.IsVotingAllowed,
-        allowedTransitions = state.AllowedTransitions
+        allowedTransitions = state.AllowedTransitions,
+        archivedRound = result.ArchivedRound != null ? RoundDto.FromEntity(result.ArchivedRound) : null
     });
 });
 
@@ -963,7 +984,60 @@ app.MapPost("/api/pitch/timer/adjust", async (AdjustPitchTimerDto dto, IArenaPro
 });
 
 // =========================================================================
-// 5. MAPEAMENTO DO HUB SIGNALR
+// 5. ROUND HISTORY & RESULT ENGINE (MILESTONE 3D)
+// =========================================================================
+
+// GET /api/rounds — Lista histórico de rodadas com filtro opcional por eventId
+app.MapGet("/api/rounds", (IArenaProjectStore store, string? eventId) =>
+{
+    var rounds = store.GetRoundHistory(eventId);
+    var dtos = rounds.Select(RoundDto.FromEntity).ToList();
+    return Results.Ok(dtos);
+});
+
+// GET /api/rounds/last — Obtém a última rodada arquivada
+app.MapGet("/api/rounds/last", (IArenaProjectStore store) =>
+{
+    var last = store.GetLastRound();
+    if (last == null)
+    {
+        return Results.NotFound(new { error = "Nenhuma rodada arquivada até o momento." });
+    }
+    return Results.Ok(RoundDto.FromEntity(last));
+});
+
+// GET /api/rounds/{id} — Obtém detalhes de uma rodada específica por ID
+app.MapGet("/api/rounds/{id}", (string id, IArenaProjectStore store) =>
+{
+    var round = store.GetRoundById(id);
+    if (round == null)
+    {
+        return Results.NotFound(new { error = "Rodada não encontrada.", id });
+    }
+    return Results.Ok(RoundDto.FromEntity(round));
+});
+
+// POST /api/rounds/archive — Força o arquivamento manual da rodada ativa
+app.MapPost("/api/rounds/archive", async (IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
+{
+    var archived = store.ArchiveCurrentRound("ManualApi");
+    if (archived == null)
+    {
+        return Results.Conflict(new { error = "Não há rodada elegível para arquivamento ou a rodada já foi arquivada." });
+    }
+
+    var dto = RoundDto.FromEntity(archived);
+    await hubContext.Clients.All.SendAsync("RoundArchived", new
+    {
+        round = dto,
+        timestamp = DateTimeOffset.UtcNow
+    });
+
+    return Results.Ok(dto);
+});
+
+// =========================================================================
+// 6. MAPEAMENTO DO HUB SIGNALR
 // =========================================================================
 app.MapHub<ArenaPocHub>("/hubs/arena-poc");
 app.MapHub<ArenaPocHub>("/arenaHub"); // Rota retrocompatível

@@ -18,6 +18,7 @@ export function useSignalR({
   onActiveEventChanged,
   onPitchStageChanged,
   onPitchTimerUpdated,
+  onRoundArchived,
   onReconnecting,
   onReconnected,
   onClose,
@@ -43,6 +44,7 @@ export function useSignalR({
     onActiveEventChanged,
     onPitchStageChanged,
     onPitchTimerUpdated,
+    onRoundArchived,
     onReconnecting,
     onReconnected,
     onClose,
@@ -56,6 +58,7 @@ export function useSignalR({
     onActiveEventChanged,
     onPitchStageChanged,
     onPitchTimerUpdated,
+    onRoundArchived,
     onReconnecting,
     onReconnected,
     onClose,
@@ -212,6 +215,14 @@ export function useSignalR({
       console.log('[SignalR Evento] PitchTimerUpdated recebido:', data);
       if (callbacksRef.current.onPitchTimerUpdated) {
         callbacksRef.current.onPitchTimerUpdated(data);
+      }
+    });
+
+    // 9. Arquivamento de Rodada Concluída (Milestone 3D: Round History & Result Engine)
+    connection.on('RoundArchived', (data) => {
+      console.log('[SignalR Evento] RoundArchived recebido:', data);
+      if (callbacksRef.current.onRoundArchived) {
+        callbacksRef.current.onRoundArchived(data);
       }
     });
 
