@@ -501,10 +501,7 @@
     - **Cenário 4 — Resiliência de Reconexão e Protocolo Snapshot-First (ADR-002):** Simulação de corte abrupto de conexão de rede/socket durante viradas ativas, religamento do cliente e validação da restauração determinística do estado completo via REST snapshot sem dessincronização.
     - **Cenário 5 — Hidratação a Frio / Recarga F5:** Simulação de carregamento inicial limpo de novos clientes consumindo `/api/state`, `/api/projects` e `/api/events/current` com 100% de coerência de estado entre memória do backend e telão.
   - **Cenário 6 — Validação Visual Real Desktop Full HD (1920x1080):**
-    - Execução via headless rendering com captura de evidências em `docs/assets/milestone-2d5-homologation/`:
-      - `chrome_operator_fhd.png`: Cockpit do Operador em Full HD com painéis de controle, grid de cadeiras e gestão de projetos.
-      - `edge_stage_fhd.png`: Telão 3D no Microsoft Edge com iluminação cênica, branding ativo, pódio e anfiteatro.
-      - `chrome_stage_fhd.png`: Telão 3D no Google Chrome confirmando consistência cromática, nitidez de materiais PBR e 60 FPS.
+    - Validação de renderização e responsividade em resolução Full HD (1920x1080) nos navegadores Google Chrome e Microsoft Edge via suíte automatizada de homologação (`tests/homologation-2d5.cjs`), confirmando carregamento do cockpit do operador com painéis de controle e grid de cadeiras, e carregamento do telão com iluminação cênica, branding ativo, pódio e anfiteatro procedural.
 - **Auditoria Técnica e Classificação de Dívidas Técnicas:**
   - **P0 (Bloqueantes para Produção):** Zero (0). A plataforma é 100% determinística, sem memory leaks nem perdas de contrato.
   - **P1 (Melhorias de Arquitetura):**
