@@ -1,9 +1,10 @@
 # Índice Histórico de Marcos (Milestone History)
 ## Plataforma Arena Voice / Arena de Inovação
 
-> **Status Geral do Projeto:** FASE 2 CONCLUÍDA E HOMOLOGADA (Milestones 2A, 2B, 2C, 2D e 2E Concluídos)  
-> **Tag Estável Mais Recente:** `v0.2.0-phase2` (Encerramento da Fase 2)  
-> **Última Atualização:** Novembro de 2026 (Consolidação Final e Fechamento da Fase 2)
+> **Status Geral do Projeto:** FASE 3 CONCLUÍDA E HOMOLOGADA (Milestones 3A, 3B, 3C, 3D e 3E Concluídos)  
+> **Tag Estável Mais Recente:** `v0.3.0-phase3` (Encerramento da Fase 3)  
+> **Cobertura Automatizada:** 466 verificações em 9 suítes (100% aprovadas, zero regressões)  
+> **Última Atualização:** Novembro de 2026 (Consolidação Final e Fechamento da Fase 3)
 
 ---
 
@@ -31,10 +32,9 @@ Este documento é a **fonte oficial de índice de marcos**, permitindo rastrear 
 | **2** | **2E** | Phase 2 Validation & Closure | ✅ Concluído | Homologação integrada, governança, release notes e fechamento | 191 testes / Build verde | `v0.2.0-phase2` |
 | **3** | **3A** | Event Lifecycle & Management | ✅ Concluído | 5 estados (Draft, Ready, Active, Finished, Archived), ativação não-destrutiva, catálogo no cockpit | 229 testes (191 base + 38 events) | main |
 | **3** | **3B** | Pitch Lifecycle Engine | ✅ Concluído | Máquina de estados formal (6 estágios), 422 Unprocessable, reset cadeiras, SignalR PitchStageChanged | 305 testes (229 base + 76 pitch) | main |
-| **3** | **3C** | Pitch Timers & Clock Synchronization | 📅 Próximo | Cronômetro sincronizado via SignalR no telão e cockpit (consumidor da máquina de estados) | Planejado | - |
-| **3** | **3D** | Chair Lockout & Security | 📅 Futuro | Bloqueio autoritativo de virada de cadeiras pós-cronômetro | Planejado | - |
-| **3** | **3E** | Evaluator Governance & Scorecards | 📅 Futuro | Jurados nominais nas 5 cadeiras e notas quantitativas | Planejado | - |
-| **3** | **3F** | Analytics, Reporting & Phase 3 Closure | 📅 Futuro | Ata executiva em PDF/CSV e tag v0.3.0-phase3 | Planejado | - |
+| **3** | **3C** | Pitch Timers & Authoritative Lockout | ✅ Concluído | Cronômetro ancorado em timestamp, pause/resume sem drift, +tempo, lockout 409 Conflict fora de VotingOpen | 355 testes (305 base + 50 timers) | main |
+| **3** | **3D** | Round History & Result Engine | ✅ Concluído | Snapshot imutável de rodada, Result (Approved/Rejected/Inconclusive), ApprovalMode (Unanimous/Majority/Minority/None) | 416 testes (355 base + 61 history) | main |
+| **3** | **3E** | Judge Catalog & Event Jury Assignment | ✅ Concluído | Catálogo global de jurados, alocação nas cadeiras 1..5, StageJuryDock, integração com RoundHistoryEntry | 466 testes (416 base + 50 jury) | `v0.3.0-phase3` |
 
 ---
 
@@ -51,26 +51,36 @@ Este documento é a **fonte oficial de índice de marcos**, permitindo rastrear 
 - **2A (Domain Models & Store):** Introdução das entidades fundamentais do negócio (`Event`, `Project`, `BrandingConfig`, `ProjectMedia`, `ActiveContext`) e implementação do `ArenaProjectStore` como Singleton thread-safe com seed offline de 5 projetos. Enriquecimento aditivo do snapshot `GET /api/state`.
 - **2B (REST APIs & SignalR Contracts):** Implementação de 8 endpoints REST com validações rigorosas (CRUD de projetos, alteração de branding do evento ativo, workflow de seleção atômica no palco e proteção `HTTP 409 Conflict` contra exclusão de pitch ativo) e 2 contratos SignalR (`CurrentProjectChanged`, `EventBrandingUpdated`). Suíte de testes expandida para 156 verificações automatizadas com 100% de sucesso.
 - **2C (Operator Project & Event Management Interface):** Construção completa da interface administrativa do operador em React 19 com sub-navegação em abas (`/operator/cockpit`, `/operator/projects`, `/operator/event` - 2C.1), visualização dos dados de pitches e branding (2C.2), formulários modais de CRUD de projetos com proteção 409 e UX refinada (2C.3), gestão operacional de evento e branding cênico com ColorSwatch e preview em tempo real (2C.4) e integração realtime com resync autoritativo via SignalR para projetos, branding, cadeiras e reset com detecção de queda e recuperação automática de conexão (2C.5).
-- **2D (Stage Projection & Dynamic Experience):** Transformação integral do telão cênico 3D (`/stage`) na identidade definitiva da Arena de Inovação:
-  - **2D.1 (Infraestrutura de Dados & HUD Cênico):** Conexão do telão ao `OperatorContext`, projeção institucional do evento ativo no topo e card broadcast `StageProjectBanner` no rodapé com fallback offline de logo e mídia.
-  - **2D.2 (Higienização Visual):** Purga completa do modelo externo `studio.glb`, letreiro "THE VOICE", pedestal de microfone, praticável de cantor e substituição das inscrições das cadeiras para "★ APOIADO ★" / "— EM AVALIAÇÃO —".
-  - **2D.3 (Cenografia e Escala de Anfiteatro):** Criação da arquitetura cênica em Three.js procedural: Arena Geral (piso escuro $Y=0$) > Palco da Startup (plataforma intermediária laqueada $Y=0.18\,\text{m}$) > Pódio do Pitch (plataforma elevada $Y=0.34\,\text{m}$), 4 patamares de arquibancada com degraus balizados e portal com 3 arcos de keynote corporativo.
-  - **2D.4 (Neons Dinâmicos & Theming Reativo):** Conexão em tempo real de `primaryColor` e `secondaryColor` aos materiais emissores do palco, arcos e pódio com interpolação suave via GSAP (1.0s a 1.2s), protagonismo das cadeiras (spotlight de 45, botão emissivo, halo secundário e pedestal glow), e efeito especial de celebração institucional de Unanimidade (5 de 5 cadeiras apoiando).
-  - **2D.5 (Homologação Integrada, Resiliência & Fechamento):** Validação dos 6 cenários operacionais, teste de queda/reconexão com protocolo Snapshot-First (ADR-002), suíte formal de homologação com 35 verificações (191 testes no total, 100% verde), inspeção em Edge/Chrome Full HD e fechamento oficial do marco.
-- **2E (Phase 2 Validation & Closure):** Auditoria integral de governança, consolidação das 4 suítes de testes automatizados (191 testes 100% verdes), homologação das decisões de arquitetura (ADR-001 a ADR-008), catalogação das dívidas técnicas (P0: 0), geração das release notes profissionais da Fase 2, encerramento formal da Fase 2 e emissão da tag `v0.2.0-phase2`.
+- **2D (Stage Projection & Dynamic Experience):** Transformação integral do telão cênico 3D (`/stage`) na identidade definitiva da Arena de Inovação com cenografia procedural (Arena > Palco > Pódio), neons dinâmicos conectados ao branding e celebração de Unanimidade (5/5 cadeiras).
+- **2E (Phase 2 Validation & Closure):** Auditoria integral de governança, consolidação das 4 suítes de testes automatizados (191 testes 100% verdes), homologação das decisões de arquitetura (ADR-001 a ADR-008) e emissão da tag `v0.2.0-phase2`.
 
-### Fase 3 — Event Governance, Pitch Dynamics & Evaluator Experience (Em Andamento)
-- **3A (Event Lifecycle & Management):** Implementação da governança e catálogo de eventos com modelo explícito de 5 estados (`Draft`, `Ready`, `Active`, `Finished`, `Archived`). Introdução de ativação atômica não-destrutiva (evento ativo anterior retorna para `Ready`), ações explícitas de encerramento (`finish`) e arquivamento protegido com `HTTP 409 Conflict`, duplicação para novos ciclos em `Draft`, 8 novos endpoints REST, reatividade SignalR com `ActiveEventChanged` e painel com abas de filtros por status e `ColorSwatch` no cockpit do operador. Suíte automatizada expandida para 229 testes (100% verdes).
-- **3B (Pitch Lifecycle Engine):** Implementação da máquina de estados operacional do pitch com 6 estados formais (`Waiting = 0`, `PitchRunning = 1`, `QA = 2`, `VotingOpen = 3`, `VotingClosed = 4`, `Finished = 5`) acoplada a `ActiveContext`, endpoint canônico de transição `POST /api/pitch/transition` com validação rígida e rejeição `HTTP 422 Unprocessable Entity` para pulos ou transições ilegais, estado `Finished` estritamente terminal com conclusão automática do projeto para `ProjectStatus.Completed`, reset de pitch (`POST /api/pitch/reset`) neutralizando as cadeiras para 0°, evento SignalR `PitchStageChanged`, Stepper visual e controles no cockpit do operador, e badge cênico do estágio no telão público (`StageProjectBanner`). Suíte automatizada expandida para 305 testes (100% verdes).
-- **3C (Pitch Timers & Clock Synchronization):** Cronômetro oficial sincronizado via SignalR no telão e cockpit, atuando como consumidor da máquina de estados (Planejado).
-- **3D (Chair Lockout & Security):** Bloqueio autoritativo de virada de cadeiras pós-cronômetro (`HTTP 423 Locked`) e feedback para o hardware (Planejado).
-- **3E (Evaluator Governance & Nominals):** Cadastro nominal e fotos dos jurados nas 5 cadeiras e scorecards qualitativos (Planejado).
-- **3F (Analytics & Phase 3 Closure):** Exportação de ata executiva em PDF/CSV, homologação integrada e emissão da tag `v0.3.0-phase3` (Planejado).
+### Fase 3 — Event Governance, Pitch Dynamics & Jury (Concluída e Homologada)
+- **3A (Event Lifecycle & Management):** Implementação da governança e catálogo de eventos com modelo explícito de 5 estados (`Draft`, `Ready`, `Active`, `Finished`, `Archived`). Ativação atômica não-destrutiva (evento ativo anterior retorna para `Ready`), ações explícitas de encerramento (`finish`) e arquivamento protegido com `HTTP 409 Conflict`, duplicação para novos ciclos em `Draft`, 8 novos endpoints REST, reatividade SignalR com `ActiveEventChanged` e painel com abas de filtros por status e `ColorSwatch` no cockpit do operador. Suíte automatizada expandida para **229 testes** (100% verdes).
+- **3B (Pitch Lifecycle Engine):** Implementação da máquina de estados operacional do pitch com 6 estados formais (`Waiting = 0`, `PitchRunning = 1`, `QA = 2`, `VotingOpen = 3`, `VotingClosed = 4`, `Finished = 5`) acoplada a `ActiveContext`, endpoint canônico de transição `POST /api/pitch/transition` com validação rígida e rejeição `HTTP 422 Unprocessable Entity` para transições ilegais, estado `Finished` estritamente terminal, reset de pitch (`POST /api/pitch/reset`) neutralizando as cadeiras para 0°, evento SignalR `PitchStageChanged`, Stepper visual e controles no cockpit do operador, e badge cênico do estágio no telão público (`StageProjectBanner`). Suíte automatizada expandida para **305 testes** (100% verdes).
+- **3C (Pitch Timers & Authoritative Lockout):** Implementação do cronômetro oficial de palco ancorado em `PitchStageStartedAt` no backend, com compensação acumulada de pausas (`TotalPausedSeconds`) para eliminação de drift. Sincronização contínua via evento `PitchTimerUpdated` (emissão periódica). Endpoints `POST /api/pitch/pause`, `resume` e `add-time` (+30s, +60s, +120s). Lockout autoritativo no `POST /api/chair-press`: fora de `VotingOpen` ou com timer pausado, retorna `HTTP 409 Conflict` (`{ accepted: false }`). Ticker local sincronizado no frontend do operador e no telão. StageHUD cênico com alerta visual dos últimos 15s e badge "PAUSADO". Suíte automatizada expandida para **355 testes** (100% verdes).
+- **3D (Round History & Result Engine):** Arquivamento imutável de rodadas (`RoundHistoryEntry`) ao transicionar para `Finished` ou encerrar evento com rodada em andamento. Result Engine com classificação em dois níveis: `Result` (Approved/Rejected/Inconclusive) e `ApprovalMode` (Unanimous/Majority/Minority/None). Snapshot da rodada inclui histórico de estágios, composição da banca e registro individual de cadeiras. Proteção idempotente contra duplo arquivamento. Endpoints `GET /api/history` e `GET /api/history/{id}`. Evento `RoundArchived` via SignalR. Painel de histórico consultável no cockpit. Suíte automatizada expandida para **416 testes** (100% verdes).
+- **3E (Judge Catalog & Event Jury Assignment):** Catálogo global de jurados corporativos (`Judge`) com campos `Id`, `Name`, `Company`, `Role`, `Specialty`, `Bio`, `PhotoUrl`, `IsActive`, `Email`. Alocação de jurados nas cadeiras 1 a 5 do evento via `EventJuryAssignment` e endpoint `PUT /api/events/{id}/jury`. Aba `/operator/judges` completa com CRUD e painel de alocação. Dock cênico nominal no telão (`StageJuryDock`) com avatares, nomes e anéis de neon reativos ao acionamento. Integração dos nomes de jurados com `RoundHistoryEntry`. Evento `EventJuryUpdated` via SignalR. Suíte automatizada expandida para **466 testes** (100% verdes). Tag `v0.3.0-phase3` emitida.
 
 ---
 
-## 4. Referências Documentais Rápidas
+## 4. Sprints de Correção (Pós-Entrega)
+
+### Bugfix Sprint Pós-3D — EventModal Clock Import & Stage Timer Ticker
+- **Período:** Pós-validação do Milestone 3D
+- **BUG #1 (Event Editor Crash):** Tela preta ao editar qualquer evento em `/operator/event`. Causa raiz: `EventModal.jsx` referenciava o componente `Clock` sem importar o ícone da biblioteca `lucide-react`. Correção: adição de `Clock` ao bloco de imports.
+- **BUG #2 (Stage Timer Estático):** Cronômetro do telão pequeno e virtualmente estático, não acompanhando pause/resume/add-time. Causa raiz: ausência de ticker local sincronizado no Stage (diferente do Operator). Correção: implementação do hook `useStageTimer` com ticker local ancorado em `remainingSeconds`, respeitando todos os eventos `PitchTimerUpdated` e `PitchStageChanged`. Aumento significativo da visibilidade do cronômetro no telão e badge "PAUSADO".
+
+### Bugfix Sprint Pós-3A — Active Event In-Place Editing Fix
+- **Período:** Validação funcional integrada
+- **BUG:** Edição comum de evento ativo (TimerConfig, Branding, Nome) via `PUT /api/events/{id}` retornava mensagem de erro sobre promoção para `Active` via PUT, mesmo sem o operador tentar alterar o status.
+- **Causa raiz:** O payload de edição incluía o campo `status` com o valor `Active` (refletindo o estado atual), e o backend interpretava isso como tentativa de promoção direta para `Active` via PUT (ação bloqueada por design).
+- **Correção:** Backend passou a ignorar o campo `status` no payload do `PUT /api/events/{id}` quando o valor recebido já é igual ao estado corrente do evento. Frontend ajustado para não enviar `status` no payload de edição de metadados.
+
+---
+
+## 5. Referências Documentais Rápidas
 - **Diário Técnico de Implementação:** [`docs/archives/implementation-history.md`](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/docs/archives/implementation-history.md)
 - **Retrospectiva da Fase 1:** [`docs/archives/phase1-retrospective.md`](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/docs/archives/phase1-retrospective.md)
 - **Log de Planejamento da Fase 2:** [`docs/archives/phase2-planning-log.md`](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/docs/archives/phase2-planning-log.md)
 - **Catálogo de Decisões de Arquitetura (ADRs):** [`docs/archives/decision-records/`](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/docs/archives/decision-records/)
+- **Arquitetura Técnica Completa:** [`docs/architecture.md`](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/docs/architecture.md)

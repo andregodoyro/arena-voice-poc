@@ -1,9 +1,10 @@
-# ROADMAP ARENA VOICE / ARENA DE INOVAÇÃO
+﻿# ROADMAP ARENA VOICE / ARENA DE INOVAÇÃO
 ## Versão 1.1 — Planejamento Progressivo, Arquitetura e Onboarding Técnico
 
 > **Classificação:** Documento Mestre de Produto e Arquitetura  
-> **Status da Fundação:** Marco 1 Concluído (POC funcional validada nos cenários automatizados e manuais documentados)  
-> **Data de Atualização:** Outubro de 2026  
+> **Status:** Fase 1, Fase 2 e Fase 3 Concluídas e Homologadas (`v0.3.0-phase3`)  
+> **Cobertura Automatizada:** 466 verificações em 9 suítes de testes (100% aprovadas, zero falhas, zero regressões)  
+> **Data de Atualização:** Novembro de 2026  
 > **Público-alvo:** Desenvolvedores, arquitetos de software, product engineers e operadores de evento
 
 ---
@@ -685,10 +686,10 @@ MACROBLOCO: ANALYTICS & PRODUCTION HARDENING (FASES 9 E 10)
 
 ---
 
-### FASE 2: Event Setup + Project Management (EM ANDAMENTO: 2A e 2B Concluídos)
+### FASE 2: Event Setup + Project Management ✅ CONCLUÍDA E HOMOLOGADA
 *Permitir que o Arena Voice configure diferentes eventos e seus projetos sem alterar código.*
 
-- **STATUS:** EM ANDAMENTO (Milestones 2A e 2B Concluídos e Homologados; 156 testes aprovados)
+- **STATUS:** ✅ CONCLUÍDA E HOMOLOGADA (Milestones 2A, 2B, 2C, 2D e 2E Concluídos; 191 testes aprovados; tag `v0.2.0-phase2`)
 - **OBJETIVO:** Tornar a plataforma reutilizável e dinâmica, permitindo cadastrar eventos e seus respectivos projetos/MVPs com identidade visual, equipe e mídias, exibindo o projeto ativo no telão sob comando do operador.
 - **PRÉ-REQUISITOS:** Fase 1 concluída (`v0.1.0-phase1`).
 - **ESCOPO:**
@@ -730,10 +731,18 @@ MACROBLOCO: ANALYTICS & PRODUCTION HARDENING (FASES 9 E 10)
 
 ---
 
-### FASE 3: Live Round Operation / Game State
-*Transformar o Operator na central ao vivo da dinâmica do projeto que está no palco.*
+### FASE 3: Event Governance, Pitch Dynamics & Jury ✅ CONCLUÍDA E HOMOLOGADA (`v0.3.0-phase3`)
+*Governança completa de eventos, dinâmica ao vivo do pitch (máquina de estados + timers + lockout), round history, result engine e catálogo de jurados com alocação por evento.*
 
-- **OBJETIVO:** Controlar a janela oficial de avaliação do pitch respondendo a "O que está acontecendo agora com este projeto?" através dos estados de rodada `PENDING -> OPEN -> CLOSED`.
+- **STATUS:** ✅ CONCLUÍDA E HOMOLOGADA (5 Milestones: 3A, 3B, 3C, 3D, 3E; tag `v0.3.0-phase3`)
+- **COBERTURA:** 466 testes automatizados em 9 suítes (100% verde, zero regressões)
+- **MILESTONES CONCLUÍDOS:**
+  - **3A — Event Lifecycle & Management (229 testes):** Governança com 5 estados (Draft, Ready, Active, Finished, Archived), ativação atômica não-destrutiva, 8 endpoints REST, ActiveEventChanged/EventBrandingUpdated/ChairsReset via SignalR e catálogo no cockpit.
+  - **3B — Pitch Lifecycle Engine (305 testes):** Máquina de estados formal de 6 estágios, HTTP 422 para transições inválidas, estado terminal Finished, reset de pitch, PitchStageChanged via SignalR e stepper no cockpit.
+  - **3C — Pitch Timers & Authoritative Lockout (355 testes):** Cronômetro ancorado em timestamp do backend, pause/resume sem drift, +30/+60/+120s, PitchTimerUpdated contínuo, lockout HTTP 409 Conflict em qualquer estágio fora de VotingOpen.
+  - **3D — Round History & Result Engine (416 testes):** Arquivamento imutável de rodadas, Result (Approved/Rejected/Inconclusive), ApprovalMode (Unanimous/Majority/Minority/None), RoundArchived via SignalR, histórico consultável no cockpit.
+  - **3E — Judge Catalog & Event Jury Assignment (466 testes):** Catálogo global de jurados, alocação nas cadeiras 1..5 do evento, dock cênico nominal no palco (StageJuryDock), integração com RoundHistoryEntry e EventJuryUpdated via SignalR.
+- **OBJETIVO ORIGINAL:**
 - **PRÉ-REQUISITOS:** Fase 2 concluída.
 - **ESCOPO:**
   - Operator Screen (Cockpit Operacional):
@@ -1020,7 +1029,7 @@ MACROBLOCO: ANALYTICS & PRODUCTION HARDENING (FASES 9 E 10)
 
 ## 23. Testes por Fase
 
-Para manter a integridade que já atinge 94 verificações automatizadas aprovadas nos contratos REST e SignalR:
+Para manter a integridade que já atinge 466 verificações automatizadas aprovadas em 9 suítes de testes:
 - **Novos Testes Automatizados:** Devem ser incorporados na pasta `tests/` a cada fase concluída, mantendo a simplicidade de execução via Node.js nativo.
 - **Testes de Regressão Obrigatórios:** Antes de encerrar qualquer fase subsequente, `node tests/test-api.cjs` e `node tests/test-signalr-e2e.cjs` devem continuar retornando 0 falhas.
 
@@ -1061,5 +1070,5 @@ As seguintes decisões técnicas permanecem congeladas até as fases competentes
 ## 🎯 PRÓXIMA FASE RECOMENDADA
 
 > [!IMPORTANT]
-> **A Próxima Fase a ser desenvolvida é a FASE 1: OPERATOR + STAGE FOUNDATION.**  
-> Esta etapa tem risco baixíssimo para o backend existente, preserva integralmente os testes atuais e resolve imediatamente a separação entre a interface operacional (`/operator`) e o telão do público (`/stage`).
+> **A Próxima Fase é a FASE 4: Scorecards, Critérios Quantitativos & Portal do Jurado.**
+> As Fases 1, 2 e 3 estão encerradas, homologadas e com 466/466 testes aprovados. A Fase 4 estende a experiência de jurados com avaliação quantitativa por critérios, portal individual e relatórios de banca.

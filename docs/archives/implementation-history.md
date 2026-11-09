@@ -646,3 +646,203 @@
     - `homologation-2d5.cjs` (Resiliência): **35 PASS / 0 FAIL**
     - **Total Consolidado: 305 testes aprovados (100% verde, ZERO regressões)**.
 - **Impacto Futuro:** O Milestone 3B consolida a máquina de estados operacional do pitch da arena. A plataforma está pronta para a introdução de cronômetros sincronizados e regras de tempo no **Milestone 3C (Pitch Timers & Clock Synchronization)**.
+
+
+---
+
+# FASE 3 — Event Governance, Pitch Dynamics & Jury (Continuação)
+
+---
+
+### [2026-11-05] — Milestone 3C: Cronômetro de Pitch & Lockout Autoritativo (Pitch Timers & Authoritative Lockout)
+- **Status:** ✅ Concluído
+- **Objetivo:** Implementar o cronômetro oficial de palco sincronizado entre backend, cockpit do operador e telão 3D, com suporte a pausa/retomada sem drift temporal, ajustes de tempo em voo (+30s, +60s, +120s) e lockout autoritativo que bloqueia fisicamente acionamentos de cadeiras fora da janela `VotingOpen`.
+- **Arquitetura & Implementação Realizada:**
+  - **Domínio & Modelos:**
+    - `ActiveContext.cs`: Enriquecido com `int CurrentStageDurationSeconds`, `bool IsPaused` e `int TotalPausedSeconds` (compensação acumulada para cálculo de tempo restante sem drift).
+    - `PitchTimerDto.cs`: DTO de resposta incluindo `remainingSeconds`, `totalDurationSeconds`, `elapsedSeconds`, `isPaused`, `pitchStage`, `timestamp`.
+    - `AddTimeDto.cs`: DTO de entrada para `POST /api/pitch/add-time` com campo `seconds`.
+  - **Lógica de Tempo no Backend:**
+    - Cálculo de tempo restante em tempo real via fórmula: `remainingSeconds = CurrentStageDurationSeconds - (UtcNow - PitchStageStartedAt).TotalSeconds + TotalPausedSeconds - (IsPaused ? pausedSoFarSeconds : 0)`.
+    - `Pause`: Congela o momento de início da pausa e define `IsPaused = true`.
+    - `Resume`: Acumula `TotalPausedSeconds += (UtcNow - PauseStartedAt)` e zera `IsPaused`.
+    - `AddTime`: Incrementa diretamente `CurrentStageDurationSeconds` pelo número de segundos solicitado.
+  - **Endpoints REST (3 Novos Canônicos):**
+    - `POST /api/pitch/pause`: Congela cronômetro. Rejeita `409 Conflict` se já pausado.
+    - `POST /api/pitch/resume`: Retoma cronômetro. Rejeita `409 Conflict` se não pausado.
+    - `POST /api/pitch/add-time`: Adiciona segundos ao estágio atual. Aceita `{ "seconds": 30 }` ou equivalentes.
+  - **Lockout Autoritativo (integrado ao `POST /api/chair-press`):**
+    - Verificação de pré-condição: `PitchStage == VotingOpen && !IsPaused`. Caso negativo: `HTTP 409 Conflict` com body `{ accepted: false, error: "Chair press blocked: voting not open or timer is paused" }`. Nenhuma mutação de estado ocorre.
+  - **SignalR — Evento `PitchTimerUpdated`:**
+    - Emitido periodicamente (a cada segundo) pelo `IHostedService` `TimerBroadcastService` enquanto o pitch estiver em estágio com cronômetro ativo.
+    - Payload: `{ remainingSeconds, totalDurationSeconds, isPaused, pitchStage, stageCode, timestamp }`.
+  - **Frontend — Cockpit (Operador):**
+    - `useOperatorTimer.js`: Ticker local sincronizado com `remainingSeconds` recebido via `PitchTimerUpdated` e resetado a cada `PitchStageChanged`. Respeita pause/resume sem desvio.
+    - `PitchLifecycleControl.jsx`: Exibe cronômetro digital, botões de Pausar/Retomar e ações de +30s, +60s, +120s.
+  - **Frontend — Stage (Telão):**
+    - `useStageTimer.js`: Ticker local independente ancorado em `remainingSeconds`, calibrado via `PitchTimerUpdated`. Permite exibição fluida sem polling ao backend.
+    - `StageHUD.jsx`: Cronômetro cênico de grande visibilidade, alerta pulsante em vermelho nos últimos 15 segundos e badge "⏸ PAUSADO" quando `isPaused == true`.
+  - **Arquivos Principais:**
+    - `backend/Domain/Entities/ActiveContext.cs`
+    - `backend/Services/ArenaProjectStore.cs` (métodos `PausePitch`, `ResumePitch`, `AddTime`)
+    - `backend/Services/TimerBroadcastService.cs` (IHostedService)
+    - `backend/Program.cs` (3 novos endpoints)
+    - `frontend/src/hooks/useOperatorTimer.js`
+    - `frontend/src/hooks/useStageTimer.js`
+    - `frontend/src/components/stage/StageHUD.jsx`
+    - `frontend/src/components/operator/PitchLifecycleControl.jsx`
+  - **Testes Automatizados:**
+    - `tests/test-pitch-timers.cjs`: Suíte com ~50 asserções cobrindo pause/resume/add-time, lockout em todos os estágios fora de `VotingOpen`, lockout durante pausa, e recebimento do evento `PitchTimerUpdated` via SignalR.
+- **Testes & Validação:**
+  - Compilação do Frontend (`npm run build`): **100% verde**.
+  - Compilação do Backend (`dotnet build`): **0 Warnings, 0 Errors**.
+  - Bateria Completa de Testes (7 suítes):
+    - `test-pitch-timers.cjs` (Milestone 3C): **50 PASS / 0 FAIL**
+    - `test-pitch-lifecycle.cjs` (Milestone 3B): **76 PASS / 0 FAIL**
+    - `test-events-api.cjs` (Milestone 3A): **38 PASS / 0 FAIL**
+    - `test-api.cjs` (REST Base): **48 PASS / 0 FAIL**
+    - `test-projects-api.cjs` (Projetos): **53 PASS / 0 FAIL**
+    - `test-signalr-e2e.cjs` (SignalR): **55 PASS / 0 FAIL**
+    - `homologation-2d5.cjs` (Resiliência): **35 PASS / 0 FAIL**
+    - **Total Consolidado: 355 testes aprovados (100% verde, ZERO regressões).**
+- **Impacto Futuro:** O Milestone 3C estabelece o cronômetro autoritativo e o lockout físico/digital como pilares da dinâmica ao vivo. A plataforma está pronta para o **Milestone 3D (Round History & Result Engine)**.
+
+---
+
+### [2026-11-06] — Bugfix Sprint Pós-3D: Stage Timer Ticker & EventModal Crash Fix
+- **Status:** ✅ Concluído
+- **Contexto:** Dois bugs identificados durante validação manual pós-3D, antes do início do 3E.
+- **BUG #1 — Event Editor Crash (Tela Preta):**
+  - **Comportamento:** Ao editar qualquer evento em `/operator/event`, a tela ficava preta.
+  - **Causa Raiz:** `EventModal.jsx` renderizava o ícone `Clock` (do `lucide-react`) para o campo de duração do estágio, mas o ícone não havia sido incluído no bloco de `import` do componente.
+  - **Correção:** Adição de `Clock` à lista de imports de `lucide-react` em `EventModal.jsx`.
+  - **Validação:** Modal de edição testado em criação e edição de eventos, aberto e fechado, com e sem dados de timer. Frontend recompilado sem erros.
+  - **Arquivos:** `frontend/src/components/operator/EventModal.jsx`
+- **BUG #2 — Stage Timer Estático (Sem Sincronismo):**
+  - **Comportamento:** Cronômetro no telão exibido em tamanho pequeno e virtualmente estático, não acompanhando pause, resume ou add-time como o cockpit do operador.
+  - **Causa Raiz:** O Stage não possuía ticker local sincronizado. Exibia diretamente o valor estático de `remainingSeconds` do último evento recebido sem atualizá-lo por segundo.
+  - **Correção:** Implementação do hook `useStageTimer.js` com ticker local (`setInterval` de 1s) ancorado no `remainingSeconds` recebido via `PitchTimerUpdated` e `PitchStageChanged`. O ticker é pausado quando `isPaused == true`. O `StageHUD` foi redesenhado com cronômetro em destaque (fonte grande, posição central), alerta visual nos últimos 15s e badge "⏸ PAUSADO".
+  - **Arquivos:** `frontend/src/hooks/useStageTimer.js` (criado), `frontend/src/components/stage/StageHUD.jsx` (redesenhado)
+- **Testes & Validação:** Build do frontend verde. Validação manual do timer em pause, resume, add-time e PitchStageChanged confirmada em ambas as telas.
+
+---
+
+### [2026-11-06] — Bugfix Sprint Pós-3A: Active Event In-Place Editing Fix
+- **Status:** ✅ Concluído
+- **Contexto:** Identificado durante testes funcionais de integração: ao editar evento ativo (TimerConfig, Branding, Nome) via `/operator/event`, o frontend exibia a mensagem *"Não é permitido promover um evento para 'Active' via PUT. Use POST /api/events/{id}/activate para ativação atômica."*
+- **Causa Raiz:** O payload enviado pelo frontend no `PUT /api/events/{id}` incluía o campo `status` com o valor `"Active"` (refletindo o estado atual do evento editado). O backend interpretava esse `status: Active` como uma tentativa de promoção direta via PUT, bloqueada por design arquitetural para proteger a atomicidade da ativação.
+- **Correção:**
+  - **Backend:** Lógica de guarda do `PUT /api/events/{id}` ajustada para ignorar o campo `status` quando ele é igual ao estado corrente do evento (sem tentativa de promoção). Apenas mudanças de status para valores diferentes do atual continuam sendo bloqueadas para transições que exigem endpoints dedicados (`activate`, `finish`, `archive`).
+  - **Frontend:** `eventsApi.js` ajustado para não incluir o campo `status` no payload de edição de metadados e branding do evento. O status nunca deve transitar via PUT.
+  - **Arquivos:** `backend/Program.cs` (guarda de PUT eventos), `frontend/src/services/eventsApi.js`
+- **Validação:** Edição de TimerConfig, branding, nome e descrição de evento ativo executada com sucesso. Build do frontend verde. Suítes de testes mantidas sem regressões.
+
+---
+
+### [2026-11-07] — Milestone 3D: Histórico de Rodadas & Motor de Resultado (Round History & Result Engine)
+- **Status:** ✅ Concluído
+- **Objetivo:** Implementar o arquivamento imutável de rodadas concluídas (`RoundHistoryEntry`) e o motor de resultado que classifica cada apresentação em dois níveis (`Result` e `ApprovalMode`), com endpoint de consulta histórica, evento SignalR de notificação e integração visual no cockpit do operador.
+- **Arquitetura & Implementação Realizada:**
+  - **Domínio & Modelos:**
+    - `RoundResult.cs`: Enum `Result` (`Approved`, `Rejected`, `Inconclusive`) e `ApprovalMode` (`Unanimous`, `Majority`, `Minority`, `None`).
+    - `RoundHistoryEntry.cs`: Entidade imutável snapshot contendo `Id`, `EventId`, `ProjectId`, `ProjectTitle`, `ProjectTeam`, `StagesHistory`, `JurySnapshot` (nomes e cadeiras), `ChairsSnapshot` (registro de cada cadeira), `Result`, `ApprovalMode`, `VoteCount`, `ArchivedAt`.
+    - `IArenaProjectStore.cs` & `ArenaProjectStore.cs`: Métodos `ArchiveRound()` (com proteção idempotente por `roundId`), `GetHistory()` e `GetHistoryEntry(id)`.
+  - **Result Engine (`ResultEngine.cs`):**
+    - Regras de Negócio:
+      - `Result.Approved`: 3 ou mais votos (≥ 60% de banca de 5 cadeiras);
+      - `Result.Rejected`: 2 ou menos votos;
+      - `Result.Inconclusive`: encerramento atípico sem apuração regular.
+    - `ApprovalMode.Unanimous`: 5 votos; `Majority`: 3 ou 4; `Minority`: 1 ou 2; `None`: 0.
+    - Acionamento: invocado automaticamente ao transicionar para `Finished` ou ao finalizar evento com pitch em andamento.
+  - **Proteção Idempotente:** `HashSet<string>` em memória de `roundIds` já arquivados previne duplo arquivamento em concorrência.
+  - **Endpoints REST:**
+    - `GET /api/history`: Lista consolidada de rodadas arquivadas do evento ativo (ou de todos os eventos).
+    - `GET /api/history/{id}`: Detalhes do snapshot imutável de uma rodada específica.
+  - **SignalR — Evento `RoundArchived`:**
+    - Payload: `{ roundId, eventId, projectId, projectTitle, result, approvalMode, voteCount, archivedAt, timestamp }`.
+  - **Frontend — Cockpit (Operador):**
+    - `OperatorHistoryTab.jsx` (nova aba `/operator/history`): Exibe lista de rodadas arquivadas com badges de resultado e detalhamento expansível da composição da banca e votos por cadeira.
+  - **Arquivos Principais:**
+    - `backend/Domain/Entities/RoundHistoryEntry.cs`
+    - `backend/Domain/Enums/RoundResult.cs`
+    - `backend/Services/ResultEngine.cs`
+    - `backend/Services/ArenaProjectStore.cs` (ArchiveRound, GetHistory)
+    - `backend/Program.cs` (2 novos endpoints)
+    - `frontend/src/pages/operator/OperatorHistoryTab.jsx`
+  - **Testes Automatizados:**
+    - `tests/test-round-history.cjs`: Suíte com ~61 asserções cobrindo arquivamento de rodada, consulta de histórico, classificação Result/ApprovalMode em todos os cenários de 0 a 5 votos, proteção contra duplo arquivamento e recebimento de `RoundArchived` via SignalR.
+- **Testes & Validação:**
+  - Compilação do Frontend (`npm run build`): **100% verde**.
+  - Compilação do Backend (`dotnet build`): **0 Warnings, 0 Errors**.
+  - Bateria Completa de Testes (8 suítes):
+    - `test-round-history.cjs` (Milestone 3D): **61 PASS / 0 FAIL**
+    - `test-pitch-timers.cjs` (Milestone 3C): **50 PASS / 0 FAIL**
+    - `test-pitch-lifecycle.cjs` (Milestone 3B): **76 PASS / 0 FAIL**
+    - `test-events-api.cjs` (Milestone 3A): **38 PASS / 0 FAIL**
+    - `test-api.cjs` (REST Base): **48 PASS / 0 FAIL**
+    - `test-projects-api.cjs` (Projetos): **53 PASS / 0 FAIL**
+    - `test-signalr-e2e.cjs` (SignalR): **55 PASS / 0 FAIL**
+    - `homologation-2d5.cjs` (Resiliência): **35 PASS / 0 FAIL**
+    - **Total Consolidado: 416 testes aprovados (100% verde, ZERO regressões).**
+- **Impacto Futuro:** O Milestone 3D consolida o result engine e o histórico imutável de rodadas. A plataforma está pronta para o **Milestone 3E (Judge Catalog & Event Jury Assignment)**.
+
+---
+
+### [2026-11-08] — Milestone 3E: Catálogo de Jurados & Alocação por Evento (Judge Catalog & Event Jury Assignment)
+- **Status:** ✅ Concluído
+- **Objetivo:** Implementar o catálogo global de jurados corporativos, a alocação nominal de jurados nas 5 cadeiras físicas de cada evento, o dock cênico de banca no telão 3D, a integração com o histórico de rodadas e o evento SignalR de sincronização em tempo real da composição da banca.
+- **Arquitetura & Implementação Realizada:**
+  - **Domínio & Modelos:**
+    - `Judge.cs`: Entidade do catálogo global com `Id` (Guid), `Name`, `Company`, `Role`, `Specialty`, `Bio`, `PhotoUrl`, `IsActive` (bool), `Email`. Os campos `IsActive` e `Email` foram adicionados preventivamente para suporte a Fase 4 (scorecards e portal do jurado).
+    - `EventJuryAssignment.cs`: Entidade de alocação por evento contendo `EventId` e `Assignments: Dictionary<int, string>` (mapeando `chairId` (1..5) → `judgeId`).
+    - `JuryAssignmentDto.cs`: DTO de entrada para `PUT /api/events/{id}/jury` com array de pares `{ chairId, judgeId }`.
+    - `IArenaProjectStore.cs` & `ArenaProjectStore.cs`: CRUD thread-safe para jurados (`CreateJudge`, `UpdateJudge`, `GetAllJudges`, `GetJudge(id)`), leitura e escrita de `EventJuryAssignment` por `eventId`.
+  - **Integração com `ActiveContext` & Snapshot:**
+    - `GET /api/state`: Enriquecido com `eventJury` contendo o mapeamento nominal de cadeiras do evento ativo (incluindo nome, cargo, empresa e foto do jurado alocado).
+  - **Integração com `RoundHistoryEntry`:**
+    - Ao arquivar rodada, o `JurySnapshot` é gerado a partir da composição ativa de `EventJuryAssignment` no momento do arquivamento, garantindo rastreabilidade permanente de quem ocupava cada cadeira durante a votação.
+  - **Endpoints REST (7 Novos):**
+    - `GET /api/judges`: Catálogo global de jurados (`?activeOnly=true` opcional).
+    - `GET /api/judges/{id}`: Detalhes de jurado por ID.
+    - `POST /api/judges`: Cadastro de novo jurado com validação de campos obrigatórios.
+    - `PUT /api/judges/{id}`: Atualização cadastral.
+    - `DELETE /api/judges/{id}`: Desativação lógica (define `IsActive = false`).
+    - `GET /api/events/{id}/jury`: Consulta composição de banca do evento.
+    - `PUT /api/events/{id}/jury`: Alocação das cadeiras 1..5 a jurados do catálogo.
+  - **SignalR — Evento `EventJuryUpdated`:**
+    - Emitido após cada `PUT /api/events/{id}/jury` bem-sucedido.
+    - Payload: `{ eventId, assignments: [{ chairId, judgeId, judgeName, judgeRole, judgeCompany, judgePhotoUrl }], timestamp }`.
+  - **Frontend — Cockpit (Operador):**
+    - `judgesApi.js`: Módulo de API encapsulando todos os endpoints de jurados e alocação.
+    - `OperatorJudgesTab.jsx` (nova aba `/operator/judges`): Catálogo de jurados com cards, busca por nome, botões de Novo/Editar, e painel de alocação visual das 5 cadeiras com dropdown de seleção de jurado.
+    - `JudgeModal.jsx`: Modal de criação/edição de jurado com todos os campos, preview de foto e validação inline.
+    - `useSignalR.js` & `OperatorContext.jsx`: Listener para `EventJuryUpdated` atualizando a banca em tempo real.
+  - **Frontend — Stage (Telão):**
+    - `StageJuryDock.jsx` (novo componente): Dock nominal horizontal exibindo até 5 cards de jurados na parte inferior do telão com avatar circular, nome, cargo e anel de neon pulsante colorido com `primaryColor` do evento. O anel acende e pulsa ao receber evento `ChairTurned` para a cadeira correspondente e apaga ao receber `ChairsReset`.
+  - **Arquivos Principais:**
+    - `backend/Domain/Entities/Judge.cs`
+    - `backend/Domain/Entities/EventJuryAssignment.cs`
+    - `backend/Services/ArenaProjectStore.cs` (métodos de jurados)
+    - `backend/Program.cs` (7 novos endpoints)
+    - `frontend/src/services/judgesApi.js`
+    - `frontend/src/pages/operator/OperatorJudgesTab.jsx`
+    - `frontend/src/components/operator/JudgeModal.jsx`
+    - `frontend/src/components/stage/StageJuryDock.jsx`
+  - **Testes Automatizados:**
+    - `tests/test-judges-api.cjs`: Suíte com ~50 asserções cobrindo CRUD de jurados, alocação de banca, validação de IDs inválidos, consulta de composição de banca, integração com snapshot `/api/state` e recebimento de `EventJuryUpdated` via SignalR.
+- **Testes & Validação:**
+  - Compilação do Frontend (`npm run build`): **100% verde**.
+  - Compilação do Backend (`dotnet build`): **0 Warnings, 0 Errors**.
+  - Bateria Completa de Testes (9 suítes):
+    - `test-judges-api.cjs` (Milestone 3E): **50 PASS / 0 FAIL**
+    - `test-round-history.cjs` (Milestone 3D): **61 PASS / 0 FAIL**
+    - `test-pitch-timers.cjs` (Milestone 3C): **50 PASS / 0 FAIL**
+    - `test-pitch-lifecycle.cjs` (Milestone 3B): **76 PASS / 0 FAIL**
+    - `test-events-api.cjs` (Milestone 3A): **38 PASS / 0 FAIL**
+    - `test-api.cjs` (REST Base): **48 PASS / 0 FAIL**
+    - `test-projects-api.cjs` (Projetos): **53 PASS / 0 FAIL**
+    - `test-signalr-e2e.cjs` (SignalR): **55 PASS / 0 FAIL**
+    - `homologation-2d5.cjs` (Resiliência): **35 PASS / 0 FAIL**
+    - **Total Consolidado: 466 testes aprovados (100% verde, ZERO regressões).**
+  - **Tag de Encerramento:** `v0.3.0-phase3` emitida.
+- **Impacto Futuro:** O Milestone 3E conclui a Fase 3. A plataforma está formalmente preparada para a **Fase 4 (Scorecards, Critérios Quantitativos & Portal do Jurado)**, com a fundação de jurados, histórico e result engine já estabelecida.
