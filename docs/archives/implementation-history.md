@@ -1,4 +1,4 @@
-# Diário Técnico de Implementação (Implementation History)
+﻿# Diário Técnico de Implementação (Implementation History)
 ## Plataforma Arena Voice / Arena de Inovação
 
 > **Status:** Documento Vivo de Memória Arquitetural  
@@ -842,4 +842,70 @@
     - `homologation-2d5.cjs` (Resiliência): **35 PASS / 0 FAIL**
     - **Total Consolidado: 466 testes aprovados (100% verde, ZERO regressões).**
   - **Tag de Encerramento:** `v0.3.0-phase3` emitida.
-- **Impacto Futuro:** O Milestone 3E conclui a Fase 3. A plataforma está formalmente preparada para a **Fase 4 (Scorecards, Critérios Quantitativos & Portal do Jurado)**, com a fundação de jurados, histórico e result engine já estabelecida.
+- **Impacto Futuro:** O Milestone 3E conclui a Fase 3. A plataforma está formalmente preparada para a **Fase 4 (Platform Reliability & Data Resilience)**, com a fundação de jurados, histórico e result engine já estabelecida.
+
+---
+
+# TRANSIÇÃO DE FASE — Homologação da Fase 3 e Planejamento Arquitetural da Fase 4
+
+### [2026-11-09] — Roadmap V2, SQLite Strategy & Fase 4 Architecture (Planejamento Estratégico)
+- **Status:** ✅ Documentado (sem implementação de código)
+- **Contexto:** Encerramento formal da Fase 3 com 0.3.0-phase3 e 466/466 testes aprovados. Revisão estratégica completa do roadmap antes da abertura da branch da Fase 4.
+
+#### Homologação Final da Fase 3
+- **5 motores de negócio entregues e homologados:**
+  - **3A — Event Governance:** Governança de eventos com 5 estados formais, ativação atômica, catálogo no cockpit.
+  - **3B — Pitch Lifecycle Engine:** Máquina de estados do pitch com 6 estágios, transições validadas, SignalR PitchStageChanged.
+  - **3C — Timers & Authoritative Lockout:** Cronômetro ancorado em timestamp, compensação de drift, lockout por estado de pitch.
+  - **3D — Round History & Result Engine:** Arquivamento imutável de rodadas, Result Engine (Approved/Rejected/Inconclusive), ApprovalMode.
+  - **3E — Judge Catalog & Event Jury Assignment:** Catálogo de jurados, alocação por cadeira, StageJuryDock, integração com RoundHistoryEntry.
+- **Cobertura automatizada:** 466 testes em 9 suítes (100% aprovados, zero regressões).
+- **Tag estável:** 0.3.0-phase3 emitida.
+- **ADRs documentados:** ADR-011 a ADR-015 formalizados na sessão de encerramento.
+
+#### Rebase Estratégico do Roadmap (Roadmap V2)
+- **Motivação:** Revisão estratégica para garantir que a plataforma seja show-ready antes de expandir features.
+- **Decisões do Rebase:**
+  - Absorção das antigas fases 3, 4 e 5 (parcialmente) na Fase 3 concluída (todo o núcleo de governança entregue).
+  - **Nova Fase 4 redefinida:** "Platform Reliability & Data Resilience" — foco em confiabilidade operacional e persistência de dados.
+  - Scorecards quantitativos e Portal do Avaliador postergados para **Fase 8 (módulo satélite)** (ADR-017).
+  - **Linha evolutiva oficial aprovada (Fases 4–8):**
+    - Fase 4: Platform Reliability & Data Resilience (SQLite + Offline-First)
+    - Fase 5: Live Show Experience (Áudio & Dinâmicas Cênicas)
+    - Fase 6: Awards, Ranking & Reports (PDF/CSV)
+    - Fase 7: Operational Hardening & Fleet Management
+    - Fase 8: Evaluator Portal & Scorecards (Módulo Satélite)
+
+#### Decisão de Persistência: SQLite com Offline-First (ADR-016)
+- **Tecnologia aprovada:** Microsoft.Data.Sqlite (NuGet, embedded, zero-setup).
+- **Modo de operação:** WAL (Write-Ahead Logging) para concorrência leitura/escrita não-bloqueante.
+- **Estratégia:** Offline-First — plataforma 100% operacional sem rede externa; banco local no notebook do operador.
+- **Arquitetura planejada:** SqliteArenaProjectStore como substituição direta do ArenaProjectStore em memória.
+- **Referência formal:** [ADR-016-offline-first-persistence-strategy.md](../decision-records/ADR-016-offline-first-persistence-strategy.md)
+
+#### Priorização de Confiabilidade sobre Expansão (ADR-017)
+- **Decisão:** Priorizar robustez operacional (Fase 4) antes de qualquer nova feature visível ao usuário.
+- **Justificativa:** Sistema operado em eventos presenciais com público real — uma falha durante apresentação é inaceitável.
+- **Referência formal:** [ADR-017-platform-reliability-over-feature-expansion.md](../decision-records/ADR-017-platform-reliability-over-feature-expansion.md)
+
+#### Especificação Formal da Fase 4 — 5 Milestones
+| Milestone | Nome | Entrega Principal |
+|:---:|:---|:---|
+| **4A** | Storage Engine & Relational Schema | SQLite WAL, schema relacional estrito, Foreign Keys & Checks |
+| **4B** | State Persistence & Session Re-hydration | SqliteArenaProjectStore, Crash Boot Recovery |
+| **4C** | Operational Audit Trail & Event Sourcing Leve | Tabela AuditEvents, ActivityLog persistido |
+| **4D** | Automated Snapshots, Backup & Disaster Recovery | VACUUM INTO hot-backup, RecoveryManager |
+| **4E** | Chaos Engineering & Reliability Test Suite | 	est-chaos-reliability.cjs, 50+ asserções de caos |
+
+- **Branch planejada:** eat/phase4-data-resilience (a criar após aprovação desta documentação).
+- **Tag planejada:** 0.4.0-phase4 ao encerrar a Fase 4.
+
+#### Documentação Atualizada nesta Transição
+- docs/decision-records/ADR-016-offline-first-persistence-strategy.md — Criado
+- docs/decision-records/ADR-017-platform-reliability-over-feature-expansion.md — Criado
+- README.md — Roadmap V2 e referências ADR-016/ADR-017
+- docs/README.md — Índice atualizado com ADR-016, ADR-017 e nova linha evolutiva
+- docs/roadmap.md — Versão 2.0 completa com Fases 4–8 e milestones 4A–4E
+- docs/architecture.md — Seção 6 adicionada (Persistência e Resiliência de Dados)
+- docs/archives/milestone-history.md — Tabela Mestra atualizada com Fases 4–8
+- docs/archives/implementation-history.md — Esta entrada de transição

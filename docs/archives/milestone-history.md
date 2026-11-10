@@ -35,6 +35,15 @@ Este documento é a **fonte oficial de índice de marcos**, permitindo rastrear 
 | **3** | **3C** | Pitch Timers & Authoritative Lockout | ✅ Concluído | Cronômetro ancorado em timestamp, pause/resume sem drift, +tempo, lockout 409 Conflict fora de VotingOpen | 355 testes (305 base + 50 timers) | main |
 | **3** | **3D** | Round History & Result Engine | ✅ Concluído | Snapshot imutável de rodada, Result (Approved/Rejected/Inconclusive), ApprovalMode (Unanimous/Majority/Minority/None) | 416 testes (355 base + 61 history) | main |
 | **3** | **3E** | Judge Catalog & Event Jury Assignment | ✅ Concluído | Catálogo global de jurados, alocação nas cadeiras 1..5, StageJuryDock, integração com RoundHistoryEntry | 466 testes (416 base + 50 jury) | `v0.3.0-phase3` |
+| **4** | **4A** | Storage Engine & Relational Schema | 📅 Próximo | SQLite WAL Mode, schema relacional estrito, Foreign Keys & Check Constraints | Testes de migração e integridade | `v0.4.0-phase4` |
+| **4** | **4B** | State Persistence & Session Re-hydration | 📅 Próximo | `SqliteArenaProjectStore`, re-hidratação de sessão, Crash Boot Recovery | Testes de persistência e re-hidratação | `v0.4.0-phase4` |
+| **4** | **4C** | Operational Audit Trail & Event Sourcing Leve | 📅 Próximo | Tabela `AuditEvents`, ActivityLog persistido, rastreabilidade de operações críticas | Testes de auditoria e rastreabilidade | `v0.4.0-phase4` |
+| **4** | **4D** | Automated Snapshots, Backup & Disaster Recovery | 📅 Próximo | `VACUUM INTO` hot-backup, snapshots automáticos, Recovery Manager | Testes de backup e recuperação de desastre | `v0.4.0-phase4` |
+| **4** | **4E** | Chaos Engineering & Reliability Test Suite | 📅 Próximo | `test-chaos-reliability.cjs`, simulações de falha, validação de idempotência | 50+ asserções de caos e confiabilidade | `v0.4.0-phase4` |
+| **5** | **5A-5D** | Live Show Experience (Áudio & Dinâmicas) | 🔮 Futuro | Integração de áudio cênico, dinâmicas de show ao vivo, animações de entrada | A definir na Fase 5 | `v0.5.0-phase5` |
+| **6** | **6A-6C** | Awards, Ranking & Reports | 🔮 Futuro | Pódio de premiação, ranking acumulado, exportação PDF/CSV de resultados | A definir na Fase 6 | `v0.6.0-phase6` |
+| **7** | **7A-7C** | Operational Hardening & Fleet Management | 🔮 Futuro | Multi-dispositivo, monitoramento de frota, hardening operacional | A definir na Fase 7 | `v0.7.0-phase7` |
+| **8** | **8A-8C** | Evaluator Portal & Scorecards (Satélite) | 🔮 Futuro | Portal web do avaliador, critérios quantitativos, scorecards digitais (módulo satélite) | A definir na Fase 8 | `v0.8.0-phase8` |
 
 ---
 
@@ -61,6 +70,18 @@ Este documento é a **fonte oficial de índice de marcos**, permitindo rastrear 
 - **3D (Round History & Result Engine):** Arquivamento imutável de rodadas (`RoundHistoryEntry`) ao transicionar para `Finished` ou encerrar evento com rodada em andamento. Result Engine com classificação em dois níveis: `Result` (Approved/Rejected/Inconclusive) e `ApprovalMode` (Unanimous/Majority/Minority/None). Snapshot da rodada inclui histórico de estágios, composição da banca e registro individual de cadeiras. Proteção idempotente contra duplo arquivamento. Endpoints `GET /api/history` e `GET /api/history/{id}`. Evento `RoundArchived` via SignalR. Painel de histórico consultável no cockpit. Suíte automatizada expandida para **416 testes** (100% verdes).
 - **3E (Judge Catalog & Event Jury Assignment):** Catálogo global de jurados corporativos (`Judge`) com campos `Id`, `Name`, `Company`, `Role`, `Specialty`, `Bio`, `PhotoUrl`, `IsActive`, `Email`. Alocação de jurados nas cadeiras 1 a 5 do evento via `EventJuryAssignment` e endpoint `PUT /api/events/{id}/jury`. Aba `/operator/judges` completa com CRUD e painel de alocação. Dock cênico nominal no telão (`StageJuryDock`) com avatares, nomes e anéis de neon reativos ao acionamento. Integração dos nomes de jurados com `RoundHistoryEntry`. Evento `EventJuryUpdated` via SignalR. Suíte automatizada expandida para **466 testes** (100% verdes). Tag `v0.3.0-phase3` emitida.
 
+### Fase 4 — Platform Reliability & Data Resilience (Próxima Fase)
+
+> **Branch planejada:** `feat/phase4-data-resilience`  
+> **Estratégia:** SQLite em WAL mode com `Microsoft.Data.Sqlite` (ADR-016)  
+> **Prioridade:** Confiabilidade operacional antes de expansão de features (ADR-017)
+
+- **4A (Storage Engine & Relational Schema):** Substituição do `ArenaProjectStore` em memória por `SqliteArenaProjectStore` com banco embedded. Schema relacional estrito com tabelas normalizadas para `Events`, `Projects`, `Judges`, `EventJuryAssignments`, `PitchHistory`, `AuditEvents`. WAL mode ativado, `PRAGMA foreign_keys = ON` e `CHECK CONSTRAINTS` em todas as colunas críticas.
+- **4B (State Persistence & Session Re-hydration):** Persistência completa do estado operacional da arena entre reinicializações do backend. Implementação do `Crash Boot Recovery`: ao inicializar, o backend detecta sessão interrompida e restaura o `ActiveContext` com o último estado coerente gravado. Zero perda de estado operacional em quedas de energia.
+- **4C (Operational Audit Trail & Event Sourcing Leve):** Tabela `AuditEvents` registrando automaticamente toda ação crítica do sistema (seleção de projeto, transição de pitch, acionamento de cadeira, encerramento de rodada). Integração com o `ActivityLog` do frontend para sincronia de histórico pós-reconexão. Rastreabilidade de operações para suporte e auditoria pós-evento.
+- **4D (Automated Snapshots, Backup & Disaster Recovery):** Sistema de hot-backup via `VACUUM INTO` para snapshots automáticos do banco. Snapshots pré-evento, pós-rodada e agendados por intervalo. `RecoveryManager` com seleção do snapshot mais recente coerente em caso de corrupção. Preservação do histórico completo de edições entre sessões.
+- **4E (Chaos Engineering & Reliability Test Suite):** Suíte `test-chaos-reliability.cjs` simulando falhas reais: queda de energia mid-session, corrupção de banco, restart durante votação ativa, replay de rollback e validação de idempotência em todas as operações críticas. Meta: 50+ asserções de confiabilidade com 100% de aprovação.
+
 ---
 
 ## 4. Sprints de Correção (Pós-Entrega)
@@ -86,3 +107,6 @@ Este documento é a **fonte oficial de índice de marcos**, permitindo rastrear 
 - **Retrospectiva da Fase 3:** [`docs/archives/retrospectives/phase3-retrospective.md`](retrospectives/phase3-retrospective.md)
 - **Catálogo de Decisões de Arquitetura (ADRs):** [`docs/decision-records/`](../decision-records/)
 - **Arquitetura Técnica Completa:** [`docs/architecture.md`](../architecture.md)
+- **Roadmap V2 (Linha Evolutiva Oficial):** [`docs/roadmap.md`](../roadmap.md)
+- **ADR-016 — Estratégia de Persistência Offline-First (SQLite):** [`docs/decision-records/ADR-016-offline-first-persistence-strategy.md`](../decision-records/ADR-016-offline-first-persistence-strategy.md)
+- **ADR-017 — Confiabilidade de Plataforma antes de Expansão de Features:** [`docs/decision-records/ADR-017-platform-reliability-over-feature-expansion.md`](../decision-records/ADR-017-platform-reliability-over-feature-expansion.md)

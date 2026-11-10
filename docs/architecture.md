@@ -334,3 +334,21 @@ O serviço de comunicação em tempo real (`frontend/src/services/useSignalR.js`
    - Ao restabelecer: *"Sistema Operacional"* / *"Telão Conectado"*.
 3. **Resync Automático via Versão de Conexão (`reconnectVersion`):**
    A cada reconexão bem-sucedida, um contador interno é incrementado. O orquestrador raiz consulta imediatamente o snapshot `GET /api/state`, reconciliando cadeiras, pitch, cronômetro e banca sem demandar intervenção do operador (F5 manual).
+
+
+---
+
+## 6. Persistência e Resiliência de Dados (Estratégia da Fase 4)
+
+Conforme estabelecido nas decisões arquiteturais [ADR-016](decision-records/ADR-016-offline-first-persistence-strategy.md) e [ADR-017](decision-records/ADR-017-platform-reliability-over-feature-expansion.md), a plataforma adota o motor **SQLite incorporado em modo WAL** para eliminar a volatilidade da memória RAM mantendo o princípio **Zero Setup / Offline-First**:
+
+1. **Padrão de Injeção Transparente:**
+   A camada de aplicação e endpoints continua interagindo exclusivamente com a interface `IArenaProjectStore`. A implementação `SqliteArenaProjectStore` substitui o repositório em memória gravando transacionalmente em `App_Data/arena_voice.db`.
+2. **Schema Relacional Estrito:**
+   Tabelas dedicadas para `Events`, `Projects`, `Judges`, `EventJuryAssignments`, `RoundHistoryEntries`, `ActiveSessionState` e `AuditEvents`, com constraints de integridade referencial e unicidade ativas (`PRAGMA foreign_keys = ON;`).
+3. **Crash Recovery & Sanitização de Inicialização:**
+   Na inicialização, o backend consulta `ActiveSessionState` e reidrata evento ativo, projeto selecionado e banca. Se o sistema sofreu encerramento forçado durante apresentação aberta (`PitchRunning` ou `VotingOpen`), o estágio é sanitizado para `Waiting` com cadeiras físicas neutralizadas para 0°, garantindo segurança contra votos fantasmas pós-queda.
+4. **Trilha de Auditoria Operacional (Audit Trail):**
+   Tabela append-only `AuditEvents` registrando cada mutação operacional relevante (ativação, transição, pausas, acionamento de voto, backups e recuperações), reidratando o log de atividades do operador (`ActivityLog`) através do endpoint `GET /api/audit-log`.
+5. **Backups a Quente e Snapshots Automáticos:**
+   Endpoint administrativo `POST /api/admin/backup` invocando `VACUUM INTO` do SQLite para cópias consistentes a quente em pendrive, além de snapshot automático acionado a cada `RoundArchived`.

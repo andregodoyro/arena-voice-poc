@@ -13,15 +13,16 @@ Bem-vindo ao índice central da documentação técnica e de produto do **Arena 
 Documentos que regem as regras de negócio, contratos de integração, padrões de projeto e decisões formais de engenharia:
 
 - **[Arquitetura do Sistema (`docs/architecture.md`)](architecture.md):** Documento mestre da arquitetura. Detalha a separação dos quatro papéis (Operator, Stage, Backend, Infraestrutura), `ActiveContext`, ciclo de vida de eventos (5 estados), ciclo do pitch (6 estágios), cronômetros autoritativos, lockout físico/digital (HTTP 409), Result Engine em dois níveis, catálogo de jurados, tabela completa com os 34 endpoints REST e 9 contratos SignalR.
-- **[Registros de Decisão Arquitetural — ADRs (`docs/decision-records/`)](decision-records/):** Catálogo formal de todas as 15 decisões arquiteturais homologadas no projeto:
+- **[Registros de Decisão Arquitetural — ADRs (`docs/decision-records/`)](decision-records/):** Catálogo formal de todas as 17 decisões arquiteturais homologadas no projeto:
   - `ADR-001` a `ADR-010`: Fundações da Fase 1 e Fase 2 (Backend autoritativo, Snapshot-First, Desacoplamento Cênico, etc.).
   - `ADR-011` a `ADR-015`: Decisões críticas da Fase 3 (Governança de Eventos, Pitch Lifecycle, Timers & Lockout, Result Engine, Identidade de Jurados).
+  - `ADR-016` e `ADR-017`: Decisões estratégicas da Fase 4 e Roadmap V2 (Persistência Offline-First com SQLite e Priorização de Confiabilidade sobre Telas Prematuras).
 
 ---
 
 ## 🚀 Produto e Visão Estratégica
 
-- **[Roadmap e Planejamento Progressivo (`docs/roadmap.md`)](roadmap.md):** Documento mestre de produto (v1.3). Apresenta a visão geral da plataforma corporativa, o princípio de reutilização, os macroblocos de evolução (Fases 1 a 3 concluídas; Fase 4 planejada), glossário, matriz de rastreabilidade e análise de riscos.
+- **[Roadmap e Planejamento Progressivo (`docs/roadmap.md`)](roadmap.md):** Documento mestre de produto (Roadmap V2 — Show-Ready Architecture). Apresenta a visão geral da plataforma corporativa, o princípio de reutilização, a evolução pós-Fase 3 (Fase 4: Confiabilidade e Dados; Fase 5: Áudio Cênico; Fase 6: Ranking e Relatórios; Fase 7: Hardening; Fase 8: Scorecards Satélite), glossário, matriz de rastreabilidade e análise de riscos.
 
 ---
 

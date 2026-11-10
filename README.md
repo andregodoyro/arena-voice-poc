@@ -171,7 +171,11 @@ O frontend é uma SPA reativa desenvolvida em **React 19**, **Vite** e **Tailwin
 | **Fase 3C** | Pitch Timers, Pause/Resume & Voting Lockout (HTTP 409 Conflict) | ✅ **Concluída e Homologada** |
 | **Fase 3D** | Round History & Result Engine (Approved, Rejected, Inconclusive) | ✅ **Concluída e Homologada** |
 | **Fase 3E** | Judge Catalog & Event Jury Assignment (Banca 1..5, Palco Nominal) | ✅ **Concluída e Homologada** |
-| **Fase 4** | Scorecards, Critérios Quantitativos, Portal do Jurado e Relatórios | 📅 **Planejada (Próxima Fase)** |
+| **Fase 4** | Platform Reliability & Data Resilience (SQLite, Crash Recovery, Audit, Backup) | 📅 **Planejada (Próxima Fase)** |
+| **Fase 5** | Live Show Experience & Audio Atmosphere (Áudio Cênico, Web Audio API, Sound FX) | 📅 **Roadmap V2** |
+| **Fase 6** | Awards Ceremony, Ranking & Executive Reports (Pódio 3D, Ata Oficial PDF/CSV) | 📅 **Roadmap V2** |
+| **Fase 7** | Operational Hardening, Contingency & Fleet Telemetry (Bypass no Cockpit, ESP32) | 📅 **Roadmap V2** |
+| **Fase 8** | Evaluator Portal & Qualitative Rubrics (Módulo Satélite / Complementar) | 📅 **Roadmap V2** |
 
 ### Bateria Consolidada de Testes Automatizados (466 Asserções / 100% Verde):
 ```text
@@ -238,7 +242,7 @@ Consulte o **[Índice Mestre da Documentação (`docs/README.md`)](docs/README.m
 
 | Área Temática | Documentos Principais |
 | :--- | :--- |
-| **Arquitetura & Decisões** | [Arquitetura Geral (`docs/architecture.md`)](docs/architecture.md) • [Catálogo de ADRs (`docs/decision-records/`)](docs/decision-records/) |
+| **Arquitetura & Decisões** | [Arquitetura Geral (`docs/architecture.md`)](docs/architecture.md) • [Catálogo de ADRs — ADR-001 a ADR-017 (`docs/decision-records/`)](docs/decision-records/) |
 | **Produto & Visão** | [Roadmap e Planejamento Progressivo (`docs/roadmap.md`)](docs/roadmap.md) |
 | **Infraestrutura & Campo** | [Guia de Hardware ESP32 (`docs/hardware.md`)](docs/hardware.md) • [Guia de Rede e Hotspot (`docs/network.md`)](docs/network.md) |
 | **Histórico Operacional** | [Tabela Mestra de Marcos (`docs/archives/milestone-history.md`)](docs/archives/milestone-history.md) • [Diário Técnico (`docs/archives/implementation-history.md`)](docs/archives/implementation-history.md) |

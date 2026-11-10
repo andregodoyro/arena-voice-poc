@@ -1,5 +1,5 @@
-﻿# ROADMAP ARENA VOICE / ARENA DE INOVAÇÃO
-## Versão 1.1 — Planejamento Progressivo, Arquitetura e Onboarding Técnico
+# ROADMAP ARENA VOICE / ARENA DE INOVAÇÃO
+## Versão 2.0 — Roadmap V2: Show-Ready & Production-Ready First
 
 > **Classificação:** Documento Mestre de Produto e Arquitetura  
 > **Status:** Fase 1, Fase 2 e Fase 3 Concluídas e Homologadas (`v0.3.0-phase3`)  
@@ -508,569 +508,294 @@ flowchart TD
 
 ---
 
-## 20. Domínio Futuro e Modelagem Progressiva
+## 20. Domínio Consolidado e Modelagem Entregue (Fases 1 a 3)
 
-### Princípio da Modelagem Progressiva
-**NÃO devemos esperar até a Fase 7 para começar a pensar nas entidades**.  
-As entidades de domínio são descobertas e utilizadas progressivamente no software:
-- **Fase 2:** Introduz `Event` e `Project` (com branding e mídias).
-- **Fase 3:** Introduz `Round` (máquina de estados: `PENDING -> OPEN -> CLOSED`).
-- **Fase 4:** Introduz `Evaluator` e `ChairAssignment` (desacoplamento avaliador vs. cadeira).
-- **Fase 5:** Introduz `Vote` e `RoundResult` (regras e consolidação).
-- **Fase 7:** **Consolida, revisa e formaliza o modelo de dados completo** antes da escolha da persistência.
-- **Fase 8:** Implementa a persistência oficial baseada no modelo consolidado.
+Ao longo dos Milestones 2A a 3E, as entidades de negócio foram descobertas, refinadas e implementadas diretamente em C# com 466 testes automatizados aprovados:
 
-### Imagens e Conteúdo Visual (Necessidade Conceitual de Produto)
-O produto reconhece imagens e ativos visuais como necessidades essenciais desde a Fase 2:
-- **`Event`:** `branding` (`logo`, `coverImage`, `primaryColor`, `secondaryColor`).
-- **`Project`:** `media` (`coverImage`, `logo`).
-- **`Evaluator`:** `profileImage`.
+- **Event:** Agregado raiz da edição com ciclo de vida em 5 estados (Draft, Ready, Active, Finished, Archived), paleta de neons (primaryColor, secondaryColor), metadados e temporização (TimerConfig).
+- **Project:** Startup participante com ordem de apresentação, status (Pending, Current, Completed), equipe, categoria e mídias conceituais (LogoUrl, CoverImageUrl).
+- **Judge:** Catálogo global corporativo permanente (Id, Name, Company, Role, Specialty, Bio, PhotoUrl, IsActive, Email).
+- **EventJuryAssignment:** Mapeamento dinâmico de jurados nas cadeiras físicas 1..5 por evento (EventId, ChairId, JudgeId).
+- **RoundHistoryEntry:** Snapshot imutável da rodada arquivada, com Result (Approved/Rejected/Inconclusive), ApprovalMode (Unanimous/Majority/Minority/None), histórico de estágios e lista nominal da banca.
+- **ActiveContext:** Singleton thread-safe que orquestra a sessão física ativa na arena (CurrentEvent, CurrentProject, PitchStage, PitchStageStartedAt, IsPaused, TotalPausedSeconds, chairStates).
 
-> [!NOTE]
-> Os campos de mídia representam uma **necessidade conceitual do produto**. O mecanismo definitivo de armazenamento (sistema de arquivos local, BLOB storage, URLs externas, etc.) permanece **em standby (TBD)** e será decidido no momento técnico apropriado, sem antecipação prematura.
-
-```mermaid
+`mermaid
 classDiagram
     class Evento {
         +string Id
-        +string Nome
-        +string Descricao
-        +DateTime Data
-        +StatusEvento Status
+        +string Title
+        +string Description
+        +DateTime Date
+        +EventStatus Status
         +BrandingConfig Branding
-    }
-
-    class BrandingConfig {
-        +string LogoUrl
-        +string CoverImageUrl
-        +string PrimaryColor
-        +string SecondaryColor
+        +TimerConfig Timers
     }
 
     class Projeto {
         +string Id
-        +string EventoId
-        +string Titulo
-        +string Descricao
-        +string Equipe
-        +string Categoria
-        +int Ordem
-        +ProjectMedia Media
-    }
-
-    class ProjectMedia {
-        +string CoverImageUrl
+        +string EventId
+        +string Title
+        +string Description
+        +string Team
+        +string Category
+        +int PresentationOrder
+        +ProjectStatus Status
         +string LogoUrl
+        +string CoverImageUrl
     }
 
-    class Avaliador {
-        +string Id
-        +string Nome
-        +string Papel
-        +string Organizacao
-        +string ProfileImageUrl
+    class Jurado {
+        +Guid Id
+        +string Name
+        +string Company
+        +string Role
+        +string Specialty
+        +string PhotoUrl
+        +bool IsActive
+        +string Email
     }
 
-    class CadeiraArena {
+    class AlocacaoBanca {
+        +string EventId
         +int ChairId
-        +string AvaliadorId
-        +bool EstaVirada
+        +Guid JudgeId
     }
 
-    class SessaoRodada {
+    class EntradaHistoricoRodada {
         +string Id
-        +string EventoId
-        +string ProjetoId
-        +StatusRodada Status
-        +DateTime Inicio
-        +DateTime? Fim
-        +List~VotoCadeira~ Votos
-    }
-
-    class VotoCadeira {
-        +int ChairId
-        +string AvaliadorId
-        +DateTime Timestamp
-        +string Origem
+        +string EventId
+        +string ProjectId
+        +RoundResult Result
+        +RoundApprovalMode ApprovalMode
+        +int VoteCount
+        +DateTime ArchivedAt
     }
 
     Evento "1" *-- "many" Projeto
-    Evento "1" *-- "many" Avaliador
-    SessaoRodada --> Projeto
-    SessaoRodada "1" *-- "5" VotoCadeira
-    CadeiraArena ..> Avaliador : Associação na Rodada
-```
+    Evento "1" *-- "5" AlocacaoBanca
+    AlocacaoBanca --> Jurado
+    EntradaHistoricoRodada --> Projeto
+    EntradaHistoricoRodada --> Evento
+`
 
 ---
 
-## 21. Roadmap Oficial de Evolução (Versão 1.1)
+## 21. Roadmap Oficial de Evolução (Versão 2.0 — Roadmap V2)
 
-```text
-MARCO 1 — SOFTWARE FOUNDATION / VALIDATION (CONCLUÍDO)
-   │
-   ▼
-════════════════════════════════════════════════════════════════
-MACROBLOCO: EVENT SETUP & LIVE OPERATION (FASES 1 A 4)
-O mesmo workflow operacional construído progressivamente
-════════════════════════════════════════════════════════════════
-   │
-   ├─► FASE 1: Operator + Stage Foundation (CONCLUÍDA)
-   │
-   ├─► FASE 2: Event Setup + Project Management (PRÓXIMA FASE RECOMENDADA)
-   │
-   ├─► FASE 3: Live Round Operation / Game State
-   │
-   └─► FASE 4: Evaluator & Jury Management
-   │
-   ▼
-════════════════════════════════════════════════════════════════
-MACROBLOCO: GAME INTELLIGENCE & SCENIC EXPERIENCE (FASES 5 E 6)
-════════════════════════════════════════════════════════════════
-   │
-   ├─► FASE 5: Game Rules + Result Engine
-   │
-   └─► FASE 6: Experiência Cênica Avançada
-   │
-   ▼
-════════════════════════════════════════════════════════════════
-MACROBLOCO: DOMAIN CONSOLIDATION & PERSISTENCE (FASES 7 E 8)
-════════════════════════════════════════════════════════════════
-   │
-   ├─► FASE 7: Modelo de Dados Definitivo (Consolidação do Domínio)
-   │
-   └─► FASE 8: Persistência Oficial (Tecnologia TBD)
-   │
-   ▼
-════════════════════════════════════════════════════════════════
-MACROBLOCO: ANALYTICS & PRODUCTION HARDENING (FASES 9 E 10)
-════════════════════════════════════════════════════════════════
-   │
-   ├─► FASE 9: Histórico, Ranking e Relatórios
-   │
-   └─► FASE 10: Hardening e Preparação Operacional
-```
+### Princípio Estratégico: Show-Ready & Production-Ready First
+O Roadmap V2 reorienta a evolução da plataforma com base em dois pilares inegociáveis para eventos ao vivo: **Resiliência de Dados (Zero Data Loss)** e **Excelência Sensorial de Palco (Som & Espetáculo)**. Decisões burocráticas de formulários quantitativos em celulares de jurados foram postergadas para priorizar a robustez e o impacto cênico da arena física (conforme consagrado nos [ADR-016](decision-records/ADR-016-offline-first-persistence-strategy.md) e [ADR-017](decision-records/ADR-017-platform-reliability-over-feature-expansion.md)).
+
+`	ext
+════════════════════════════════════════════════════════════════════════════════
+FASES ENTREGUES E HOMOLOGADAS (CONCLUÍDAS)
+════════════════════════════════════════════════════════════════════════════════
+  ✅ FASE 1: Operator + Stage Foundation (v0.1.0-phase1)
+  ✅ FASE 2: Event Setup & Project Management (v0.2.0-phase2)
+  ✅ FASE 3: Event Governance, Pitch Dynamics & Jury (v0.3.0-phase3)
+════════════════════════════════════════════════════════════════════════════════
+NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
+════════════════════════════════════════════════════════════════════════════════
+  │
+  ├─► FASE 4: Platform Reliability & Data Resilience ◄── [PRÓXIMA FASE OFICIAL]
+  │     ├─ 4A: Storage Engine & Relational Schema (SQLite WAL Mode & Integridade Nativa)
+  │     ├─ 4B: State Persistence & Session Re-hydration (SqliteArenaProjectStore & Crash Boot)
+  │     ├─ 4C: Operational Audit Trail & Event Sourcing Leve (AuditEvents & ActivityLog Sync)
+  │     ├─ 4D: Automated Snapshots, Backup & Disaster Recovery (VACUUM INTO & Auto-Snapshots)
+  │     └─ 4E: Chaos Engineering & Reliability Test Suite (Simulação de kill -9 & 100 Restarts)
+  │
+  ├─► FASE 5: Live Show Experience & Audio Atmosphere
+  │     ├─ 5A: Motor de Áudio Cênico Web Audio API no Telão (/stage)
+  │     ├─ 5B: Sincronização Sonora: Whoosh de Rotação, Buzzer e Gongo de Encerramento
+  │     └─ 5C: Efeitos de Celebração Cênica: Fanfarra e Iluminação de Unanimidade (5/5)
+  │
+  ├─► FASE 6: Awards Ceremony, Ranking & Executive Reports
+  │     ├─ 6A: Motor de Ranking Oficial (Desempate por Modo de Aprovação e Votos)
+  │     ├─ 6B: Telão Cênico de Premiação e Pódio (/stage com visual de celebração)
+  │     └─ 6C: Emissão da Ata da Banca (Exportação Executiva em PDF e CSV)
+  │
+  ├─► FASE 7: Operational Hardening, Contingency & Fleet Telemetry
+  │     ├─ 7A: Cockpit de Contingência (Bypass de Voto Manual em 1 Clique na Mesa)
+  │     ├─ 7B: Telemetria da Frota de ESP32 (Monitor de Liveness e Status das 5 Cadeiras)
+  │     └─ 7C: Runbook Operacional de Produção e Checklist de Ensaio Técnico
+  │
+  └─► FASE 8 (Módulo Satélite / Complementar): Evaluator Portal & Qualitative Rubrics
+        ├─ 8A: Parametrização Opcional de Critérios e Rubricas por Evento
+        ├─ 8B: Web App Responsivo do Jurado para Pareceres Complementares
+        └─ 8C: Integração Híbrida: Decisão Cênica Soberana + Dossiê Quantitativo
+`
 
 ---
 
-### MARCO 1: Software Foundation / Software Validation
-*Fundação físico-digital e resiliência de software.*
-- **STATUS:** CONCLUÍDO (validado nos cenários automatizados e manuais documentados).
-- **EVIDÊNCIAS:** 48 verificações aprovadas em `test-api.cjs`, 46 verificações aprovadas em `test-signalr-e2e.cjs`, build de frontend aprovado e documento de auditoria `docs/archives/audits/software-foundation-audit.md`.
+### Fases Concluídas e Homologadas
+
+#### FASE 1: Operator + Stage Foundation (✅ CONCLUÍDA — 0.1.0-phase1)
+- Roteamento isolado entre /stage e /operator.
+- Telão cênico 3D limpo e contemplativo.
+- Cockpit operacional 2D com placar e status das 5 cadeiras.
+- Reset autoritativo ponta a ponta (POST /api/reset e broadcast ChairsReset).
+
+#### FASE 2: Event Setup & Project Management (✅ CONCLUÍDA — 0.2.0-phase2)
+- Catálogo de projetos e startups com ordem de apresentação e mídias.
+- Cenografia procedural low-poly no Three.js (Arena > Palco > Pódio).
+- Theming reativo e neons dinâmicos via GSAP tweens.
+- Proteção 409 Conflict contra exclusão de pitch ativo e 191 testes aprovados.
+
+#### FASE 3: Event Governance, Pitch Dynamics & Jury (✅ CONCLUÍDA — 0.3.0-phase3)
+- **3A:** Governança com 5 estados (Draft, Ready, Active, Finished, Archived) e ativação atômica.
+- **3B:** Máquina de estados do pitch com 6 estágios, rejeição 422 e estado terminal Finished.
+- **3C:** Cronômetros autoritativos ancorados em timestamp, pause/resume sem drift e Lockout HTTP 409 Conflict.
+- **3D:** Histórico imutável de rodadas (RoundHistoryEntry) e Result Engine em dois níveis (Result e ApprovalMode).
+- **3E:** Catálogo de jurados corporativos (Judge), alocação nas cadeiras 1..5 e dock cênico nominal no telão (StageJuryDock).
+- Total de **466 verificações automatizadas em 9 suítes (100% verde)**.
 
 ---
 
-### MACROBLOCO: EVENT SETUP & LIVE OPERATION (FASES 1 A 4)
-> **Princípio de Construção do Operator:** Ao longo das Fases 1 a 4, constrói-se conceitualmente um **único dashboard operacional expansível**, e não aplicações administrativas independentes ou fragmentadas. A fundação de tela criada na Fase 1 cresce de forma contínua e incremental, recebendo os módulos de cadastro de eventos/projetos (Fase 2), controle de rodada (Fase 3) e montagem de banca (Fase 4).
+### Especificação Detalhada das Novas Fases do Roadmap V2
 
 ---
 
-### FASE 1: Operator + Stage Foundation (CONCLUÍDA)
-*Criar a fundação das duas superfícies principais da plataforma (`/operator` e `/stage`).*
+### FASE 4: Platform Reliability & Data Resilience (PRÓXIMA FASE OFICIAL)
+*Blindar a plataforma contra falhas, quedas de energia e perda de dados em eventos ao vivo.*
 
-- **STATUS:** CONCLUÍDA
-- **OBJETIVO:** Estabelecer a separação física e de responsabilidades entre o telão público (`/stage`) e o painel operacional (`/operator`), criando uma base arquitetural expansível que receberá os módulos das fases seguintes sem necessidade de reconstrução.
-- **ENTREGAS REALIZADAS E VALIDADAS:**
-  - ✅ **Roteamento React Router 7:** Superfícies isoladas em `/stage` e `/operator`, com `/` redirecionando para `/stage`.
-  - ✅ **Telão Cênico 3D Sanitizado (`/stage`):** Renderização limpa do Voice Studio 3D com `StageHUD` contemplativo, placar consolidado ao vivo e sem controles manuais ou termos de infraestrutura.
-  - ✅ **Cockpit Operacional da Mesa (`/operator`):** Dashboard 2D ergonômico com `OperatorHeader` (status semântico *"Sistema Pronto"*), `ScoreBoard` (X/5 com barra segmentada), `ChairGrid` (monitoramento das 5 cadeiras) e `ActivityLog` (linha do tempo de eventos).
-  - ✅ **Reset Autoritativo Ponta a Ponta:** Botão "Resetar Arena" no Operator com loading state e proteção contra duplo clique, despachando `POST /api/reset` ao backend, que emite o broadcast SignalR `ChairsReset` sincronizando ambas as telas.
-  - ✅ **Sincronização Dupla e Resiliência:** Snapshot REST (`GET /api/state`) para hidratação e reconciliação automática pós-reconexão (`reconnectVersion`) + Realtime SignalR (`/hubs/arena-poc`).
-  - ✅ **Expurgo de Código Legado:** Remoção completa de `HUD.jsx`, `isDevMode`, `toggleChairManual`, `turnAllChairs`, `lastEvent` e ouvintes de raycasting no Three.js.
-  - ✅ **Limpeza do Pipeline 3D:** Remoção da prop órfã `toggleChair` e otimização da performance de renderização no palco.
-- **EVIDÊNCIAS DE TESTES:**
-  - `tests/test-api.cjs`: **48 PASS / 0 FAIL** (100% de conformidade REST).
-  - `tests/test-signalr-e2e.cjs`: **46 PASS / 0 FAIL** (100% de conformidade Realtime/Reset).
-  - Frontend Build (Vite 8): **Exit Code 0** (compilação limpa em ~3s).
-- **DOCUMENTAÇÃO:**
-  - `README.md` e `docs/architecture.md` plenamente atualizados com a arquitetura de duas superfícies, diagramas de sequência e fluxos autoritativos.
-- **PRÓXIMA FASE RECOMENDADA:**
-  - **FASE 2: Event Setup + Project Management**.
-
----
-
-### FASE 2: Event Setup + Project Management ✅ CONCLUÍDA E HOMOLOGADA
-*Permitir que o Arena Voice configure diferentes eventos e seus projetos sem alterar código.*
-
-- **STATUS:** ✅ CONCLUÍDA E HOMOLOGADA (Milestones 2A, 2B, 2C, 2D e 2E Concluídos; 191 testes aprovados; tag `v0.2.0-phase2`)
-- **OBJETIVO:** Tornar a plataforma reutilizável e dinâmica, permitindo cadastrar eventos e seus respectivos projetos/MVPs com identidade visual, equipe e mídias, exibindo o projeto ativo no telão sob comando do operador.
-- **PRÉ-REQUISITOS:** Fase 1 concluída (`v0.1.0-phase1`).
-- **ESCOPO:**
-  - Operator Screen (Painel Operacional):
-    - Interface para cadastrar e editar projetos participantes e ficha do MVP;
-    - Ordenação visual da sequência de apresentações;
-    - Ação operacional "Colocar no Palco" para selecionar o projeto ativo da vez.
-  - Stage Screen (Telão Público):
-    - Exibe a identidade visual do evento (logo, cores);
-    - Banner/card visual com o projeto atualmente selecionado (título, equipe, categoria, imagem de capa).
-  - Modelagem em memória no backend (Camada de Aplicação):
-    - `Event`: `id`, `name`, `description`, `date`, `status`, `branding` (`logo`, `coverImage`, `primaryColor`, `secondaryColor`), `settings`.
-    - `Project`: `id`, `eventId`, `title`, `description`, `team`, `category`, `order`, `status`, `media` (`coverImage`, `logo`).
-  - Endpoints REST (Camada Técnica):
-    - `GET /api/events/current` e `PUT /api/events/current`: configuração do evento ativo.
-    - `GET /api/projects`: listagem dos projetos participantes.
-    - `POST /api/projects`: cadastro e edição de projetos.
-    - `POST /api/projects/current`: define o projeto selecionado para apresentação no palco.
-  - Evento SignalR (Infraestrutura de Transporte):
-    - `CurrentProjectChanged { id, title, team, category, coverImage, branding }`.
-- **FORA DO ESCOPO:** Ciclo de vida da rodada (abrir/fechar votação), banco de dados relacional, infraestrutura definitiva de armazenamento de arquivos/BLOBs.
-- **IMPLEMENTAÇÃO (CAMADA TÉCNICA ENCAPSULADA):**
-  - Repositório em memória para eventos e projetos no backend.
-  - Campos de mídia conceituais modelados como referências URI/URL.
-  - Camada de serviço de frontend consome os endpoints sem expor URLs nos componentes de visualização.
-  - Atualização do Stage para exibir a identidade do evento e dados do projeto ativo.
-- **WORKFLOW:**
-  1. Operador cadastra a edição do evento (ex: "Demo Day Inovação 2026") com sua identidade e cadastra os 10 projetos participantes.
-  2. Operador ordena a fila de pitches.
-  3. Operador clica em "Colocar no Palco" no Projeto Alpha.
-  4. O Stage projeta instantaneamente a identidade do evento e a capa com título e equipe do Projeto Alpha.
-- **TESTES:**
-  - Testes de endpoints REST de cadastro e seleção de projeto.
-  - Validação de sincronização em tempo real via SignalR no Stage Screen.
-- **CRITÉRIO DE ACEITE:** O operador troca de projeto no painel operacional e o telão atualiza as informações públicas instantaneamente, mantendo os dados após recarga de página via snapshot.
-- **DOCUMENTAÇÃO:** Especificação dos contratos de Evento e Projeto em `docs/architecture.md`.
-- **RISCOS:** Sobrescrita acidental de projeto em exibição. (Mitigado com diálogo de confirmação simples no Operator).
-- **DEPENDÊNCIAS:** Fase 1.
+- **STATUS:** 📅 PLANEJADA (Branch eat/phase4-data-resilience)
+- **OBJETIVO:** Substituir o armazenamento volátil em memória por persistência local transacional ACID (SQLite WAL mode), garantindo reidratação instantânea pós-queda, trilha de auditoria e backups atômicos a quente.
+- **PRÉ-REQUISITOS:** Fase 3 concluída (0.3.0-phase3).
+- **SUBFASES E ESCOPO:**
+  - **Milestone 4A — Storage Engine & Relational Schema:**
+    - Driver Microsoft.Data.Sqlite in-process (zero instaladores, zero serviços de background);
+    - Ativação do modo WAL (PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;);
+    - Criação do schema DDL relacional estrito com constraints de integridade para Events, Projects, Judges, EventJuryAssignments, RoundHistoryEntries e ActiveSessionState.
+  - **Milestone 4B — State Persistence & Session Re-hydration:**
+    - Implementação de SqliteArenaProjectStore encapsulando IArenaProjectStore;
+    - Boot com reidratação automática do evento ativo, projeto corrente e banca;
+    - Regra de sanitização pós-queda: pitch interrompido no meio volta com segurança para Waiting e cadeiras em 0°.
+  - **Milestone 4C — Operational Audit Trail & Event Sourcing Leve:**
+    - Tabela append-only AuditEvents registrando todas as mutações operacionais (ativação, transições, pausas, acionamentos de votos, backups);
+    - Endpoint GET /api/audit-log e reidratação do ActivityLog no cockpit do operador após recarga de página.
+  - **Milestone 4D — Automated Snapshots, Backup & Disaster Recovery:**
+    - Backup a quente atômico via VACUUM INTO através do endpoint POST /api/admin/backup;
+    - Snapshot automático a cada rodada arquivada (ound_N_snapshot.db);
+    - Procedimento documentado de restauração rápida em máquina secundária via pendrive.
+  - **Milestone 4E — Chaos Engineering & Reliability Test Suite:**
+    - Suíte automatizada especializada 	ests/test-chaos-reliability.cjs;
+    - Simulação de terminação abrupta de processo (kill -9) durante escritas e votações concorrentes;
+    - Validação de 100 reinicializações rápidas consecutivas e PRAGMA integrity_check no boot;
+    - Homologação formal e emissão da tag 0.4.0-phase4.
+- **CRITÉRIO DE ACEITE:** Desligar forçadamente o processo .NET durante qualquer momento da operação e reiniciar o servidor sem perda de nenhuma rodada, voto ou configuração.
+- **DECISÕES ARQUITETURAIS:** [ADR-016](decision-records/ADR-016-offline-first-persistence-strategy.md) e [ADR-017](decision-records/ADR-017-platform-reliability-over-feature-expansion.md).
 
 ---
 
-### FASE 3: Event Governance, Pitch Dynamics & Jury ✅ CONCLUÍDA E HOMOLOGADA (`v0.3.0-phase3`)
-*Governança completa de eventos, dinâmica ao vivo do pitch (máquina de estados + timers + lockout), round history, result engine e catálogo de jurados com alocação por evento.*
+### FASE 5: Live Show Experience & Audio Atmosphere
+*Elevar o valor sensorial e a dramaticidade cênica do telão 3D através de áudio estéreo imersivo.*
 
-- **STATUS:** ✅ CONCLUÍDA E HOMOLOGADA (5 Milestones: 3A, 3B, 3C, 3D, 3E; tag `v0.3.0-phase3`)
-- **COBERTURA:** 466 testes automatizados em 9 suítes (100% verde, zero regressões)
-- **MILESTONES CONCLUÍDOS:**
-  - **3A — Event Lifecycle & Management (229 testes):** Governança com 5 estados (Draft, Ready, Active, Finished, Archived), ativação atômica não-destrutiva, 8 endpoints REST, ActiveEventChanged/EventBrandingUpdated/ChairsReset via SignalR e catálogo no cockpit.
-  - **3B — Pitch Lifecycle Engine (305 testes):** Máquina de estados formal de 6 estágios, HTTP 422 para transições inválidas, estado terminal Finished, reset de pitch, PitchStageChanged via SignalR e stepper no cockpit.
-  - **3C — Pitch Timers & Authoritative Lockout (355 testes):** Cronômetro ancorado em timestamp do backend, pause/resume sem drift, +30/+60/+120s, PitchTimerUpdated contínuo, lockout HTTP 409 Conflict em qualquer estágio fora de VotingOpen.
-  - **3D — Round History & Result Engine (416 testes):** Arquivamento imutável de rodadas, Result (Approved/Rejected/Inconclusive), ApprovalMode (Unanimous/Majority/Minority/None), RoundArchived via SignalR, histórico consultável no cockpit.
-  - **3E — Judge Catalog & Event Jury Assignment (466 testes):** Catálogo global de jurados, alocação nas cadeiras 1..5 do evento, dock cênico nominal no palco (StageJuryDock), integração com RoundHistoryEntry e EventJuryUpdated via SignalR.
-- **OBJETIVO ORIGINAL:**
-- **PRÉ-REQUISITOS:** Fase 2 concluída.
-- **ESCOPO:**
-  - Operator Screen (Cockpit Operacional):
-    - Ações operacionais claras: "Preparar Apresentação", "Abrir Votação", "Encerrar Votação", "Avançar Próximo";
-    - Cronômetro de tempo de pitch e indicador em tempo real da contagem de votos;
-    - Feedback amigável de regra de negócio caso ocorra tentativa de voto fora da janela ("A votação já está encerrada").
-  - Stage Screen (Telão Público):
-    - Exibe badge de status cênico ("AGUARDANDO PITCH", "VOTAÇÃO ABERTA", "VOTAÇÃO ENCERRADA");
-    - Congelamento visual do placar ao encerrar a rodada.
-  - Máquina de estados da rodada em memória no backend (Camada de Aplicação):
-    - `PENDING`: Projeto posicionado no palco, votação aguardando início.
-    - `OPEN`: Pitch em andamento, votos de cadeira aceitos.
-    - `CLOSED`: Tempo de votação encerrado, novos acionamentos bloqueados.
-  - Regra de bloqueio no backend (Camada Técnica): `POST /api/chair-press` só aceita virar cadeira se o status da rodada for estritamente `OPEN`. Em `PENDING` ou `CLOSED`, a requisição é rejeitada com `HTTP 409 Conflict`.
-  - Endpoints REST (Camada Técnica):
-    - `POST /api/rounds/prepare`: vincula projeto e define status `PENDING`.
-    - `POST /api/rounds/start`: abre a votação (`OPEN`).
-    - `POST /api/rounds/close`: encerra a votação (`CLOSED`) e congela o placar.
-  - Eventos SignalR (Infraestrutura de Transporte):
-    - `RoundPrepared`, `RoundStarted`, `RoundClosed`.
-- **FORA DO ESCOPO:** Motor de regras de resultado (Result Engine), pontuações numéricas, desempates, banco de dados.
-- **IMPLEMENTAÇÃO (CAMADA TÉCNICA ENCAPSULADA):**
-  - Classe `RoundCoordinator` gerenciada como singleton em memória no backend.
-  - Interceptação de `POST /api/chair-press` para validação de estado antes de alterar `chairStates`.
-  - Serviços de frontend encapsulam as chamadas REST em métodos semânticos (`openRound()`, `closeRound()`).
-- **WORKFLOW:**
-  1. Operador seleciona o Projeto Beta e clica em "Preparar Apresentação" (`PENDING`).
-  2. Apresentador inicia a fala; operador clica em "Abrir Votação" (`OPEN`).
-  3. Durante o pitch, jurados acionam suas cadeiras (1..5) e elas viram no telão 3D.
-  4. Fim do tempo; operador clica em "Encerrar Votação" (`CLOSED`).
-  5. Acionamentos tardios são bloqueados pelo backend com aviso amigável ao operador; o resultado fica congelado na tela.
-  6. Operador clica em "Avançar Próximo", limpando o palco para a próxima apresentação.
-- **TESTES:**
-  - Teste automatizado tentando votar antes da abertura (deve retornar 409).
-  - Teste de voto com rodada aberta (deve retornar 200).
-  - Teste de voto após encerramento (deve retornar 409).
-- **CRITÉRIO DE ACEITE:** Nenhuma cadeira pode virar fora do estado `OPEN`; transições de status da rodada sincronizam com precisão entre Operator e Stage; o operador recebe feedback claro de regras de negócio.
-- **DOCUMENTAÇÃO:** Inclusão do diagrama de estados da rodada em `docs/architecture.md`.
-- **RISCOS:** Concorrência no milissegundo de fechamento. (Mitigado com bloqueio concorrente em memória via `lock` ou `ConcurrentDictionary`).
-- **DEPENDÊNCIAS:** Fase 2.
+- **STATUS:** 📅 PLANEJADA (Roadmap V2)
+- **OBJETIVO:** Integrar um motor de áudio no telão (/stage) via Web Audio API, atrelando efeitos sonoros cinemáticos às mudanças de estado da apresentação e acionamentos da banca.
+- **PRÉ-REQUISITOS:** Fase 3 concluída (independe da Fase 4).
+- **SUBFASES E ESCOPO:**
+  - **Milestone 5A — Web Audio Engine no Stage:** Hook reativo useAudioScene com controle de volume, master mute e desbloqueio inicial de áudio (conformidade com autoplay dos navegadores).
+  - **Milestone 5B — Sincronização Sonora com SignalR:** Som de rotação da cadeira (whoosh/catraca metálica dramática no ChairTurned), sinal de alerta sonoro nos últimos 15 segundos do timer e gongo de encerramento da votação (VotingClosed).
+  - **Milestone 5C — Efeitos de Clímax Cênico:** Fanfarra comemorativa e iluminação especial de celebração quando o ResultEngine computa Unanimidade (5/5 votos favoráveis).
+- **CRITÉRIO DE ACEITE:** Telão executa efeitos sonoros em sincronia com animações GSAP a 60 FPS sem engasgos de áudio ou vídeo.
 
 ---
 
-### FASE 4: Evaluator & Jury Management
-*Permitir que o Operator administre os avaliadores e monte a banca do evento.*
+### FASE 6: Awards Ceremony, Ranking & Executive Reports
+*Consolidar a apuração do evento com pódio visual no telão e emissão de ata executiva formal.*
 
-- **OBJETIVO:** Formalizar o desacoplamento entre quem avalia e onde avalia (`Evaluator != Chair`), permitindo cadastrar os jurados da edição e associá-los dinamicamente às cadeiras 1 a 5 para cada bloco ou rodada.
-- **PRÉ-REQUISITOS:** Fase 3 concluída.
-- **ESCOPO:**
-  - Operator Screen (Painel Operacional):
-    - Interface para cadastrar avaliadores (nome, cargo, organização, foto);
-    - Painel visual de montagem de banca: ação "Associar avaliador à cadeira 1..5";
-    - Remanejamento de jurados entre blocos de apresentação.
-  - Stage Screen (Telão Público):
-    - Apresenta os dados da banca oficial (nomes, cargos e fotos dos jurados alocados no bloco, conforme design visual do evento).
-  - Modelagem em memória no backend (Camada de Aplicação):
-    - `Evaluator`: `id`, `name`, `role`, `organization`, `profileImage`.
-    - `ChairAssignment`: `chairId` (1..5), `evaluatorId`, contexto de validade.
-  - Endpoints REST (Camada Técnica):
-    - `GET /api/evaluators` e `POST /api/evaluators`: gestão de jurados cadastrados.
-    - `PUT /api/chairs/assignments`: associa jurados às cadeiras físicas/lógicas 1 a 5.
-  - Evento SignalR (Infraestrutura de Transporte):
-    - `ChairAssignmentsUpdated`.
-- **FORA DO ESCOPO:** Aplicativo individual em smartphone para cada jurado votar, banco de dados.
-- **IMPLEMENTAÇÃO (CAMADA TÉCNICA ENCAPSULADA):**
-  - Gerenciador de banca em memória associando `chairId` a `Evaluator`.
-  - Propagação da composição da banca no snapshot `GET /api/state`.
-  - Serviços de frontend encapsulam atribuições através do método `assignEvaluator()`.
-- **WORKFLOW:**
-  1. Antes do evento ou na troca de bloco, o operador monta a banca associando 5 jurados às cadeiras 1 a 5.
-  2. O Stage exibe a banca oficial do bloco com nomes, cargos e fotos.
-  3. Na apresentação, os votos das cadeiras ficam vinculados nominalmente aos jurados correspondentes.
-- **TESTES:**
-  - Validação de atribuição com IDs inválidos ou cadeiras duplicadas.
-  - Verificação de persistência dos jurados na cena após F5 via snapshot REST.
-- **CRITÉRIO DE ACEITE:** A composição da banca reflete com precisão os jurados configurados pelo operador e os votos das cadeiras registram a identidade do jurado correspondente.
-- **DOCUMENTAÇÃO:** Especificação das regras de associação de jurados em `docs/architecture.md`.
-- **RISCOS:** Nomes muito extensos na interface visual. (Mitigado com truncamento elegante no design).
-- **DEPENDÊNCIAS:** Fase 3.
+- **STATUS:** 📅 PLANEJADA (Roadmap V2)
+- **OBJETIVO:** Computar a classificação geral dos pitches apresentados, projetar a cerimônia de premiação no palco e exportar a ata oficial em PDF e CSV para a comissão organizadora.
+- **PRÉ-REQUISITOS:** Fase 4 (Persistência) e Fase 3D (Result Engine).
+- **SUBFASES E ESCOPO:**
+  - **Milestone 6A — Motor de Ranking Oficial:** Algoritmo de classificação baseado nos snapshots do RoundHistoryEntry com desempate por: ApprovalMode (Unanimidade > Maioria) ➔ Total de Votos ➔ Ordem cronológica.
+  - **Milestone 6B — Telão Cênico de Premiação e Pódio:** Visualização de encerramento no /stage com revelação do Top 3 / Top 5 das startups apoiadas pela banca.
+  - **Milestone 6C — Emissão de Ata da Banca:** Endpoints GET /api/reports/minutes?format=pdf|csv e botão no cockpit "Exportar Ata do Evento", gerando documento executivo pronto para assinatura do comitê.
+- **CRITÉRIO DE ACEITE:** Download em 1 clique de relatório PDF completo contendo cabeçalho do evento, relação de projetos, votos nominais de cada jurado e veredito final.
 
 ---
 
-### FASE 5: Game Rules + Result Engine
-*Transformar os acionamentos de cadeira em um resultado formal e consolidado da rodada.*
+### FASE 7: Operational Hardening, Contingency & Fleet Telemetry
+*Blindagem operacional de campo e procedimentos de contingência para a mesa técnica.*
 
-- **OBJETIVO:** Processar as decisões dos avaliadores ao fechar a rodada e produzir um `RoundResult` estruturado de acordo com as regras de negócio definidas para o evento.
-- **PRÉ-REQUISITOS:** Macrobloco Event Setup & Live Operation (Fases 1 a 4) concluído.
-- **ESCOPO:**
-  - Definição e implementação do `ResultEngine` no backend.
-  - Geração do `RoundResult`:
-    - `totalVotos`: quantidade de cadeiras viradas (0 a 5);
-    - `aprovado`: booleano indicando aprovação formal;
-    - `classificacao`: status descritivo (ex: "Aprovado com Unanimidade", "Aprovado por Maioria", "Reprovado").
-  - Evento SignalR: `RoundResultComputed { projectId, roundResult }`.
-- **FORA DO ESCOPO:** Persistência em banco de dados, exportação de arquivos CSV/PDF.
-- **DECISÕES DE PRODUTO QUE PRECISAM SER DEFINIDAS NESTA FASE:**
-  - *O que significa exatamente cada placar (0/5, 1/5, 2/5, 3/5, 4/5, 5/5)?*
-  - *Qual é a quantidade mínima de cadeiras viradas para aprovação (ex: 3 de 5)?*
-  - *Todos os jurados possuem o mesmo peso de voto ou existem papéis com poder de veto?*
-  - *Existe nota numérica complementar além da decisão binária de virar a cadeira?*
-  - *O resultado é consolidado apenas no fechamento da rodada (`CLOSED`) ou de forma progressiva?*
-  - *Como são tratadas situações de empate ou repescagem?*
-  *(Nota: Nenhuma dessas regras deve ser criada no código antes da aprovação formal de produto).*
-- **IMPLEMENTAÇÃO:**
-  - Classe `ResultEngine` acionada ao fechar a rodada (`POST /api/rounds/close`).
-  - Stage passa a apresentar o selo oficial de resultado (Aprovado / Não Aprovado / Unanimidade).
-- **WORKFLOW:**
-  1. Rodada fecha com 4 cadeiras viradas.
-  2. O `ResultEngine` processa os 4 votos contra as regras oficiais do evento.
-  3. O backend emite `RoundResultComputed`.
-  4. O telão exibe a placa oficial do resultado consolidado.
-- **TESTES:**
-  - Testes unitários com simulação de 0 a 5 votos validando as saídas do `ResultEngine`.
-  - Verificação de emissão correta do evento para o frontend.
-- **CRITÉRIO DE ACEITE:** O resultado formal da rodada é gerado e exibido no telão em estrita conformidade com as regras de negócio aprovadas.
-- **DOCUMENTAÇÃO:** Especificação formal das regras de negócio do jogo registradas em `docs/game-rules.md`.
-- **RISCOS:** Divergência entre a regra programada e a expectativa dos organizadores do evento. (Mitigado por validação prévia com o Product Owner antes de codificar).
-- **DEPENDÊNCIAS:** Fases 3 e 4.
+- **STATUS:** 📅 PLANEJADA (Roadmap V2)
+- **OBJETIVO:** Fornecer ao operador da mesa ferramentas de diagnóstico em tempo real e comandos de bypass manual imediato em caso de falha de hardware das cadeiras.
+- **PRÉ-REQUISITOS:** Fases 4, 5 e 6.
+- **SUBFASES E ESCOPO:**
+  - **Milestone 7A — Cockpit de Contingência (Bypass Manual):** Ação no cockpit "Forçar Voto Manual da Cadeira N" para uso exclusivo em caso de quebra mecânica de botão ou bateria fraca durante o pitch.
+  - **Milestone 7B — Telemetria da Frota de ESP32:** Monitor de liveness em background medindo ping e status de conexão Wi-Fi das 5 cadeiras físicas antes do início de cada apresentação.
+  - **Milestone 7C — Runbook de Produção e Checklist Pré-Show:** Manual operacional minuto a minuto para alinhamento entre mesa técnica, mestre de cerimônias e direção de palco.
+- **CRITÉRIO DE ACEITE:** Operador consegue contornar uma falha física de botão em menos de 3 segundos sem interromper a apresentação.
 
 ---
 
-### FASE 6: Experiência Cênica Avançada (Áudio & Efeitos)
-*Elevar o valor sensorial do Voice Studio 3D com efeitos visuais e sonoros impactantes atrelados aos eventos reais do jogo.*
+### FASE 8 (Módulo Satélite / Complementar): Evaluator Portal & Qualitative Rubrics
+*Módulo opcional para bancas acadêmicas ou eventos que exijam pareceres técnicos detalhados.*
 
-- **OBJETIVO:** Integrar áudio cênico e efeitos visuais no telão atrelados estritamente às mudanças de estado da rodada e ao `ResultEngine`.
-- **PRÉ-REQUISITOS:** Fase 5 concluída.
-- **ESCOPO:**
-  - Sistema de áudio no telão (Web Audio API / Howler):
-    - Som dramático de acionamento ao virar cada cadeira individual;
-    - Efeito sonoro de suspense durante a rodada aberta;
-    - Gongo de encerramento de tempo de pitch;
-    - Fanfarra/comemoração especial para aprovação unânime (5/5).
-  - Efeitos visuais:
-    - Sistema de partículas/confetes 3D no estúdio quando unânime;
-    - Iluminação especial e transições de câmera cinemáticas no Three.js;
-  - Controle de áudio no `/operator` (mute, controle de volume).
-- **FORA DO ESCOPO:** Integração física com mesas de som DMX ou canhões de luz externos.
-- **IMPLEMENTAÇÃO:**
-  - Hook `useAudioEffects` gerenciado pelo ciclo de eventos do SignalR.
-  - Botão de "Desbloquear Áudio" no telão para conformidade com políticas de autoplay dos navegadores.
-- **WORKFLOW:**
-  1. Operador inicia o telão e clica para habilitar o áudio.
-  2. A cada cadeira virada, o som de rotação toca perfeitamente sincronizado com a animação GSAP.
-  3. Ao consolidar 5 de 5, o estúdio dispara confetes e iluminação cênica celebratória.
-- **TESTES:**
-  - Teste de áudio em navegadores distintos (Chrome, Edge, Firefox).
-  - Teste de estabilidade de taxa de quadros (60 FPS) durante animações com partículas.
-- **CRITÉRIO DE ACEITE:** Áudio e efeitos visuais executam com precisão cênica sem causar engasgos de renderização na cena 3D.
-- **DOCUMENTAÇÃO:** Guia de operação de áudio adicionado ao manual do operador.
-- **RISCOS:** Políticas rígidas de autoplay de navegadores bloquearem a execução sonora. (Mitigado por ativação explícita de áudio na primeira interação).
-- **DEPENDÊNCIAS:** Fases 1 e 5.
+- **STATUS:** 📅 PLANEJADA COMO COMPLEMENTAR (Roadmap V2)
+- **OBJETIVO:** Permitir a configuração de critérios de avaliação com notas (ex: Inovação, Viabilidade, Pitch) via portal responsivo para jurados, operando como camada acessória à decisão física soberana da cadeira.
+- **PRÉ-REQUISITOS:** Fases 4, 6 e 7 homologadas.
+- **ESCOPO:** Formulário web móvel para jurados, agregação de notas e geração de dossiê técnico anexo à ata executiva.
 
 ---
 
-### FASE 7: Modelo de Dados Definitivo (Consolidação do Domínio)
-*Consolidar, revisar e formalizar o modelo de dados completo antes da escolha de persistência.*
-
-- **OBJETIVO:** Formalizar e unificar o esquema de dados completo de todas as entidades já descobertas e utilizadas nas Fases 2 a 5, estabelecendo regras de integridade, imutabilidade e auditoria, sem escolher prematuramente a tecnologia de banco de dados.
-- **PRÉ-REQUISITOS:** Fases 2 a 5 concluídas.
-- **ESCOPO:**
-  - Consolidação e revisão do modelo de entidades:
-    - `Event` (`id`, `name`, `description`, `date`, `status`, `branding`, `settings`);
-    - `Project` (`id`, `eventId`, `title`, `description`, `team`, `category`, `order`, `status`, `media`);
-    - `Evaluator` (`id`, `name`, `role`, `organization`, `profileImage`);
-    - `ChairAssignment` (`id`, `roundId`, `chairId`, `evaluatorId`);
-    - `Round` (`id`, `projectId`, `startedAt`, `closedAt`, `status`);
-    - `Vote` (`id`, `roundId`, `chairId`, `evaluatorId`, `timestamp`, `source`, `rawPayload`);
-    - `RoundResult` (`id`, `roundId`, `totalVotes`, `isApproved`, `classificationSummary`);
-    - `EventResult` (`id`, `eventId`, `computedAt`, `rankings`).
-  - Definição das regras de auditoria, relacionamentos, cardinalidades e retenção de histórico.
-- **FORA DO ESCOPO:** Instalação de drivers de banco de dados, execução de scripts SQL ou migrações.
-- **IMPLEMENTAÇÃO:**
-  - Documentação formal em diagrama Entidade-Relacionamento e consolidação das classes de domínio puro em C#.
-- **WORKFLOW:**
-  - Revisão técnica da arquitetura confirmando que todas as necessidades de tela e relatórios estão contempladas nas entidades.
-- **TESTES:**
-  - Validação de integridade do modelo conceitual cobrindo todas as cardinalidades necessárias.
-- **CRITÉRIO DE ACEITE:** Modelo de entidades homologado formalmente com todas as chaves e propriedades requeridas pelas fases anteriores.
-- **DOCUMENTAÇÃO:** Criação de `docs/data-model.md` contendo o diagrama e dicionário de dados oficial.
-- **RISCOS:** Esquecimento de campos essenciais para relatórios futuros. (Mitigado por revisão conjunta com as necessidades da Fase 9).
-- **DEPENDÊNCIAS:** Fases 2, 3, 4 e 5.
-
----
-
-### FASE 8: Persistência Oficial (Tecnologia TBD)
-*Implementar a camada de persistência oficial da plataforma com base no domínio consolidado.*
-
-- **OBJETIVO:** Tornar os dados da aplicação persistentes entre reinicializações do servidor, permitindo retomar sessões interrompidas sem perda de histórico.
-- **PRÉ-REQUISITOS:** Fase 7 homologada.
-- **ESCOPO:**
-  - Persistência transparente: nenhuma tela operacional expõe schemas SQL, migrations ou detalhes de tabelas; a experiência do usuário permanece focada exclusivamente no fluxo do evento.
-  - Seleção e implementação da tecnologia de persistência mais adequada aos requisitos reais (tecnologia **TBD** após a Fase 7, considerando opções como SQLite autocontido, PostgreSQL, SQL Server ou persistência em arquivos transacionais).
-  - Repositórios e mapeamento objeto-relacional ou documental.
-  - Carregamento de estado persistido durante a inicialização do backend.
-- **FORA DO ESCOPO:** Replicação multi-região, clusters de alta disponibilidade.
-- **IMPLEMENTAÇÃO:**
-  - Implementação das interfaces de repositório (`IEventRepository`, `IRoundRepository`, etc.).
-  - Migrações controladas na inicialização.
-- **WORKFLOW:**
-  1. Se o processo do backend sofrer uma queda ou reinicialização durante o evento, o sistema recarrega a sessão e histórico intactos.
-  2. O telão e o operador reconectam e continuam do exato ponto em que pararam.
-- **TESTES:**
-  - Teste automatizado com inserção de dados, terminação forçada do processo backend, reinicialização e validação de manutenção do estado completo.
-- **CRITÉRIO DE ACEITE:** Nenhuma rodada, voto ou resultado é perdido após encerramento e restart do servidor.
-- **DOCUMENTAÇÃO:** Guia de configuração da persistência e instruções de backup registradas em `docs/persistence.md`.
-- **RISCOS:** Falha de I/O em disco ou locks concorrentes. (Mitigado com configuração adequada de transações e modo de acesso).
-- **DEPENDÊNCIAS:** Fase 7.
-
----
-
-### FASE 9: Histórico, Ranking e Relatórios
-*Consolidar a inteligência analítica do evento: apuração de vencedores e exportação.*
-
-- **OBJETIVO:** Gerar o ranking final de projetos, relatórios consolidados da banca e exportações em formatos interoperáveis (CSV, JSON, PDF).
-- **PRÉ-REQUISITOS:** Fases 5 e 8 concluídas.
-- **ESCOPO:**
-  - Motor de Ranking Geral do Evento (critérios de ordenação por aprovação, votos recebidos, desempate);
-  - Tela de Ranking no `/stage` para anúncio solene dos projetos vencedores ao final do evento;
-  - Painel de Histórico no `/operator` com busca por projeto e detalhes de votos por jurado; botões de ação operacional "Exportar Resultados" / "Exportar Relatório";
-  - Endpoints de exportação (Camada Técnica):
-    - `GET /api/reports/event-summary?format=csv`
-    - `GET /api/reports/event-summary?format=json`
-- **FORA DO ESCOPO:** Painel público de votação popular externa na internet.
-- **IMPLEMENTAÇÃO:**
-  - Serviços de relatório e exportação no backend.
-  - Visualização de pódio/ranking animada no frontend.
-- **WORKFLOW:**
-  1. Ao término de todas as apresentações, o operador clica em "Consolidar Resultado do Evento".
-  2. O telão 3D faz uma transição solene e exibe a tela de premiação/ranking dos projetos.
-  3. O operador clica em "Exportar Resultados" e faz o download da planilha oficial de notas para a organização.
-- **TESTES:**
-  - Teste de consistência do ranking contra cenários com empates e notas variadas.
-  - Validação de integridade dos arquivos CSV/JSON baixados.
-- **CRITÉRIO DE ACEITE:** O ranking gerado bate com precisão com os votos registrados e as exportações contêm o log de auditoria completo da banca.
-- **DOCUMENTAÇÃO:** Especificação dos formatos de relatório em `docs/reporting.md`.
-- **RISCOS:** Inconsistência nos critérios de desempate. (Mitigado pela homologação prévia das regras na Fase 5).
-- **DEPENDÊNCIAS:** Fases 5 e 8.
-
----
-
-### FASE 10: Hardening e Preparação Operacional
-*Estabilização técnica, segurança e observabilidade para eventos presenciais de missão crítica.*
-
-- **OBJETIVO:** Blindar a plataforma contra falhas operacionais, otimizar consumo de memória e pacotes, e estruturar procedimentos de contingência.
-- **PRÉ-REQUISITOS:** Fases 1 a 9 implementadas e integradas.
-- **ESCOPO:**
-  - Otimização do bundle do frontend (code-splitting dinâmico no Vite para resolver o aviso de chunk grande);
-  - Logs estruturados e métricas de latência e consumo de memória;
-  - Ferramentas de diagnóstico e observabilidade técnica: endpoints especializados (`/healthz`, `/metrics`) e telemetria estruturada disponibilizados para ferramentas de suporte e monitoramento de infraestrutura, mantidos completamente apartados da interface de operação principal do evento;
-  - Tratamento de reconexão de rede Wi-Fi com modo de contingência manual no operador;
-  - Manual operacional e checklist de conferência pré-evento (runbook).
-- **FORA DO ESCOPO:** Reescrita de arquitetura ou introdução de novas funcionalidades de negócio.
-- **IMPLEMENTAÇÃO:**
-  - Lazy loading com `React.lazy()` para componentes Three.js pesados.
-  - Configuração de logging estruturado no ASP.NET Core (ex: Serilog / OpenTelemetry).
-- **WORKFLOW:**
-  - Equipe técnica executa o runbook pré-evento, roda os testes de contingência e opera o sistema com confiança operacional.
-- **TESTES:**
-  - Teste de carga e estresse simulando disparos simultâneos.
-  - Simulação de desconexão de cabos de rede e verificação do tempo de restabelecimento.
-- **CRITÉRIO DE ACEITE:** Aplicação opera sem degradação de memória em sessões longas e cumpre integralmente o runbook operacional.
-- **DOCUMENTAÇÃO:** Publicação do `docs/operational-runbook.md` com checklist de evento.
-- **RISCOS:** Instabilidade física no dia do evento (energia ou rede). (Mitigado por procedimentos de contingência claros e no-break recomendado).
-- **DEPENDÊNCIAS:** Fases 1 a 9.
-
----
-
-## 22. Matriz de Rastreabilidade e Critérios de Conclusão por Fase
+## 22. Matriz de Rastreabilidade e Critérios de Conclusão por Fase (Roadmap V2)
 
 | Fase | Foco Principal | Critério de Aceite Inegociável | Teste Chave |
 | :---: | :--- | :--- | :--- |
-| **Fase 1** | Operator + Stage Foundation | Telão roda em tela cheia sem controles de mouse; operador compreende e controla o estado essencial da Arena com linguagem de produto, sem expor protocolos internos. | Duas abas abertas sincronizadas via SignalR com reset remoto. |
-| **Fase 2** | Event Setup + Project Management | Operator configura evento/projetos; telão reflete branding e projeto atual selecionado. | Teste de alternância de projetos e hidratação de tela. |
-| **Fase 3** | Live Round Operation / Game State | Votos rejeitados com HTTP 409 quando fora do estado `OPEN`. | Disparos de voto antes, durante e após fechamento da rodada. |
-| **Fase 4** | Evaluator & Jury Management | Operator monta a banca; cadeiras associam votos nominalmente aos jurados. | Verificação de reidratação dos nomes na cena 3D após F5. |
-| **Fase 5** | Game Rules + Result Engine | Resultado consolidado gerado e exibido conforme regras de negócio aprovadas. | Testes unitários com simulação de 0 a 5 votos. |
-| **Fase 6** | Experiência Cênica | Áudio e efeitos visuais tocam sincronizados sem queda na taxa de quadros (60 FPS). | Teste em múltiplos navegadores com profiler de desempenho. |
-| **Fase 7** | Modelo de Dados Definitivo | Diagrama e classes POCO de domínio homologados formalmente sem gaps. | Revisão de modelo de domínio cobrindo todas as entidades. |
-| **Fase 8** | Persistência (TBD) | Reinicialização forçada do backend preserva 100% dos dados e rodadas. | Teste de recuperação de estado após derrubar processo. |
-| **Fase 9** | Histórico e Relatórios | Ranking apurado com precisão e relatórios exportados com integridade. | Validação de download de planilhas CSV com log de votos. |
-| **Fase 10** | Hardening Operacional | Bundle otimizado e runbook operacional homologado em ensaio geral. | Simulação de estresse de longa duração com checklist. |
+| **Fase 1** | Operator + Stage Foundation | Telão passivo sem controles de mouse; operador controla a arena com linguagem de produto. | Duas abas sincronizadas via SignalR com reset remoto. |
+| **Fase 2** | Event Setup & Projects | Operador configura branding e catálogo; telão reflete startup atual e neons dinâmicos. | Alternância de pitches no palco e hidratação REST. |
+| **Fase 3** | Pitch Dynamics & Jury | 6 estágios de pitch, timers sem drift, lockout HTTP 409, histórico e jurados nominais. | 466 verificações automatizadas em 9 suítes (100% verde). |
+| **Fase 4** | Platform Reliability & Data | Reinício forçado do servidor restaura 100% do estado sem perda de histórico; backup em 1 clique. | 	ests/test-chaos-reliability.cjs (simulação de kill -9). |
+| **Fase 5** | Live Show Experience | Som de rotação e efeitos de clímax tocam sincronizados no telão a 60 FPS sem travamentos. | Teste de latência de áudio no Web Audio API com SignalR. |
+| **Fase 6** | Ranking & Executive Reports | Ata oficial em PDF/CSV gerada com fidelidade auditável; pódio exibido no telão. | Validação de consistência do ranking e download da ata. |
+| **Fase 7** | Hardening & Contingency | Bypass manual de cadeira executado na mesa técnica em caso de falha do ESP32. | Simulação de botão desconectado com contingência manual. |
+| **Fase 8** | Evaluator Portal (Opcional) | Pareceres técnicos complementares anexados à ata sem afetar a soberania do botão físico. | Submissão de notas via smartphone em rede local. |
 
 ---
 
 ## 23. Testes por Fase
 
-Para manter a integridade que já atinge 466 verificações automatizadas aprovadas em 9 suítes de testes:
-- **Novos Testes Automatizados:** Devem ser incorporados na pasta `tests/` a cada fase concluída, mantendo a simplicidade de execução via Node.js nativo.
-- **Testes de Regressão Obrigatórios:** Antes de encerrar qualquer fase subsequente, `node tests/test-api.cjs` e `node tests/test-signalr-e2e.cjs` devem continuar retornando 0 falhas.
+Para assegurar a integridade do ecossistema que já conta com **466 verificações automatizadas aprovadas**:
+- **Regressão Zero Obrigatória:** Toda nova suíte adicionada em 	ests/ deve ser executada em conjunto com as 9 suítes existentes. Nenhuma fase é homologada sem 100% de testes verdes.
+- **Testes de Resiliência no CI/CD:** A suíte de caos da Fase 4 testará inicialização a quente e recuperação de base SQLite em todas as execuções futuras.
 
 ---
 
-## 24. Documentação por Fase
+## 24. Documentação e Governança por Fase
 
-A cada fase entregue, os seguintes artefatos devem ser mantidos e versionados:
-1. `README.md`: Atualizar rotas e comandos de execução.
-2. `docs/architecture.md`: Atualizar diagramas de sequência e modelos de contrato.
-3. Changelog / Commits semânticos: Preservar as convenções adotadas (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
+A cada fase entregue:
+1. README.md: Atualizar tabela de status e comandos de execução.
+2. docs/architecture.md: Atualizar modelos de contrato e diagramas.
+3. docs/decision-records/: Registrar os novos ADRs específicos da fase.
+4. docs/archives/milestone-history.md: Atualizar status dos marcos entregues.
+5. docs/archives/implementation-history.md: Registrar log técnico detalhado de código e testes.
 
 ---
 
-## 25. Análise de Riscos e Mitigações
+## 25. Análise de Riscos e Mitigações em Evento Real
 
 | Risco Técnico / Operacional | Impacto | Probabilidade | Mitigação Arquitetural |
 | :--- | :---: | :---: | :--- |
-| **Interferência de Wi-Fi no evento** (saturação 2.4 GHz pelos celulares do público). | Alto | Média | O protocolo HTTP POST é leve e possui timeout curto; para ambientes críticos, cabear o operador ou usar roteador dedicado com SSID oculto. |
-| **Queda do navegador do telão** durante a apresentação. | Médio | Baixa | A hidratação (`GET /api/state`) restaura a cena 3D instantaneamente após recarga de página. |
-| **Bloqueio de CORS ou portas restritas.** | Alto | Baixa | A política de CORS do backend é universal (`SetIsOriginAllowed(_ => true)`) e as portas são parametrizáveis por variáveis de ambiente. |
-| **Overengineering prematuro** atrasar as entregas do produto. | Alto | Média | Cumprir rigorosamente a progressão fase a fase, sem introduzir persistência antes da Fase 8. |
+| **Queda de energia no notebook da mesa.** | Crítico | Média | **Fase 4:** SQLite com WAL mode salva cada transação em disco; o boot reidrata o evento intacto em segundos. |
+| **Falha de hardware no botão ESP32 durante o pitch.** | Alto | Média | **Fase 7:** Botão de bypass manual no cockpit do operador permite virar a cadeira via software em 1 clique. |
+| **Telão mudo durante apresentação importante.** | Médio | Alta | **Fase 5:** Motor Web Audio com fallback procedural e botão de ativação de som visível no HUD. |
+| **Saturação de Wi-Fi por celulares do público.** | Alto | Média | A arquitetura **não depende de internet** nem de celulares de terceiros; a rede do evento atende exclusivamente aos 5 ESP32. |
 
 ---
 
-## 26. Decisões Que Deliberadamente Estão em Standby
+## 26. Decisões Estratégicas e ADRs de Referência
 
-As seguintes decisões técnicas permanecem congeladas até as fases competentes:
-1. **Mecanismo Definitivo de Armazenamento de Imagens/Mídias:** Adiado para avaliação oportuna (filesystem local, BLOB storage, URLs externas).
-2. **Escolha de Banco de Dados Oficial:** Adiada até a Fase 8. O estado em memória atual é suficiente e mais ágil para o desenvolvimento das regras de negócio.
-3. **Framework de Autenticação / Identity:** Adiado para a Fase 10. O operador e o telão operam em rede local controlada de evento.
-4. **Migração para Nuvem / Microsserviços:** O sistema deve priorizar operação 100% autossuficiente e offline em máquina local no evento.
-5. **Otimizações Agressivas de Bundle:** O aviso de chunk > 500 kB é inofensivo em rede local; será tratado na Fase 10.
-6. **Replicação de Hardware ESP32:** Manter foco no ecossistema de software. A frente física avança em paralelo.
+1. **[ADR-001: Backend Authoritative](decision-records/ADR-001-backend-authoritative.md):** O servidor como única fonte da verdade.
+2. **[ADR-002: Snapshot-First Hydration](decision-records/ADR-002-snapshot-first.md):** Reidratação REST antes de consumir deltas SignalR.
+3. **[ADR-011 a ADR-015: Governança, Ciclo do Pitch, Lockout, Histórico e Banca](decision-records/):** Fundações homologadas da Fase 3.
+4. **[ADR-016: Estratégia de Persistência Offline-First com SQLite](decision-records/ADR-016-offline-first-persistence-strategy.md):** Decisão formal de armazenamento local transacional in-process.
+5. **[ADR-017: Priorização de Confiabilidade sobre Telas Prematuras](decision-records/ADR-017-platform-reliability-over-feature-expansion.md):** Decisão formal do Roadmap V2 priorizando robustez e palco sobre scorecards móveis.
 
 ---
 
-## 🎯 PRÓXIMA FASE RECOMENDADA
+## 🎯 PRÓXIMA FASE OFICIAL RECOMENDADA
 
 > [!IMPORTANT]
-> **A Próxima Fase é a FASE 4: Scorecards, Critérios Quantitativos & Portal do Jurado.**
-> As Fases 1, 2 e 3 estão encerradas, homologadas e com 466/466 testes aprovados. A Fase 4 estende a experiência de jurados com avaliação quantitativa por critérios, portal individual e relatórios de banca.
+> **A Próxima Fase a ser desenvolvida é a FASE 4: PLATFORM RELIABILITY & DATA RESILIENCE.**  
+> Branch oficial recomendada: eat/phase4-data-resilience  
+> Esta etapa elimina o único ponto de falha existencial da plataforma (volatilidade da memória RAM), implementa o banco relacional SQLite local com modo WAL, cria o mecanismo de reidratação pós-queda, a trilha de auditoria operacional e o backup a quente em 1 clique, deixando a Arena Voice 100% blindada para eventos reais.
