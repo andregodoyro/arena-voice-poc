@@ -1,4 +1,4 @@
-# ROADMAP ARENA VOICE / ARENA DE INOVAÇÃO
+﻿# ROADMAP ARENA VOICE / ARENA DE INOVAÇÃO
 ## Versão 2.0 — Roadmap V2: Show-Ready & Production-Ready First
 
 > **Classificação:** Documento Mestre de Produto e Arquitetura  
@@ -597,10 +597,10 @@ NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
 ════════════════════════════════════════════════════════════════════════════════
   │
   ├─► FASE 4: Platform Reliability & Data Resilience ◄── [PRÓXIMA FASE OFICIAL]
-  │     ├─ 4A: Storage Engine & Relational Schema (SQLite WAL Mode & Integridade Nativa)
-  │     ├─ 4B: State Persistence & Session Re-hydration (SqliteArenaProjectStore & Crash Boot)
+  │     ├─ 4A: Storage Engine & Relational Schema (PostgreSQL Portable, Npgsql & Schema Relacional)
+  │     ├─ 4B: State Persistence & Session Re-hydration (PostgresArenaProjectStore & Crash Boot)
   │     ├─ 4C: Operational Audit Trail & Event Sourcing Leve (AuditEvents & ActivityLog Sync)
-  │     ├─ 4D: Automated Snapshots, Backup & Disaster Recovery (VACUUM INTO & Auto-Snapshots)
+  │     ├─ 4D: Automated Snapshots, Backup & Disaster Recovery (BackupOrchestrator, pg_dump & Auto-Snapshots)
   │     └─ 4E: Chaos Engineering & Reliability Test Suite (Simulação de kill -9 & 100 Restarts)
   │
   ├─► FASE 5: Live Show Experience & Audio Atmosphere
@@ -658,34 +658,37 @@ NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
 *Blindar a plataforma contra falhas, quedas de energia e perda de dados em eventos ao vivo.*
 
 - **STATUS:** 📅 PLANEJADA (Branch eat/phase4-data-resilience)
-- **OBJETIVO:** Substituir o armazenamento volátil em memória por persistência local transacional ACID (SQLite WAL mode), garantindo reidratação instantânea pós-queda, trilha de auditoria e backups atômicos a quente.
+- **OBJETIVO:** Substituir o armazenamento volátil em memória por persistência local transacional ACID (PostgreSQL Portable via Npgsql), garantindo reidratação instantânea pós-queda, trilha de auditoria e backups operacionais via pg_dump.
 - **PRÉ-REQUISITOS:** Fase 3 concluída (0.3.0-phase3).
 - **SUBFASES E ESCOPO:**
   - **Milestone 4A — Storage Engine & Relational Schema:**
-    - Driver Microsoft.Data.Sqlite in-process (zero instaladores, zero serviços de background);
-    - Ativação do modo WAL (PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;);
-    - Criação do schema DDL relacional estrito com constraints de integridade para Events, Projects, Judges, EventJuryAssignments, RoundHistoryEntries e ActiveSessionState.
+    - Driver Npgsql (PostgreSQL Portable — binários portáteis, sem instalador, sem Docker);
+    - Cluster local via pg_ctl; script start-arena.bat inicializa PG + backend em sequência;
+    - ConnectionLifecycleManager: verifica disponibilidade de localhost:5432 na subida do backend;
+    - Schema DDL relacional estrito com FOREIGN KEY, CHECK CONSTRAINTS e índices de unicidade para Events, Projects, Judges, EventJuryAssignments, RoundHistoryEntries, ActiveSessionState e AuditEvents;
+    - Migrações versionadas aplicadas automaticamente via MigrationRunner.
   - **Milestone 4B — State Persistence & Session Re-hydration:**
-    - Implementação de SqliteArenaProjectStore encapsulando IArenaProjectStore;
+    - Implementação de PostgresArenaProjectStore encapsulando IArenaProjectStore via Npgsql;
     - Boot com reidratação automática do evento ativo, projeto corrente e banca;
-    - Regra de sanitização pós-queda: pitch interrompido no meio volta com segurança para Waiting e cadeiras em 0°.
+    - Regra de sanitização pós-queda: pitch interrompido volta com segurança para Waiting com cadeiras em 0°.
   - **Milestone 4C — Operational Audit Trail & Event Sourcing Leve:**
     - Tabela append-only AuditEvents registrando todas as mutações operacionais (ativação, transições, pausas, acionamentos de votos, backups);
     - Endpoint GET /api/audit-log e reidratação do ActivityLog no cockpit do operador após recarga de página.
   - **Milestone 4D — Automated Snapshots, Backup & Disaster Recovery:**
-    - Backup a quente atômico via VACUUM INTO através do endpoint POST /api/admin/backup;
-    - Snapshot automático a cada rodada arquivada (ound_N_snapshot.db);
-    - Procedimento documentado de restauração rápida em máquina secundária via pendrive.
+    - BackupOrchestrator: executa pg_dump em processo separado gerando arquivo comprimido com timestamp;
+    - Snapshot automático a cada rodada arquivada (ound_N_<timestamp>.pgdump);
+    - Endpoint POST /api/admin/backup acionável pelo operador em 1 clique;
+    - Procedimento documentado de restauração rápida via runbook operacional.
   - **Milestone 4E — Chaos Engineering & Reliability Test Suite:**
     - Suíte automatizada especializada 	ests/test-chaos-reliability.cjs;
-    - Simulação de terminação abrupta de processo (kill -9) durante escritas e votações concorrentes;
-    - Validação de 100 reinicializações rápidas consecutivas e PRAGMA integrity_check no boot;
+    - Simulação de terminação abrupta do processo (kill -9) durante escritas e votações concorrentes;
+    - Validação de 100 reinicializações rápidas consecutivas e integridade do schema no boot;
+    - Cenários de chaos específicos do PostgreSQL: porta indisponível, cluster não iniciado, restart do PG durante operação;
     - Homologação formal e emissão da tag 0.4.0-phase4.
-- **CRITÉRIO DE ACEITE:** Desligar forçadamente o processo .NET durante qualquer momento da operação e reiniciar o servidor sem perda de nenhuma rodada, voto ou configuração.
+- **CRITÉRIO DE ACEITE:** Desligar forçadamente o processo .NET e/ou o cluster PostgreSQL durante qualquer momento da operação e reiniciar o servidor sem perda de nenhuma rodada, voto ou configuração.
 - **DECISÕES ARQUITETURAIS:** [ADR-016](decision-records/ADR-016-offline-first-persistence-strategy.md) e [ADR-017](decision-records/ADR-017-platform-reliability-over-feature-expansion.md).
 
 ---
-
 ### FASE 5: Live Show Experience & Audio Atmosphere
 *Elevar o valor sensorial e a dramaticidade cênica do telão 3D através de áudio estéreo imersivo.*
 
@@ -788,7 +791,7 @@ A cada fase entregue:
 1. **[ADR-001: Backend Authoritative](decision-records/ADR-001-backend-authoritative.md):** O servidor como única fonte da verdade.
 2. **[ADR-002: Snapshot-First Hydration](decision-records/ADR-002-snapshot-first.md):** Reidratação REST antes de consumir deltas SignalR.
 3. **[ADR-011 a ADR-015: Governança, Ciclo do Pitch, Lockout, Histórico e Banca](decision-records/):** Fundações homologadas da Fase 3.
-4. **[ADR-016: Estratégia de Persistência Offline-First com SQLite](decision-records/ADR-016-offline-first-persistence-strategy.md):** Decisão formal de armazenamento local transacional in-process.
+4. **[ADR-016: Estratégia de Persistência Offline-First com PostgreSQL Portable](decision-records/ADR-016-offline-first-persistence-strategy.md):** Decisão formal de armazenamento local transacional in-process.
 5. **[ADR-017: Priorização de Confiabilidade sobre Telas Prematuras](decision-records/ADR-017-platform-reliability-over-feature-expansion.md):** Decisão formal do Roadmap V2 priorizando robustez e palco sobre scorecards móveis.
 
 ---
@@ -798,4 +801,4 @@ A cada fase entregue:
 > [!IMPORTANT]
 > **A Próxima Fase a ser desenvolvida é a FASE 4: PLATFORM RELIABILITY & DATA RESILIENCE.**  
 > Branch oficial recomendada: eat/phase4-data-resilience  
-> Esta etapa elimina o único ponto de falha existencial da plataforma (volatilidade da memória RAM), implementa o banco relacional SQLite local com modo WAL, cria o mecanismo de reidratação pós-queda, a trilha de auditoria operacional e o backup a quente em 1 clique, deixando a Arena Voice 100% blindada para eventos reais.
+> Esta etapa elimina o único ponto de falha existencial da plataforma (volatilidade da memória RAM), implementa o banco relacional PostgreSQL Portable local via Npgsql, cria o mecanismo de reidratação pós-queda, a trilha de auditoria operacional e o backup a quente em 1 clique, deixando a Arena Voice 100% blindada para eventos reais.

@@ -1,4 +1,4 @@
-# Índice Histórico de Marcos (Milestone History)
+﻿# Índice Histórico de Marcos (Milestone History)
 ## Plataforma Arena Voice / Arena de Inovação
 
 > **Status Geral do Projeto:** FASE 3 CONCLUÍDA E HOMOLOGADA (Milestones 3A, 3B, 3C, 3D e 3E Concluídos)  

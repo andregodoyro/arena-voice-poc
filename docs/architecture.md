@@ -340,15 +340,38 @@ O serviço de comunicação em tempo real (`frontend/src/services/useSignalR.js`
 
 ## 6. Persistência e Resiliência de Dados (Estratégia da Fase 4)
 
-Conforme estabelecido nas decisões arquiteturais [ADR-016](decision-records/ADR-016-offline-first-persistence-strategy.md) e [ADR-017](decision-records/ADR-017-platform-reliability-over-feature-expansion.md), a plataforma adota o motor **SQLite incorporado em modo WAL** para eliminar a volatilidade da memória RAM mantendo o princípio **Zero Setup / Offline-First**:
+Conforme estabelecido nas decisões arquiteturais [ADR-016](decision-records/ADR-016-offline-first-persistence-strategy.md) e [ADR-017](decision-records/ADR-017-platform-reliability-over-feature-expansion.md), a plataforma adota o **PostgreSQL Portable** (binários portáteis sem instalador, cluster local via `pg_ctl`, driver **Npgsql**) como motor de persistência local, operando em modo **Offline-First** e garantindo Zero Data Loss em eventos presenciais:
+
+```text
+REST API / SignalR Hub
+        │
+        ▼
+   Services Layer  (lógica de negócio — sem conhecimento de BD)
+        │
+        ▼
+  IArenaProjectStore  (contrato imutável)
+        │
+        ▼
+  PostgresArenaProjectStore  (implementação Npgsql)
+        │
+        ▼
+  PostgreSQL Portable  (localhost:5432 — cluster pgdata local)
+```
 
 1. **Padrão de Injeção Transparente:**
-   A camada de aplicação e endpoints continua interagindo exclusivamente com a interface `IArenaProjectStore`. A implementação `SqliteArenaProjectStore` substitui o repositório em memória gravando transacionalmente em `App_Data/arena_voice.db`.
-2. **Schema Relacional Estrito:**
-   Tabelas dedicadas para `Events`, `Projects`, `Judges`, `EventJuryAssignments`, `RoundHistoryEntries`, `ActiveSessionState` e `AuditEvents`, com constraints de integridade referencial e unicidade ativas (`PRAGMA foreign_keys = ON;`).
-3. **Crash Recovery & Sanitização de Inicialização:**
-   Na inicialização, o backend consulta `ActiveSessionState` e reidrata evento ativo, projeto selecionado e banca. Se o sistema sofreu encerramento forçado durante apresentação aberta (`PitchRunning` ou `VotingOpen`), o estágio é sanitizado para `Waiting` com cadeiras físicas neutralizadas para 0°, garantindo segurança contra votos fantasmas pós-queda.
-4. **Trilha de Auditoria Operacional (Audit Trail):**
+   A Minimal API e os hubs SignalR continuam consumindo estritamente a interface `IArenaProjectStore`. A implementação `PostgresArenaProjectStore` (via **Npgsql**) substitui o repositório em memória, mantendo intactos todos os 34 contratos REST e 9 contratos SignalR.
+
+2. **Schema Relacional Estrito e Migrações Versionadas:**
+   Tabelas dedicadas para `Events`, `Projects`, `Judges`, `EventJuryAssignments`, `RoundHistoryEntries`, `ActiveSessionState` e `AuditEvents`, com `FOREIGN KEY`, `CHECK CONSTRAINTS` e índices de unicidade. Migrações aplicadas automaticamente na inicialização via `MigrationRunner`.
+
+3. **Inicialização Assistida e ConnectionLifecycleManager:**
+   Script `start-arena.bat` inicializa o cluster PostgreSQL (`pg_ctl start`) e o backend .NET em sequência. O `ConnectionLifecycleManager` verifica a disponibilidade do banco na subida do backend — se `localhost:5432` estiver indisponível, o processo termina com mensagem de erro clara antes de qualquer operação.
+
+4. **Crash Recovery & Sanitização de Inicialização:**
+   Na inicialização, o backend consulta `ActiveSessionState` e reidrata evento ativo, projeto corrente e banca. Se o sistema sofreu encerramento forçado durante apresentação aberta (`PitchRunning` ou `VotingOpen`), o estágio é sanitizado para `Waiting` com cadeiras físicas neutralizadas para 0°, garantindo segurança contra votos fantasmas pós-queda.
+
+5. **Trilha de Auditoria Operacional (Audit Trail):**
    Tabela append-only `AuditEvents` registrando cada mutação operacional relevante (ativação, transição, pausas, acionamento de voto, backups e recuperações), reidratando o log de atividades do operador (`ActivityLog`) através do endpoint `GET /api/audit-log`.
-5. **Backups a Quente e Snapshots Automáticos:**
-   Endpoint administrativo `POST /api/admin/backup` invocando `VACUUM INTO` do SQLite para cópias consistentes a quente em pendrive, além de snapshot automático acionado a cada `RoundArchived`.
+
+6. **Backups Operacionais via `BackupOrchestrator`:**
+   Endpoint `POST /api/admin/backup` dispara o `BackupOrchestrator`, que executa `pg_dump` em processo separado gerando arquivo comprimido com timestamp. Snapshot automático a cada `RoundArchived`. Procedimento de restauração documentado no runbook operacional da Fase 4.

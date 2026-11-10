@@ -1,4 +1,4 @@
-# Índice Mestre da Documentação — Arena Voice
+﻿# Índice Mestre da Documentação — Arena Voice
 
 > **Status da Plataforma:** Fase 3 Concluída e Homologada (`v0.3.0-phase3`)  
 > **Cobertura Automatizada:** 466 verificações em 9 suítes (100% aprovadas, zero falhas, zero regressões)  

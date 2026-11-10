@@ -1,4 +1,4 @@
-# Arena Voice — Plataforma de Avaliação e Espetáculo de Inovação
+﻿# Arena Voice — Plataforma de Avaliação e Espetáculo de Inovação
 
 > **Status:** Fase 3 Concluída e Homologada (Milestones 3A a 3E) \| 466/466 Testes Aprovados (100% Verde)  
 > **Versão Estável Atual:** `v0.3.0-phase3`  
@@ -171,7 +171,7 @@ O frontend é uma SPA reativa desenvolvida em **React 19**, **Vite** e **Tailwin
 | **Fase 3C** | Pitch Timers, Pause/Resume & Voting Lockout (HTTP 409 Conflict) | ✅ **Concluída e Homologada** |
 | **Fase 3D** | Round History & Result Engine (Approved, Rejected, Inconclusive) | ✅ **Concluída e Homologada** |
 | **Fase 3E** | Judge Catalog & Event Jury Assignment (Banca 1..5, Palco Nominal) | ✅ **Concluída e Homologada** |
-| **Fase 4** | Platform Reliability & Data Resilience (SQLite, Crash Recovery, Audit, Backup) | 📅 **Planejada (Próxima Fase)** |
+| **Fase 4** | Platform Reliability & Data Resilience (PostgreSQL Portable, Crash Recovery, Audit, Backup) | 📅 **Planejada (Próxima Fase)** |
 | **Fase 5** | Live Show Experience & Audio Atmosphere (Áudio Cênico, Web Audio API, Sound FX) | 📅 **Roadmap V2** |
 | **Fase 6** | Awards Ceremony, Ranking & Executive Reports (Pódio 3D, Ata Oficial PDF/CSV) | 📅 **Roadmap V2** |
 | **Fase 7** | Operational Hardening, Contingency & Fleet Telemetry (Bypass no Cockpit, ESP32) | 📅 **Roadmap V2** |

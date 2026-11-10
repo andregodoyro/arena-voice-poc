@@ -876,7 +876,7 @@
     - Fase 7: Operational Hardening & Fleet Management
     - Fase 8: Evaluator Portal & Scorecards (Módulo Satélite)
 
-#### Decisão de Persistência: SQLite com Offline-First (ADR-016)
+#### Decisão de Persistência: SQLite com Offline-First (ADR-016 v1.0 — Posteriormente Revisado para PostgreSQL Portable)
 - **Tecnologia aprovada:** Microsoft.Data.Sqlite (NuGet, embedded, zero-setup).
 - **Modo de operação:** WAL (Write-Ahead Logging) para concorrência leitura/escrita não-bloqueante.
 - **Estratégia:** Offline-First — plataforma 100% operacional sem rede externa; banco local no notebook do operador.
@@ -909,3 +909,20 @@
 - docs/architecture.md — Seção 6 adicionada (Persistência e Resiliência de Dados)
 - docs/archives/milestone-history.md — Tabela Mestra atualizada com Fases 4–8
 - docs/archives/implementation-history.md — Esta entrada de transição
+
+### [2026-11-10] — Rebase de Storage Engine: Adoção Oficial do PostgreSQL Portable (ADR-016 Revisado)
+- **Status:** ✅ Documentado / Decisão Arquitetural Homologada
+- **Contexto:** Validação prática bem-sucedida do PostgreSQL 18.6 Portable no ambiente corporativo (sem instaladores, sem serviços de fundo bloqueados, sem Docker/WSL, sem privilégios administrativos).
+- **Decisão Revisada:** O ADR-016 foi revisado formalmente (v2.0), substituindo o SQLite pelo **PostgreSQL Portable** como o Storage Engine oficial da Fase 4 e da Arena Voice.
+- **Motivações Estratégicas:**
+  - Alinhamento total com as práticas e pilhas de mercado corporativo (ASP.NET Core + Npgsql + PostgreSQL).
+  - Capacidade analítica superior (window functions, CTEs recursivas, JSONB, particionamento) para apoiar os rankings e relatórios da Fase 6 em diante.
+  - Concorrência de leitura e escrita nativa via MVCC (eliminando riscos de locks locais).
+  - Facilidade de transição para nuvem/multi-arena corporativa a longo prazo (apenas alteração de connection string).
+- **Adequação dos Milestones da Fase 4:**
+  - **4A:** Implementação do driver Npgsql e schema relacional no PostgreSQL Portable, com ConnectionLifecycleManager para checagem de porta 5432 na inicialização do backend.
+  - **4B:** PostgresArenaProjectStore implementando a interface IArenaProjectStore com reidratação e sanitização idênticas.
+  - **4C:** AuditEvents append-only no PostgreSQL.
+  - **4D:** BackupOrchestrator gerenciando backups a quente via pg_dump e snapshots automáticos por rodada (ound_N_<timestamp>.pgdump).
+  - **4E:** Suíte de caos testando indisponibilidade de porta, reinicialização rápida e resiliência de cluster.
+- **Garantia Arquitetural:** Zero alterações nos 34 contratos REST e 9 contratos SignalR; a camada de aplicação continua consumindo unicamente IArenaProjectStore.
