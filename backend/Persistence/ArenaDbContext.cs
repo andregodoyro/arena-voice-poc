@@ -16,6 +16,7 @@ public class ArenaDbContext : DbContext
     public DbSet<EventJuryAssignment> EventJuryAssignments => Set<EventJuryAssignment>();
     public DbSet<Round> RoundHistoryEntries => Set<Round>();
     public DbSet<ActiveSessionState> ActiveSessionState => Set<ActiveSessionState>();
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

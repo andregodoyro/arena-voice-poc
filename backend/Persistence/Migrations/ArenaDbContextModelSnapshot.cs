@@ -107,6 +107,139 @@ namespace ArenaVoicePocBackend.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ArenaVoicePocBackend.Domain.Entities.AuditEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ActorId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("actor_id");
+
+                    b.Property<string>("ActorName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("actor_name");
+
+                    b.Property<int>("ActorType")
+                        .HasColumnType("integer")
+                        .HasColumnName("actor_type");
+
+                    b.Property<string>("AfterState")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("after_state");
+
+                    b.Property<string>("AggregateId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("aggregate_id");
+
+                    b.Property<string>("AggregateType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("aggregate_type");
+
+                    b.Property<string>("ArenaEventId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("arena_event_id");
+
+                    b.Property<string>("BeforeState")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("before_state");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text")
+                        .HasColumnName("error_message");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("event_type");
+
+                    b.Property<int>("EventVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("event_version");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("metadata");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValue("{}")
+                        .HasColumnName("payload");
+
+                    b.Property<string>("ProjectId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("RoundId")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("round_id");
+
+                    b.Property<string>("SourceIp")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)")
+                        .HasColumnName("source_ip");
+
+                    b.Property<bool>("Success")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("success");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorType")
+                        .HasDatabaseName("idx_audit_actor_type");
+
+                    b.HasIndex("ArenaEventId")
+                        .HasDatabaseName("idx_audit_arena_event_id");
+
+                    b.HasIndex("EventType")
+                        .HasDatabaseName("idx_audit_event_type");
+
+                    b.HasIndex("OccurredAt")
+                        .HasDatabaseName("idx_audit_occurred_at");
+
+                    b.HasIndex("ProjectId")
+                        .HasDatabaseName("idx_audit_project_id");
+
+                    b.HasIndex("AggregateType", "AggregateId")
+                        .HasDatabaseName("idx_audit_aggregate");
+
+                    b.ToTable("audit_events", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_audit_actor_type", "actor_type BETWEEN 0 AND 5");
+
+                            t.HasCheckConstraint("ck_audit_event_version", "event_version >= 1");
+                        });
+                });
+
             modelBuilder.Entity("ArenaVoicePocBackend.Domain.Entities.Event", b =>
                 {
                     b.Property<string>("Id")
