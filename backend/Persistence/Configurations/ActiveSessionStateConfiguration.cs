@@ -28,6 +28,31 @@ public class ActiveSessionStateConfiguration : IEntityTypeConfiguration<ActiveSe
         builder.Property(s => s.IsPaused).HasColumnName("is_paused").IsRequired();
         builder.Property(s => s.PausedAt).HasColumnName("paused_at");
         builder.Property(s => s.TotalPausedSeconds).HasColumnName("total_paused_seconds").IsRequired();
+
+        // PostgreSQL Array nativo (int[]) para as cadeiras físicas ativas (Milestone 4B)
+        builder.Property(s => s.TurnedChairs)
+            .HasColumnName("turned_chairs")
+            .HasColumnType("int[]")
+            .HasDefaultValue(Array.Empty<int>())
+            .IsRequired();
+
+        // Metadados operacionais de Crash Recovery (Milestone 4B)
+        builder.Property(s => s.RecoveredFromCrash)
+            .HasColumnName("recovered_from_crash")
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Property(s => s.InterruptedStage)
+            .HasColumnName("interrupted_stage")
+            .HasConversion<int?>();
+
+        builder.Property(s => s.RecoveredAt)
+            .HasColumnName("recovered_at");
+
+        // Metadados operacionais de auditoria de checkpoint (Milestone 4B)
+        builder.Property(s => s.LastCheckpointAt)
+            .HasColumnName("last_checkpoint_at");
+
         builder.Property(s => s.LastUpdated).HasColumnName("last_updated").IsRequired();
 
         // Foreign keys opcionais apontando para evento e projeto atuais (ON DELETE SET NULL)

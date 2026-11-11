@@ -44,9 +44,17 @@ namespace ArenaVoicePocBackend.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("current_stage_duration_seconds");
 
+                    b.Property<int?>("InterruptedStage")
+                        .HasColumnType("integer")
+                        .HasColumnName("interrupted_stage");
+
                     b.Property<bool>("IsPaused")
                         .HasColumnType("boolean")
                         .HasColumnName("is_paused");
+
+                    b.Property<DateTimeOffset?>("LastCheckpointAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_checkpoint_at");
 
                     b.Property<DateTimeOffset>("LastUpdated")
                         .HasColumnType("timestamp with time zone")
@@ -64,9 +72,26 @@ namespace ArenaVoicePocBackend.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("pitch_stage_started_at");
 
+                    b.Property<DateTimeOffset?>("RecoveredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recovered_at");
+
+                    b.Property<bool>("RecoveredFromCrash")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("recovered_from_crash");
+
                     b.Property<double>("TotalPausedSeconds")
                         .HasColumnType("double precision")
                         .HasColumnName("total_paused_seconds");
+
+                    b.PrimitiveCollection<int[]>("TurnedChairs")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int[]")
+                        .HasDefaultValue(new int[0])
+                        .HasColumnName("turned_chairs");
 
                     b.HasKey("SingletonId");
 
@@ -411,7 +436,7 @@ namespace ArenaVoicePocBackend.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_round_last_stage", "last_stage_reached BETWEEN 0 AND 5");
 
-                            t.HasCheckConstraint("ck_round_result", "result BETWEEN 0 AND 2");
+                            t.HasCheckConstraint("ck_round_result", "result BETWEEN 0 AND 3");
                         });
                 });
 
