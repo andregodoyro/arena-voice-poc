@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using ArenaVoicePocBackend.Domain;
 using ArenaVoicePocBackend.Domain.DTOs;
 using ArenaVoicePocBackend.Domain.Entities;
 using ArenaVoicePocBackend.Domain.Enums;
@@ -10,6 +11,7 @@ namespace ArenaVoicePocBackend.Services;
 public class PostgresArenaProjectStore : IArenaProjectStore
 {
     private readonly IDbContextFactory<ArenaDbContext> _contextFactory;
+    private readonly IAuditEventPublisher? _auditPublisher;
     private readonly object _contextLock = new();
     private readonly object _dbPersistenceLock = new();
 
@@ -45,9 +47,12 @@ public class PostgresArenaProjectStore : IArenaProjectStore
     private bool _hasReachedVoting = false;
     private DateTimeOffset? _currentRoundStartedAt = DateTimeOffset.UtcNow;
 
-    public PostgresArenaProjectStore(IDbContextFactory<ArenaDbContext> contextFactory)
+    public PostgresArenaProjectStore(
+        IDbContextFactory<ArenaDbContext> contextFactory,
+        IAuditEventPublisher? auditPublisher = null)
     {
         _contextFactory = contextFactory;
+        _auditPublisher = auditPublisher;
         InitializeAndSeedDatabase();
         RehydrateSessionState();
     }
@@ -137,6 +142,24 @@ public class PostgresArenaProjectStore : IArenaProjectStore
             {
                 _lastCheckpointAt = now;
             }
+
+            // Publica evento de auditoria de snapshot / checkpoint operacional (Milestone 4C.3)
+            _auditPublisher?.Publish(new AuditEventRecord(
+                EventType: "RecoveryCheckpointCreated",
+                AggregateType: "Session",
+                AggregateId: snapshot.SingletonId.ToString(),
+                ActorType: ActorType.System,
+                ArenaEventId: snapshot.CurrentEventId,
+                ProjectId: snapshot.CurrentProjectId,
+                Payload: new
+                {
+                    lastCheckpointAt = now,
+                    stage = snapshot.PitchStage.ToString(),
+                    isPaused = snapshot.IsPaused,
+                    turnedChairs = snapshot.TurnedChairs
+                },
+                EventVersion: 1
+            ));
         }
     }
 
@@ -631,6 +654,19 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         }
 
         PersistSnapshot(snapshot);
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "ActiveSessionUpdated",
+            AggregateType: "Session",
+            AggregateId: "singleton-1",
+            ActorType: ActorType.Operator,
+            ArenaEventId: eventId,
+            ProjectId: _currentProjectId,
+            Payload: new { currentEventId = eventId, currentProjectId = _currentProjectId },
+            AfterState: new { eventId = eventId, projectId = _currentProjectId },
+            EventVersion: 1
+        ));
+
         return true;
     }
 
@@ -646,6 +682,18 @@ public class PostgresArenaProjectStore : IArenaProjectStore
                 nullSnapshot = CreateSnapshotUnderLock();
             }
             PersistSnapshot(nullSnapshot);
+
+            _auditPublisher?.Publish(new AuditEventRecord(
+                EventType: "ActiveSessionUpdated",
+                AggregateType: "Session",
+                AggregateId: "singleton-1",
+                ActorType: ActorType.Operator,
+                ArenaEventId: _currentEventId,
+                ProjectId: null,
+                Payload: new { currentEventId = _currentEventId, currentProjectId = (string?)null },
+                EventVersion: 1
+            ));
+
             return true;
         }
 
@@ -663,6 +711,31 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         }
 
         PersistSnapshot(snapshot);
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "ActiveSessionUpdated",
+            AggregateType: "Session",
+            AggregateId: "singleton-1",
+            ActorType: ActorType.Operator,
+            ArenaEventId: _currentEventId,
+            ProjectId: projectId,
+            Payload: new { currentEventId = _currentEventId, currentProjectId = projectId },
+            AfterState: new { eventId = _currentEventId, projectId = projectId },
+            EventVersion: 1
+        ));
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "ProjectActivated",
+            AggregateType: "Project",
+            AggregateId: projectId,
+            ArenaEventId: _currentEventId,
+            ProjectId: projectId,
+            ActorType: ActorType.Operator,
+            Payload: new { projectId = projectId, title = proj.Title },
+            AfterState: new { status = "Current" },
+            EventVersion: 1
+        ));
+
         return true;
     }
 
@@ -725,6 +798,46 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         }
 
         PersistSnapshot(snapshot);
+
+        if (previousProj != null && previousProj.Id != projectId)
+        {
+            _auditPublisher?.Publish(new AuditEventRecord(
+                EventType: "ProjectCompleted",
+                AggregateType: "Project",
+                AggregateId: previousProj.Id,
+                ArenaEventId: _currentEventId,
+                ProjectId: previousProj.Id,
+                ActorType: ActorType.System,
+                Payload: new { projectId = previousProj.Id, title = previousProj.Title, reason = "Mudança de Projeto no Palco" },
+                BeforeState: new { status = "Current" },
+                AfterState: new { status = "Completed" },
+                EventVersion: 1
+            ));
+        }
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "ProjectActivated",
+            AggregateType: "Project",
+            AggregateId: projectId,
+            ArenaEventId: _currentEventId,
+            ProjectId: projectId,
+            ActorType: ActorType.Operator,
+            Payload: new { projectId = projectId, title = newProj.Title, previousProjectId = previousProj?.Id },
+            AfterState: new { status = "Current" },
+            EventVersion: 1
+        ));
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "ActiveSessionUpdated",
+            AggregateType: "Session",
+            AggregateId: "singleton-1",
+            ActorType: ActorType.Operator,
+            ArenaEventId: _currentEventId,
+            ProjectId: projectId,
+            Payload: new { currentEventId = _currentEventId, currentProjectId = projectId, stage = "Waiting" },
+            EventVersion: 1
+        ));
+
         return new SelectProjectResult(true, newProj, previousProj, null, archivedRound);
     }
 
@@ -758,6 +871,18 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         evt.UpdatedAt = DateTimeOffset.UtcNow;
         context.Events.Add(evt);
         context.SaveChanges();
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "EventCreated",
+            AggregateType: "Event",
+            AggregateId: evt.Id,
+            ArenaEventId: evt.Id,
+            ActorType: ActorType.Operator,
+            Payload: new { title = evt.Title, status = evt.Status.ToString(), scheduledDate = evt.ScheduledDate },
+            AfterState: new { status = evt.Status.ToString() },
+            EventVersion: 1
+        ));
+
         return evt;
     }
 
@@ -766,6 +891,8 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         using var context = _contextFactory.CreateDbContext();
         var existing = context.Events.FirstOrDefault(e => e.Id == evt.Id);
         if (existing == null) return false;
+
+        var beforeState = new { title = existing.Title, status = existing.Status.ToString() };
 
         existing.Title = evt.Title;
         existing.Description = evt.Description;
@@ -776,6 +903,19 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
         context.SaveChanges();
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "EventUpdated",
+            AggregateType: "Event",
+            AggregateId: evt.Id,
+            ArenaEventId: evt.Id,
+            ActorType: ActorType.Operator,
+            Payload: new { title = evt.Title, status = evt.Status.ToString() },
+            BeforeState: beforeState,
+            AfterState: new { title = evt.Title, status = evt.Status.ToString() },
+            EventVersion: 1
+        ));
+
         return true;
     }
 
@@ -790,8 +930,22 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         var existing = context.Events.FirstOrDefault(e => e.Id == eventId);
         if (existing == null) return false;
 
+        var beforeState = new { title = existing.Title, status = existing.Status.ToString() };
+
         context.Events.Remove(existing);
         context.SaveChanges();
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "EventDeleted",
+            AggregateType: "Event",
+            AggregateId: eventId,
+            ArenaEventId: eventId,
+            ActorType: ActorType.Operator,
+            Payload: new { title = existing.Title },
+            BeforeState: beforeState,
+            EventVersion: 1
+        ));
+
         return true;
     }
 
@@ -845,6 +999,30 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         }
 
         PersistSnapshot(snapshot);
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "EventActivated",
+            AggregateType: "Event",
+            AggregateId: targetEvent.Id,
+            ArenaEventId: targetEvent.Id,
+            ActorType: ActorType.Operator,
+            Payload: new { eventId = targetEvent.Id, title = targetEvent.Title, previousEventId = previousActiveEvent?.Id },
+            BeforeState: new { activeEventId = previousActiveEvent?.Id },
+            AfterState: new { activeEventId = targetEvent.Id },
+            EventVersion: 1
+        ));
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "ActiveSessionUpdated",
+            AggregateType: "Session",
+            AggregateId: "singleton-1",
+            ActorType: ActorType.Operator,
+            ArenaEventId: targetEvent.Id,
+            ProjectId: _currentProjectId,
+            Payload: new { currentEventId = targetEvent.Id, currentProjectId = _currentProjectId, stage = "Waiting" },
+            EventVersion: 1
+        ));
+
         return new ActivateEventResult(true, targetEvent, previousActiveEvent);
     }
 
@@ -881,6 +1059,17 @@ public class PostgresArenaProjectStore : IArenaProjectStore
             PersistSnapshot(snapshotToPersist);
         }
 
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "EventUpdated",
+            AggregateType: "Event",
+            AggregateId: eventId,
+            ArenaEventId: eventId,
+            ActorType: ActorType.Operator,
+            Payload: new { title = target.Title, status = "Finished" },
+            AfterState: new { status = "Finished" },
+            EventVersion: 1
+        ));
+
         return target;
     }
 
@@ -904,6 +1093,18 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         target.Status = EventStatus.Archived;
         target.UpdatedAt = DateTimeOffset.UtcNow;
         context.SaveChanges();
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "EventArchived",
+            AggregateType: "Event",
+            AggregateId: eventId,
+            ArenaEventId: eventId,
+            ActorType: ActorType.Operator,
+            Payload: new { title = target.Title },
+            BeforeState: new { status = "Finished" },
+            AfterState: new { status = "Archived" },
+            EventVersion: 1
+        ));
 
         return new ArchiveEventResult(true, target, false);
     }
@@ -951,6 +1152,18 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         }
 
         context.SaveChanges();
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "EventCreated",
+            AggregateType: "Event",
+            AggregateId: newEvent.Id,
+            ArenaEventId: newEvent.Id,
+            ActorType: ActorType.Operator,
+            Payload: new { title = newEvent.Title, status = newEvent.Status.ToString(), sourceEventId = eventId },
+            AfterState: new { status = newEvent.Status.ToString() },
+            EventVersion: 1
+        ));
+
         return newEvent;
     }
 
@@ -983,6 +1196,19 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         project.UpdatedAt = DateTimeOffset.UtcNow;
         context.Projects.Add(project);
         context.SaveChanges();
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "ProjectCreated",
+            AggregateType: "Project",
+            AggregateId: project.Id,
+            ArenaEventId: project.EventId,
+            ProjectId: project.Id,
+            ActorType: ActorType.Operator,
+            Payload: new { title = project.Title, track = project.Track, pitchLeader = project.PitchLeader, eventId = project.EventId },
+            AfterState: new { status = project.Status.ToString() },
+            EventVersion: 1
+        ));
+
         return project;
     }
 
@@ -991,6 +1217,8 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         using var context = _contextFactory.CreateDbContext();
         var existing = context.Projects.FirstOrDefault(p => p.Id == project.Id);
         if (existing == null) return false;
+
+        var beforeState = new { title = existing.Title, status = existing.Status.ToString() };
 
         existing.Title = project.Title;
         existing.PitchLeader = project.PitchLeader;
@@ -1002,6 +1230,20 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
         context.SaveChanges();
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "ProjectUpdated",
+            AggregateType: "Project",
+            AggregateId: project.Id,
+            ArenaEventId: project.EventId,
+            ProjectId: project.Id,
+            ActorType: ActorType.Operator,
+            Payload: new { title = project.Title, track = project.Track, pitchLeader = project.PitchLeader, status = project.Status.ToString() },
+            BeforeState: beforeState,
+            AfterState: new { title = project.Title, status = project.Status.ToString() },
+            EventVersion: 1
+        ));
+
         return true;
     }
 
@@ -1022,8 +1264,22 @@ public class PostgresArenaProjectStore : IArenaProjectStore
             return new DeleteProjectResult(false, false, true);
         }
 
+        var beforeState = new { title = existing.Title, eventId = existing.EventId, status = existing.Status.ToString() };
         context.Projects.Remove(existing);
         context.SaveChanges();
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "ProjectDeleted",
+            AggregateType: "Project",
+            AggregateId: projectId,
+            ArenaEventId: existing.EventId,
+            ProjectId: projectId,
+            ActorType: ActorType.Operator,
+            Payload: new { title = existing.Title, eventId = existing.EventId },
+            BeforeState: beforeState,
+            EventVersion: 1
+        ));
+
         return new DeleteProjectResult(true, false, false);
     }
 
@@ -1108,6 +1364,17 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         judge.UpdatedAt = DateTimeOffset.UtcNow;
         context.SaveChanges();
 
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "JudgeUnassigned",
+            AggregateType: "Judge",
+            AggregateId: judgeId,
+            ActorType: ActorType.Operator,
+            Payload: new { judgeId = judgeId, name = judge.Name, reason = "Deactivated" },
+            BeforeState: new { isActive = true },
+            AfterState: new { isActive = false },
+            EventVersion: 1
+        ));
+
         return new DeleteJudgeResult(true, false, false);
     }
 
@@ -1169,6 +1436,35 @@ public class PostgresArenaProjectStore : IArenaProjectStore
 
         context.EventJuryAssignments.AddRange(newAssignments);
         context.SaveChanges();
+
+        if (previousAssignments.Count > 0)
+        {
+            _auditPublisher?.Publish(new AuditEventRecord(
+                EventType: "JudgeUnassigned",
+                AggregateType: "Jury",
+                AggregateId: eventId,
+                ArenaEventId: eventId,
+                ActorType: ActorType.Operator,
+                Payload: new { eventId = eventId, unassignedCount = previousAssignments.Count },
+                EventVersion: 1
+            ));
+        }
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "JudgeAssigned",
+            AggregateType: "Jury",
+            AggregateId: eventId,
+            ArenaEventId: eventId,
+            ActorType: ActorType.Operator,
+            Payload: new
+            {
+                eventId = eventId,
+                assignedCount = newAssignments.Count,
+                assignments = assignments.Select(a => new { chairId = a.ChairId, judgeId = a.JudgeId }).ToArray()
+            },
+            AfterState: new { assignedCount = newAssignments.Count },
+            EventVersion: 1
+        ));
 
         var hydrated = context.EventJuryAssignments
             .Include(a => a.Judge)
@@ -1428,6 +1724,69 @@ public class PostgresArenaProjectStore : IArenaProjectStore
             PersistSnapshot(snapshotToPersist);
         }
 
+        // Instrumentação do ciclo de vida do Pitch (Milestone 4C.3)
+        if (_pitchStage == PitchStage.PitchRunning)
+        {
+            _auditPublisher?.Publish(new AuditEventRecord(
+                EventType: "PitchStarted",
+                AggregateType: "Pitch",
+                AggregateId: _currentProjectId ?? "session",
+                ArenaEventId: _currentEventId,
+                ProjectId: _currentProjectId,
+                ActorType: ActorType.Operator,
+                Payload: new { stage = "PitchRunning", durationSeconds = _stageDurationSeconds, previousStage = previousStage.ToString() },
+                BeforeState: new { stage = previousStage.ToString() },
+                AfterState: new { stage = "PitchRunning" },
+                EventVersion: 1
+            ));
+        }
+        else if (_pitchStage == PitchStage.Finished)
+        {
+            _auditPublisher?.Publish(new AuditEventRecord(
+                EventType: "PitchCompleted",
+                AggregateType: "Pitch",
+                AggregateId: _currentProjectId ?? "session",
+                ArenaEventId: _currentEventId,
+                ProjectId: _currentProjectId,
+                ActorType: ActorType.Operator,
+                Payload: new { stage = "Finished", previousStage = previousStage.ToString(), roundArchived = (archivedRound != null) },
+                BeforeState: new { stage = previousStage.ToString() },
+                AfterState: new { stage = "Finished" },
+                EventVersion: 1
+            ));
+
+            if (!string.IsNullOrEmpty(_currentProjectId))
+            {
+                _auditPublisher?.Publish(new AuditEventRecord(
+                    EventType: "ProjectCompleted",
+                    AggregateType: "Project",
+                    AggregateId: _currentProjectId,
+                    ArenaEventId: _currentEventId,
+                    ProjectId: _currentProjectId,
+                    ActorType: ActorType.System,
+                    Payload: new { projectId = _currentProjectId, completedAt = DateTimeOffset.UtcNow },
+                    BeforeState: new { status = "Current" },
+                    AfterState: new { status = "Completed" },
+                    EventVersion: 1
+                ));
+            }
+        }
+        else
+        {
+            _auditPublisher?.Publish(new AuditEventRecord(
+                EventType: "PitchTransitioned",
+                AggregateType: "Pitch",
+                AggregateId: _currentProjectId ?? "session",
+                ArenaEventId: _currentEventId,
+                ProjectId: _currentProjectId,
+                ActorType: ActorType.Operator,
+                Payload: new { from = previousStage.ToString(), to = _pitchStage.ToString(), durationSeconds = _stageDurationSeconds },
+                BeforeState: new { stage = previousStage.ToString() },
+                AfterState: new { stage = _pitchStage.ToString() },
+                EventVersion: 1
+            ));
+        }
+
         return new PitchTransitionResult(true, previousStage, _pitchStage, _pitchStageStartedAt, null, ArchivedRound: archivedRound);
     }
 
@@ -1460,6 +1819,19 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         }
 
         PersistSnapshot(snapshot);
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "ActiveSessionUpdated",
+            AggregateType: "Session",
+            AggregateId: "singleton-1",
+            ArenaEventId: _currentEventId,
+            ProjectId: _currentProjectId,
+            ActorType: ActorType.Operator,
+            Payload: new { action = "ResetPitch", stage = "Waiting", projectId = _currentProjectId },
+            AfterState: new { stage = "Waiting" },
+            EventVersion: 1
+        ));
+
         return result;
     }
 
@@ -1490,6 +1862,24 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         if (snapshotToPersist != null)
         {
             PersistSnapshot(snapshotToPersist);
+
+            _auditPublisher?.Publish(new AuditEventRecord(
+                EventType: "PitchPaused",
+                AggregateType: "Pitch",
+                AggregateId: _currentProjectId ?? "session",
+                ArenaEventId: _currentEventId,
+                ProjectId: _currentProjectId,
+                ActorType: ActorType.Operator,
+                Payload: new
+                {
+                    stage = _pitchStage.ToString(),
+                    remainingSeconds = result.RemainingSeconds,
+                    pausedAt = _timerPausedAt
+                },
+                BeforeState: new { paused = false },
+                AfterState: new { paused = true },
+                EventVersion: 1
+            ));
         }
 
         return result;
@@ -1499,6 +1889,7 @@ public class PostgresArenaProjectStore : IArenaProjectStore
     {
         ActiveSessionSnapshot? snapshotToPersist = null;
         PitchTimerActionResult result;
+        double pauseDuration = 0.0;
 
         lock (_contextLock)
         {
@@ -1507,7 +1898,7 @@ public class PostgresArenaProjectStore : IArenaProjectStore
                 return new PitchTimerActionResult(true, false, null, CalculateRemainingSeconds(), _stageDurationSeconds);
             }
 
-            var pauseDuration = (DateTimeOffset.UtcNow - _timerPausedAt.Value).TotalSeconds;
+            pauseDuration = (DateTimeOffset.UtcNow - _timerPausedAt.Value).TotalSeconds;
             _totalPausedSeconds += Math.Max(0, pauseDuration);
             _isTimerPaused = false;
             _timerPausedAt = null;
@@ -1520,6 +1911,24 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         if (snapshotToPersist != null)
         {
             PersistSnapshot(snapshotToPersist);
+
+            _auditPublisher?.Publish(new AuditEventRecord(
+                EventType: "PitchResumed",
+                AggregateType: "Pitch",
+                AggregateId: _currentProjectId ?? "session",
+                ArenaEventId: _currentEventId,
+                ProjectId: _currentProjectId,
+                ActorType: ActorType.Operator,
+                Payload: new
+                {
+                    stage = _pitchStage.ToString(),
+                    remainingSeconds = result.RemainingSeconds,
+                    pauseDurationSeconds = Math.Round(pauseDuration, 2)
+                },
+                BeforeState: new { paused = true },
+                AfterState: new { paused = false },
+                EventVersion: 1
+            ));
         }
 
         return result;
@@ -1540,6 +1949,21 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         }
 
         PersistSnapshot(snapshot);
+
+        if (result.RemainingSeconds <= 0 && _stageDurationSeconds > 0)
+        {
+            _auditPublisher?.Publish(new AuditEventRecord(
+                EventType: "PitchExpired",
+                AggregateType: "Pitch",
+                AggregateId: _currentProjectId ?? "session",
+                ArenaEventId: _currentEventId,
+                ProjectId: _currentProjectId,
+                ActorType: ActorType.Operator,
+                Payload: new { stage = _pitchStage.ToString(), deltaSeconds = addSeconds, remainingSeconds = result.RemainingSeconds },
+                EventVersion: 1
+            ));
+        }
+
         return result;
     }
 
@@ -1625,6 +2049,36 @@ public class PostgresArenaProjectStore : IArenaProjectStore
             PersistSnapshot(snapshotToPersist);
         }
 
+        if (result.Success)
+        {
+            var actorType = (source ?? "").ToLowerInvariant() switch
+            {
+                var s when s.Contains("esp32") => ActorType.ESP32,
+                var s when s.Contains("voicestudio") => ActorType.VoiceStudio,
+                _ => ActorType.Operator
+            };
+
+            _auditPublisher?.Publish(new AuditEventRecord(
+                EventType: "ChairPressed",
+                AggregateType: "Chair",
+                AggregateId: chairId.ToString(),
+                ArenaEventId: _currentEventId,
+                ProjectId: _currentProjectId,
+                ActorType: actorType,
+                ActorName: actorType == ActorType.ESP32 ? $"ESP32 Chair {chairId}" : (actorType == ActorType.VoiceStudio ? "VoiceStudio Panel" : "Operator"),
+                Payload: new
+                {
+                    chairId = chairId,
+                    source = source,
+                    activeCount = result.ActiveCount,
+                    stage = _pitchStage.ToString()
+                },
+                BeforeState: new { turned = false },
+                AfterState: new { turned = true },
+                EventVersion: 1
+            ));
+        }
+
         return result;
     }
 
@@ -1640,13 +2094,28 @@ public class PostgresArenaProjectStore : IArenaProjectStore
     public void ResetChairs()
     {
         ActiveSessionSnapshot snapshot;
+        int activeBefore = 0;
         lock (_contextLock)
         {
+            activeBefore = GetActiveChairCount();
             ResetChairsInternal();
             snapshot = CreateSnapshotUnderLock();
         }
 
         PersistSnapshot(snapshot);
+
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "ChairReset",
+            AggregateType: "Chair",
+            AggregateId: "all",
+            ArenaEventId: _currentEventId,
+            ProjectId: _currentProjectId,
+            ActorType: ActorType.Operator,
+            Payload: new { resetCount = 5, activeBefore = activeBefore },
+            BeforeState: new { activeCount = activeBefore },
+            AfterState: new { activeCount = 0 },
+            EventVersion: 1
+        ));
     }
 
     public IReadOnlyDictionary<int, bool> GetChairStates() => _chairStates;
