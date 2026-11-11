@@ -1,8 +1,8 @@
-﻿# Arquitetura — Arena Voice
+# Arquitetura — Arena Voice
 
-> **Status:** Fase 1, Fase 2 e Fase 3 Concluídas e Homologadas (`v0.3.0-phase3`)  
+> **Status:** Fases 1 a 3 e Milestones 4A/4B Concluídos e Homologados (`v0.4.1-phase4b`)  
 > **Referência de Produto:** [Roadmap Oficial e Arquitetura de Produto (docs/roadmap.md)](roadmap.md)  
-> **Cobertura Automatizada:** 497 verificações em 10 suítes de testes automatizados (100% de aprovação, zero falhas, zero regressões).
+> **Cobertura Automatizada:** 530 verificações em 11 suítes de testes automatizados (100% de aprovação, zero falhas, zero regressões).
 
 ---
 
@@ -338,40 +338,40 @@ O serviço de comunicação em tempo real (`frontend/src/services/useSignalR.js`
 
 ---
 
-## 6. Persistência e Resiliência de Dados (Estratégia da Fase 4)
+## 6. Persistência, Hot-Cache e Resiliência Operacional (Fase 4 Homologada)
 
-Conforme estabelecido nas decisões arquiteturais [ADR-016](decision-records/ADR-016-offline-first-persistence-strategy.md) e [ADR-017](decision-records/ADR-017-platform-reliability-over-feature-expansion.md), a plataforma adota o **PostgreSQL Portable** (binários portáteis sem instalador, cluster local via `pg_ctl`, driver **Npgsql**) como motor de persistência local, operando em modo **Offline-First** e garantindo Zero Data Loss em eventos presenciais:
+Conforme estabelecido nas decisões arquiteturais [ADR-016](decision-records/ADR-016-offline-first-persistence-strategy.md), [ADR-018](decision-records/ADR-018-efcore10-npgsql-migrations-portable.md), [ADR-019](decision-records/ADR-019-dbcontext-factory-hybrid-store.md), [ADR-020](decision-records/ADR-020-snapshot-pattern-and-lock-separation.md) e [ADR-021](decision-records/ADR-021-crash-recovery-and-rehydration-strategy.md), a plataforma adota o **PostgreSQL Portable 18.6** com **EF Core 10** e **Npgsql 10** como motor de persistência relacional local ACID, combinando **Hot Cache em RAM** com o **Snapshot Pattern** para garantir latência ultra-baixa e recuperação total pós-falha.
 
 ```text
-REST API / SignalR Hub
-        │
-        ▼
-   Services Layer  (lógica de negócio — sem conhecimento de BD)
-        │
-        ▼
-  IArenaProjectStore  (contrato imutável)
-        │
-        ▼
-  PostgresArenaProjectStore  (implementação Npgsql)
-        │
-        ▼
-  PostgreSQL Portable  (localhost:5432 — cluster pgdata local)
+REST API / SignalR Hub / ESP32 Hardware
+             │
+             ▼
+    lock (_contextLock)  <--- Mutação imediata do Hot Cache em RAM (< 0.1ms)
+             │
+             ├── Cria ActiveSessionSnapshot (record imutável)
+             └── Libera _contextLock (Zero contenção para leituras)
+             │
+             ▼
+    lock (_dbPersistenceLock)  <--- Persistência fora da região crítica de memória
+             │
+             ▼
+    IDbContextFactory<ArenaDbContext>
+             │
+             ▼
+    PostgreSQL Portable 18.6 (localhost:5432 — active_session_state, events, projects, ...)
 ```
 
-1. **Padrão de Injeção Transparente:**
-   A Minimal API e os hubs SignalR continuam consumindo estritamente a interface `IArenaProjectStore`. A implementação `PostgresArenaProjectStore` (via **Npgsql**) substitui o repositório em memória, mantendo intactos todos os 34 contratos REST e 9 contratos SignalR.
+### 6.1. Hot Cache & Lock Separation
+- **`_contextLock`:** Exclusão mútua de altíssima velocidade em memória RAM para leitura e mutação das variáveis de palco (`_chairStates`, `_pitchStage`, timers, startup ativa). Nenhuma chamada de banco de dados ou I/O de rede é executada sob este lock.
+- **`_dbPersistenceLock`:** Sincroniza a persistência relacional de snapshots imutáveis (`ActiveSessionSnapshot`) sem concorrer com o loop de eventos ou travar a Minimal API.
 
-2. **Schema Relacional Estrito e Migrações Versionadas:**
-   Tabelas dedicadas para `Events`, `Projects`, `Judges`, `EventJuryAssignments`, `RoundHistoryEntries`, `ActiveSessionState` e `AuditEvents`, com `FOREIGN KEY`, `CHECK CONSTRAINTS` e índices de unicidade. Migrações aplicadas automaticamente na inicialização via `MigrationRunner`.
+### 6.2. Persistência de Cadeiras Físicas (`turned_chairs int[]`)
+O acionamento das 5 cadeiras físicas pelos jurados é persistido de forma atômica utilizando o tipo nativo PostgreSQL `int[]` na tupla singleton de `active_session_state`. Em caso de reboot ou crash, o estado das cadeiras é restaurado com exatidão (`[1, 3, 4]`).
 
-3. **Inicialização Assistida e ConnectionLifecycleManager:**
-   Script `start-arena.bat` inicializa o cluster PostgreSQL (`pg_ctl start`) e o backend .NET em sequência. O `ConnectionLifecycleManager` verifica a disponibilidade do banco na subida do backend — se `localhost:5432` estiver indisponível, o processo termina com mensagem de erro clara antes de qualquer operação.
-
-4. **Crash Recovery & Sanitização de Inicialização:**
-   Na inicialização, o backend consulta `ActiveSessionState` e reidrata evento ativo, projeto corrente e banca. Se o sistema sofreu encerramento forçado durante apresentação aberta (`PitchRunning` ou `VotingOpen`), o estágio é sanitizado para `Waiting` com cadeiras físicas neutralizadas para 0°, garantindo segurança contra votos fantasmas pós-queda.
-
-5. **Trilha de Auditoria Operacional (Audit Trail):**
-   Tabela append-only `AuditEvents` registrando cada mutação operacional relevante (ativação, transição, pausas, acionamento de voto, backups e recuperações), reidratando o log de atividades do operador (`ActivityLog`) através do endpoint `GET /api/audit-log`.
-
-6. **Backups Operacionais via `BackupOrchestrator`:**
-   Endpoint `POST /api/admin/backup` dispara o `BackupOrchestrator`, que executa `pg_dump` em processo separado gerando arquivo comprimido com timestamp. Snapshot automático a cada `RoundArchived`. Procedimento de restauração documentado no runbook operacional da Fase 4.
+### 6.3. Crash Recovery Engine & Paused Recovery Strategy
+Na inicialização do backend em `RehydrateSessionState()`:
+1. **Detecção de Sessão Interrompida:** Se o estágio persistido for ativo (`PitchRunning`, `QA`, `VotingOpen`) e `IsPaused == false`, o sistema identifica que ocorreu uma queda anômala.
+2. **Estratégia Paused Recovery:** O sistema **NÃO descarta o pitch para Waiting**. O estágio original é preservado, as cadeiras viradas são restauradas e o cronômetro é forçado para o estado **`Paused`**.
+3. **Preservação Temporal no Checkpoint:** O tempo restante é congelado exatamente no ponto registrado no último snapshot válido (`LastCheckpointAt`), garantindo que o cronômetro não continue correndo durante a indisponibilidade física do servidor.
+4. **Decisão Soberana do Operador:** O operador na mesa técnica decide entre **Retomar (`POST /api/pitch/timer/resume`)** ou **Reiniciar (`POST /api/pitch/reset`)**, conferindo total previsibilidade e governança à produção do evento.
+5. **Metadados de Diagnóstico:** Flags `RecoveredFromCrash`, `InterruptedStage`, `RecoveredAt` e `LastCheckpointAt` são expostas nos DTOs para auditoria.

@@ -1,8 +1,8 @@
-﻿# Arena Voice — Plataforma de Avaliação e Espetáculo de Inovação
+# Arena Voice — Plataforma de Avaliação e Espetáculo de Inovação
 
-> **Status:** Fases 1 a 3 e Milestone 4A Concluídos e Homologados \| 497/497 Testes Aprovados (100% Verde)  
-> **Versão Estável Atual:** `v0.4.0-phase4a`  
-> **Objetivo:** Plataforma completa para condução de bancas avaliadoras, pitch days e demo days corporativos com dinamismo cênico em tempo real, backend autoritativo, telão 3D procedural e cockpit operacional da mesa técnica.
+> **Status:** Fases 1 a 3 e Milestones 4A/4B Concluídos e Homologados \| 530/530 Testes Aprovados (100% Verde)  
+> **Versão Estável Atual:** `v0.4.1-phase4b`  
+> **Objetivo:** Plataforma completa para condução de bancas avaliadoras, pitch days e demo days corporativos com dinamismo cênico em tempo real, backend autoritativo, telão 3D procedural, cockpit operacional da mesa técnica e persistência relacional resiliente com recuperação automática pós-crash.
 
 ---
 

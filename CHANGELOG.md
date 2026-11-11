@@ -5,6 +5,34 @@ O formato baseia-se em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0
 
 ---
 
+## [0.4.1-phase4b] - 2026-11-11
+### Conclusão Oficial do Milestone 4B: State Persistence & Session Re-hydration
+
+#### Adicionado
+- **ActiveSessionState Evolution**: Adição das propriedades `TurnedChairs` (`int[]`), `RecoveredFromCrash` (`bool`), `InterruptedStage` (`PitchStage?`), `RecoveredAt` (`DateTimeOffset?`) e `LastCheckpointAt` (`DateTimeOffset?`) na entidade singleton relacional.
+- **Persistência das Cadeiras Físicas**: Mapeamento do array nativo PostgreSQL `turned_chairs int[]` para armazenamento íntegro do estado das 5 cadeiras acionadas pelos jurados.
+- **Migration `AddChairsAndRecoveryToActiveSessionState`**: Nova migration EF Core versionada gerada e aplicada com sucesso.
+- **ActiveSessionSnapshot**: Record imutável C# para representação atômica do estado ativo da arena sem contenção de lock.
+- **Snapshot Pattern & Lock Separation**:
+  - `_contextLock`: lock em memória ultrarrápido (< 0.1ms) protegendo o Hot Cache em RAM.
+  - `_dbPersistenceLock`: lock secundário dedicado à persistência de snapshots no PostgreSQL fora da região crítica de memória.
+- **Rehydration Engine**: Motor de recomposição de contexto no boot da aplicação restaurando evento ativo, projeto ativo, estágio da máquina de estados, timers e cadeiras viradas.
+- **Crash Recovery Engine**: Detecção inteligente de quedas anômalas durante pitches em andamento (`PitchRunning`, `QA`, `VotingOpen`) e aplicação da estratégia **Paused Recovery**:
+  - Força `isPaused = true`;
+  - Congela tempo restante exatamente no ponto do último checkpoint consistente (`LastCheckpointAt`);
+  - Registra metadados oficiais de recuperação (`RecoveredFromCrash = true`, `InterruptedStage`, `RecoveredAt`);
+  - Delega a decisão de retomada (*Resume*) ou reinício (*Reset*) com governança soberana ao operador na mesa técnica.
+- **LastCheckpointAt Metadata**: Carimbo de data/hora gravado no PostgreSQL a cada transição ou intervenção operacional, eliminando a necessidade de I/O contínuo por segundo.
+- **Extensão Retrocompatível de `PitchStateDto`**: Novos campos de recuperação expostos com valores padrão trailing (`RecoveredFromCrash`, `InterruptedStage`, `RecoveredAt`, `LastCheckpointAt`), sem quebrar nenhum dos 34 endpoints REST ou clientes frontend.
+- **Suíte de Testes de Crash Recovery (`tests/test-crash-rehydration.cjs`)**: 7 cenários fim a fim simulando shutdowns forçados do processo (`taskkill /F`) e validando reidratação com 33 testes verdes.
+- **Orquestrador Central de Regressão (`tests/run-regression-suite.cjs`)**: Runner automatizado para execução sequencial das 11 suítes de testes com relatório analítico de métricas.
+
+#### Validação e Confiabilidade
+- **11/11 Suítes Automatizadas Aprovadas** (530/530 testes verdes, 0 falhas, 0 regressões).
+- **Sobrevivência Operacional Comprovada**: Prova prática de restauração de contexto, cadeiras e cronômetro congelado pós-queda forçada.
+
+---
+
 ## [0.4.0-phase4a] - 2026-11-10
 ### Conclusão Oficial do Milestone 4A: Storage Engine & Relational Schema
 
