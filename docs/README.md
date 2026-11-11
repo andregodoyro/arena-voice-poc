@@ -1,4 +1,4 @@
-﻿# Índice Mestre da Documentação — Arena Voice
+# Índice Mestre da Documentação — Arena Voice
 
 > **Status da Plataforma:** Fase 3 Concluída e Homologada (`v0.3.0-phase3`)  
 > **Cobertura Automatizada:** 497 verificações em 10 suítes (100% aprovadas, zero falhas, zero regressões)  
@@ -50,11 +50,13 @@ Registros acumulados de evolução contínua mantidos ativamente em todas as fas
 
 Documentos de encerramento, governança e memória técnica do Milestone 4A:
 
-- **[Relatório de Encerramento do 4A (docs/Phase4A-Closure-Report.md)](Phase4A-Closure-Report.md):** Relatório executivo com escopo planejado x realizado, benefícios, critérios de aceite e evidências.
-- **[Histórico de Implementação do 4A (docs/Phase4A-Implementation-History.md)](Phase4A-Implementation-History.md):** Registro passo a passo de todas as 10 etapas (4A.1 a 4A.10).
-- **[Resumo Arquitetural do 4A (docs/Phase4A-Architecture-Summary.md)](Phase4A-Architecture-Summary.md):** Diagrama e fluxo de inicialização detalhado da camada relacional híbrida.
-- **[Decisões Arquiteturais do 4A (docs/Phase4A-Architectural-Decisions.md)](Phase4A-Architectural-Decisions.md):** Justificativas técnicas e ajustes homologados.
-- **[Lições Aprendidas do 4A (docs/Phase4A-Lessons-Learned.md)](Phase4A-Lessons-Learned.md):** Desafios, erros evitados e recomendações críticas para o Milestone 4B.
+- **[Relatório de Encerramento do 4A (`docs/archives/milestones/Phase4A-Closure-Report.md`)](archives/milestones/Phase4A-Closure-Report.md):** Relatório executivo com escopo planejado x realizado, benefícios, critérios de aceite e evidências.
+- **[Histórico de Implementação do 4A (`docs/archives/milestones/Phase4A-Implementation-History.md`)](archives/milestones/Phase4A-Implementation-History.md):** Registro passo a passo de todas as 10 etapas (4A.1 a 4A.10).
+- **[Resumo Arquitetural do 4A (`docs/architecture/Phase4A-Architecture-Summary.md`)](architecture/Phase4A-Architecture-Summary.md):** Diagrama e fluxo de inicialização detalhado da camada relacional híbrida.
+- **[Decisões Arquiteturais do 4A (`docs/architecture/Phase4A-Architectural-Decisions.md`)](architecture/Phase4A-Architectural-Decisions.md):** Justificativas técnicas e ajustes homologados.
+- **[Lições Aprendidas do 4A (`docs/archives/retrospectives/Phase4A-Lessons-Learned.md`)](archives/retrospectives/Phase4A-Lessons-Learned.md):** Desafios, erros evitados e recomendações críticas para o Milestone 4B.
+
+---
 ## 🔄 Retrospectivas de Fase
 
 Documentos formais de fechamento, lições aprendidas e governança emitidos ao final de cada fase:
