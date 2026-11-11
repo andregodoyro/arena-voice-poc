@@ -162,6 +162,8 @@ public class PostgresArenaProjectStore : IArenaProjectStore
                 return;
             }
 
+            ActiveSessionSnapshot? postRecoverySnapshot = null;
+
             lock (_contextLock)
             {
                 // 1. Restaura contexto de Evento e Projeto
@@ -175,22 +177,70 @@ public class PostgresArenaProjectStore : IArenaProjectStore
                     _currentProjectId = session.CurrentProjectId;
                 }
 
-                // 2. Restaura Máquina de Estados e Timers
-                _pitchStage = session.PitchStage;
-                _pitchStageStartedAt = session.PitchStageStartedAt;
-                _stageDurationSeconds = session.CurrentStageDurationSeconds;
-                _isTimerPaused = session.IsPaused;
-                _timerPausedAt = session.PausedAt;
-                _totalPausedSeconds = session.TotalPausedSeconds;
-                _lastUpdated = session.LastUpdated;
+                // 2. Detecção de Sessão Interrompida por Falha (Crash Recovery - Milestone 4B.4)
+                bool isInterrupted = (session.PitchStage == PitchStage.PitchRunning ||
+                                      session.PitchStage == PitchStage.QA ||
+                                      session.PitchStage == PitchStage.VotingOpen)
+                                     && !session.IsPaused;
 
-                // 3. Restaura Metadados de Recuperação e Checkpoint
-                _recoveredFromCrash = session.RecoveredFromCrash;
-                _interruptedStage = session.InterruptedStage;
-                _recoveredAt = session.RecoveredAt;
-                _lastCheckpointAt = session.LastCheckpointAt;
+                var now = DateTimeOffset.UtcNow;
 
-                // 4. Restaura Estado das Cadeiras Físicas (turned_chairs)
+                if (isInterrupted)
+                {
+                    // Crash detectado com pitch em andamento sem pausa prévia:
+                    // Congela tempo restante exatamente no ponto do último checkpoint
+                    double elapsedAtCrash = 0.0;
+                    if (session.PitchStageStartedAt.HasValue)
+                    {
+                        var referenceTime = session.LastCheckpointAt ?? session.LastUpdated;
+                        elapsedAtCrash = Math.Max(0.0, (referenceTime - session.PitchStageStartedAt.Value).TotalSeconds - session.TotalPausedSeconds);
+                    }
+
+                    _pitchStage = session.PitchStage;
+                    _pitchStageStartedAt = session.PitchStageStartedAt;
+                    _stageDurationSeconds = session.CurrentStageDurationSeconds;
+                    _isTimerPaused = true;
+                    _timerPausedAt = now;
+
+                    // Ajusta _totalPausedSeconds para que CalculateRemainingSeconds() retorne exatamente o tempo que restava
+                    if (_pitchStageStartedAt.HasValue)
+                    {
+                        _totalPausedSeconds = Math.Max(0.0, (now - _pitchStageStartedAt.Value).TotalSeconds - elapsedAtCrash);
+                    }
+                    else
+                    {
+                        _totalPausedSeconds = session.TotalPausedSeconds;
+                    }
+
+                    _lastUpdated = now;
+
+                    // Metadados oficiais de Crash Recovery
+                    _recoveredFromCrash = true;
+                    _interruptedStage = session.PitchStage;
+                    _recoveredAt = now;
+                    _lastCheckpointAt = now;
+
+                    // Marca para persistir o novo estado congelado no banco
+                    postRecoverySnapshot = CreateSnapshotUnderLock();
+                }
+                else
+                {
+                    // Sessão limpa, já pausada ou em Waiting/Finished
+                    _pitchStage = session.PitchStage;
+                    _pitchStageStartedAt = session.PitchStageStartedAt;
+                    _stageDurationSeconds = session.CurrentStageDurationSeconds;
+                    _isTimerPaused = session.IsPaused;
+                    _timerPausedAt = session.PausedAt;
+                    _totalPausedSeconds = session.TotalPausedSeconds;
+                    _lastUpdated = session.LastUpdated;
+
+                    _recoveredFromCrash = session.RecoveredFromCrash;
+                    _interruptedStage = session.InterruptedStage;
+                    _recoveredAt = session.RecoveredAt;
+                    _lastCheckpointAt = session.LastCheckpointAt;
+                }
+
+                // 3. Restaura Estado das Cadeiras Físicas (turned_chairs)
                 for (int i = 1; i <= 5; i++)
                 {
                     _chairStates[i] = false;
@@ -206,6 +256,12 @@ public class PostgresArenaProjectStore : IArenaProjectStore
                         }
                     }
                 }
+            }
+
+            // Se houve intervenção de recovery, persiste o novo estado Paused fora do lock
+            if (postRecoverySnapshot != null)
+            {
+                PersistSnapshot(postRecoverySnapshot);
             }
         }
     }
@@ -1269,7 +1325,11 @@ public class PostgresArenaProjectStore : IArenaProjectStore
                 _isTimerPaused,
                 isExpired,
                 isVotingAllowed,
-                GetAllowedTransitions(_pitchStage)
+                GetAllowedTransitions(_pitchStage),
+                _recoveredFromCrash,
+                _interruptedStage,
+                _recoveredAt,
+                _lastCheckpointAt
             );
         }
     }

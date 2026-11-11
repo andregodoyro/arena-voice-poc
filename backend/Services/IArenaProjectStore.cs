@@ -66,7 +66,11 @@ public record PitchStateDto(
     bool IsPaused,
     bool IsExpired,
     bool IsVotingAllowed,
-    IReadOnlyList<string> AllowedTransitions
+    IReadOnlyList<string> AllowedTransitions,
+    bool RecoveredFromCrash = false,
+    PitchStage? InterruptedStage = null,
+    DateTimeOffset? RecoveredAt = null,
+    DateTimeOffset? LastCheckpointAt = null
 );
 
 public record DeleteJudgeResult(
