@@ -1,3 +1,5 @@
+using ArenaVoicePocBackend.Domain.Enums;
+
 namespace ArenaVoicePocBackend.Domain.DTOs;
 
 public record UpdateProjectDto
@@ -9,4 +11,5 @@ public record UpdateProjectDto
     public int? OrderIndex { get; init; }
     public string? LogoUrl { get; init; }
     public string? CoverImageUrl { get; init; }
+    public ProjectStatus? Status { get; init; }
 }

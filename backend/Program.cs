@@ -2,8 +2,12 @@ using ArenaVoicePocBackend.Domain.DTOs;
 using ArenaVoicePocBackend.Domain.Entities;
 using ArenaVoicePocBackend.Domain.Enums;
 using ArenaVoicePocBackend.Hubs;
+using ArenaVoicePocBackend.Persistence;
+using ArenaVoicePocBackend.Persistence.Options;
+using ArenaVoicePocBackend.Persistence.Startup;
 using ArenaVoicePocBackend.Services;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
@@ -34,9 +38,49 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddSignalR();
-builder.Services.AddSingleton<IArenaProjectStore, ArenaProjectStore>();
+
+// =========================================================================
+// CONFIGURAÇÃO DE PERSISTÊNCIA & REGISTRO CONDICIONAL DE SERVIÇOS (MILESTONE 4A)
+// =========================================================================
+var persistenceSection = builder.Configuration.GetSection(ArenaPersistenceOptions.SectionName);
+builder.Services.Configure<ArenaPersistenceOptions>(persistenceSection);
+
+var persistenceOptions = persistenceSection.Get<ArenaPersistenceOptions>() ?? new ArenaPersistenceOptions();
+var storageEngineEnv = Environment.GetEnvironmentVariable("ARENA_STORAGE_ENGINE") ?? Environment.GetEnvironmentVariable("ARENA_STORAGE");
+var effectiveStorageEngine = !string.IsNullOrWhiteSpace(storageEngineEnv)
+    ? storageEngineEnv
+    : persistenceOptions.StorageEngine;
+
+if (string.Equals(effectiveStorageEngine, "memory", StringComparison.OrdinalIgnoreCase))
+{
+    // Modo de Compatibilidade: Memória Volátil pura (sem dependência de banco de dados)
+    builder.Services.AddSingleton<IArenaProjectStore, ArenaProjectStore>();
+}
+else
+{
+    // Modo Oficial: PostgreSQL Portable via EF Core 10 + Npgsql
+    builder.Services.AddPooledDbContextFactory<ArenaDbContext>(opt =>
+    {
+        opt.UseNpgsql(persistenceOptions.ConnectionString, npgsqlOpt =>
+        {
+            npgsqlOpt.CommandTimeout(persistenceOptions.CommandTimeoutSeconds);
+        });
+
+        if (persistenceOptions.EnableSensitiveDataLogging)
+        {
+            opt.EnableSensitiveDataLogging();
+        }
+    });
+
+    builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<ArenaDbContext>>().CreateDbContext());
+    builder.Services.AddSingleton<IArenaProjectStore, PostgresArenaProjectStore>();
+}
 
 var app = builder.Build();
+
+// Validação de inicialização e aplicação automática de migrações no boot
+var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseStartup");
+DatabaseStartupValidator.ValidateAndMigrate(app.Services, logger);
 
 app.UseCors();
 
@@ -819,6 +863,11 @@ app.MapPut("/api/projects/{id}", async (string id, UpdateProjectDto dto, IArenaP
             LogoUrl = dto.LogoUrl?.Trim() ?? project.Media.LogoUrl,
             CoverImageUrl = dto.CoverImageUrl?.Trim() ?? project.Media.CoverImageUrl
         };
+    }
+
+    if (dto.Status.HasValue)
+    {
+        project.Status = dto.Status.Value;
     }
 
     store.UpdateProject(project);

@@ -11,7 +11,7 @@ public class RoundHistoryConfiguration : IEntityTypeConfiguration<Round>
     {
         builder.ToTable("round_history_entries", t =>
         {
-            t.HasCheckConstraint("ck_round_result", "result BETWEEN 0 AND 2");
+            t.HasCheckConstraint("ck_round_result", "result BETWEEN 0 AND 3");
             t.HasCheckConstraint("ck_round_approval_mode", "approval_mode BETWEEN 0 AND 3");
             t.HasCheckConstraint("ck_round_last_stage", "last_stage_reached BETWEEN 0 AND 5");
         });

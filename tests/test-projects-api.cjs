@@ -52,6 +52,28 @@ async function run() {
     // =========================================================================
     // 1. EVENT MANAGEMENT (/api/events/current)
     // =========================================================================
+    // Setup: Garante estado inicial do evento e projeto ativo (idempotência no PostgreSQL)
+    await request('/api/events/evt-demo-day-2026/activate', { method: 'POST' });
+    await request('/api/events/current', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            title: 'Demo Day Inovação 2026',
+            description: 'Apresentação dos projetos finalistas do programa de aceleração e inovação aberta.',
+            branding: {
+                primaryColor: '#d90429',
+                secondaryColor: '#ffd166',
+                logoUrl: '/branding/event-logo.png',
+                tagline: 'O palco onde as melhores ideias conquistam as cadeiras.'
+            }
+        })
+    });
+    await request('/api/projects/proj-neurosync-01/select', { method: 'POST' });
+    await request('/api/projects/proj-ecolog-02', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 0 }) });
+    await request('/api/projects/proj-finflow-03', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 0 }) });
+    await request('/api/projects/proj-agrosmart-04', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 0 }) });
+    await request('/api/projects/proj-cybershield-05', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 0 }) });
+
     console.log('[1] Event Management (GET /api/events/current)');
     const eventRes = await request('/api/events/current');
     assert(eventRes.status === 200, 'GET /api/events/current retorna HTTP 200', `Recebido ${eventRes.status}`);
@@ -256,6 +278,23 @@ async function run() {
     assert(typeof stateRes.body?.activeCount === 'number', 'activeCount preservado no snapshot');
     assert(stateRes.body?.currentProject?.id === 'proj-ecolog-02', 'Snapshot reflete o projeto atualmente ativo (EcoLog)');
     assert(stateRes.body?.currentEvent?.id === 'evt-demo-day-2026', 'Snapshot reflete o evento atual');
+
+    // Cleanup: Restaura projeto inicial e evento
+    await request('/api/projects/proj-neurosync-01/select', { method: 'POST' });
+    await request('/api/events/current', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            title: 'Demo Day Inovação 2026',
+            description: 'Apresentação dos projetos finalistas do programa de aceleração e inovação aberta.',
+            branding: {
+                primaryColor: '#d90429',
+                secondaryColor: '#ffd166',
+                logoUrl: '/branding/event-logo.png',
+                tagline: 'O palco onde as melhores ideias conquistam as cadeiras.'
+            }
+        })
+    });
 
     console.log('\n======================================================');
     console.log('                 RESULTADO FINAL');

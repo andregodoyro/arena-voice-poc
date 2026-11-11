@@ -58,7 +58,7 @@ public class PostgresArenaProjectStore : IArenaProjectStore
                 Id = "evt-demo-day-2026",
                 Title = "Demo Day Inovação 2026",
                 Description = "Apresentação dos projetos finalistas do programa de aceleração e inovação aberta.",
-                ScheduledDate = new DateTimeOffset(2026, 10, 30, 19, 0, 0, TimeSpan.FromHours(-3)),
+                ScheduledDate = new DateTimeOffset(2026, 10, 30, 22, 0, 0, TimeSpan.Zero),
                 Status = EventStatus.Active,
                 Branding = new BrandingConfig
                 {
@@ -510,6 +510,9 @@ public class PostgresArenaProjectStore : IArenaProjectStore
     public Event AddEvent(Event evt)
     {
         using var context = _contextFactory.CreateDbContext();
+        if (string.IsNullOrWhiteSpace(evt.Id))
+            evt.Id = $"evt-{Guid.NewGuid():N}"[..12];
+        evt.ScheduledDate = evt.ScheduledDate.ToUniversalTime();
         evt.CreatedAt = DateTimeOffset.UtcNow;
         evt.UpdatedAt = DateTimeOffset.UtcNow;
         context.Events.Add(evt);
@@ -525,7 +528,7 @@ public class PostgresArenaProjectStore : IArenaProjectStore
 
         existing.Title = evt.Title;
         existing.Description = evt.Description;
-        existing.ScheduledDate = evt.ScheduledDate;
+        existing.ScheduledDate = evt.ScheduledDate.ToUniversalTime();
         existing.Status = evt.Status;
         existing.Branding = evt.Branding;
         existing.Timers = evt.Timers;
@@ -723,6 +726,8 @@ public class PostgresArenaProjectStore : IArenaProjectStore
     public Project AddProject(Project project)
     {
         using var context = _contextFactory.CreateDbContext();
+        if (string.IsNullOrWhiteSpace(project.Id))
+            project.Id = $"proj-{Guid.NewGuid():N}"[..12];
         project.CreatedAt = DateTimeOffset.UtcNow;
         project.UpdatedAt = DateTimeOffset.UtcNow;
         context.Projects.Add(project);
@@ -794,6 +799,8 @@ public class PostgresArenaProjectStore : IArenaProjectStore
     public Judge AddJudge(Judge judge)
     {
         using var context = _contextFactory.CreateDbContext();
+        if (string.IsNullOrWhiteSpace(judge.Id))
+            judge.Id = $"judge-{Guid.NewGuid().ToString("N")[..8]}";
         judge.CreatedAt = DateTimeOffset.UtcNow;
         judge.UpdatedAt = DateTimeOffset.UtcNow;
         context.Judges.Add(judge);
@@ -1076,15 +1083,40 @@ public class PostgresArenaProjectStore : IArenaProjectStore
     {
         lock (_contextLock)
         {
-            if (_currentProjectId == null)
+            if (string.IsNullOrEmpty(_currentProjectId))
             {
-                return new PitchTransitionResult(false, _pitchStage, _pitchStage, null, "Nenhum projeto ativo selecionado.", NoActiveProject: true);
+                return new PitchTransitionResult(
+                    Success: false,
+                    PreviousStage: _pitchStage,
+                    CurrentStage: _pitchStage,
+                    StartedAt: _pitchStageStartedAt,
+                    ErrorMessage: "Nenhum projeto ativo selecionado no momento.",
+                    NoActiveProject: true
+                );
             }
 
-            var allowed = GetAllowedTransitions(_pitchStage);
-            if (!allowed.Contains(targetStage.ToString()) && targetStage != _pitchStage)
+            if (_pitchStage == PitchStage.Finished)
             {
-                return new PitchTransitionResult(false, _pitchStage, _pitchStage, null, $"Transição de '{_pitchStage}' para '{targetStage}' inválida.", IsInvalidTransition: true);
+                return new PitchTransitionResult(
+                    Success: false,
+                    PreviousStage: _pitchStage,
+                    CurrentStage: _pitchStage,
+                    StartedAt: _pitchStageStartedAt,
+                    ErrorMessage: "A apresentação já está no estado Finished (terminal). Selecione o próximo projeto para iniciar nova rodada.",
+                    IsInvalidTransition: true
+                );
+            }
+
+            if (!IsValidTransition(_pitchStage, targetStage))
+            {
+                return new PitchTransitionResult(
+                    Success: false,
+                    PreviousStage: _pitchStage,
+                    CurrentStage: _pitchStage,
+                    StartedAt: _pitchStageStartedAt,
+                    ErrorMessage: $"Transição inválida de '{_pitchStage}' para '{targetStage}'.",
+                    IsInvalidTransition: true
+                );
             }
 
             var previousStage = _pitchStage;
@@ -1113,9 +1145,20 @@ public class PostgresArenaProjectStore : IArenaProjectStore
             }
 
             Round? archivedRound = null;
-            if (targetStage == PitchStage.Finished && !_isCurrentRoundArchived)
+            if (targetStage == PitchStage.Finished)
             {
-                archivedRound = ArchiveCurrentRoundInternal(context, "Transição para Finished");
+                var project = context.Projects.FirstOrDefault(p => p.Id == _currentProjectId);
+                if (project != null)
+                {
+                    project.Status = ProjectStatus.Completed;
+                    project.PresentationEndedAt ??= DateTimeOffset.UtcNow;
+                    project.UpdatedAt = DateTimeOffset.UtcNow;
+                }
+
+                if (!_isCurrentRoundArchived)
+                {
+                    archivedRound = ArchiveCurrentRoundInternal(context, "Finished");
+                }
                 context.SaveChanges();
             }
 
@@ -1204,13 +1247,28 @@ public class PostgresArenaProjectStore : IArenaProjectStore
 
     private static IReadOnlyList<string> GetAllowedTransitions(PitchStage current) => current switch
     {
-        PitchStage.Waiting => new[] { "PitchRunning", "QA", "VotingOpen" },
-        PitchStage.PitchRunning => new[] { "QA", "VotingOpen", "Finished" },
-        PitchStage.QA => new[] { "VotingOpen", "Finished" },
-        PitchStage.VotingOpen => new[] { "VotingClosed", "Finished" },
-        PitchStage.VotingClosed => new[] { "Finished" },
+        PitchStage.Waiting => new[] { nameof(PitchStage.PitchRunning) },
+        PitchStage.PitchRunning => new[] { nameof(PitchStage.QA), nameof(PitchStage.VotingOpen), nameof(PitchStage.Waiting) },
+        PitchStage.QA => new[] { nameof(PitchStage.VotingOpen), nameof(PitchStage.PitchRunning) },
+        PitchStage.VotingOpen => new[] { nameof(PitchStage.VotingClosed), nameof(PitchStage.QA) },
+        PitchStage.VotingClosed => new[] { nameof(PitchStage.Finished), nameof(PitchStage.VotingOpen) },
         PitchStage.Finished => Array.Empty<string>(),
         _ => Array.Empty<string>()
+    };
+
+    private static bool IsValidTransition(PitchStage from, PitchStage to) => (from, to) switch
+    {
+        (PitchStage.Waiting, PitchStage.PitchRunning) => true,
+        (PitchStage.PitchRunning, PitchStage.QA) => true,
+        (PitchStage.PitchRunning, PitchStage.VotingOpen) => true,
+        (PitchStage.PitchRunning, PitchStage.Waiting) => true,
+        (PitchStage.QA, PitchStage.VotingOpen) => true,
+        (PitchStage.QA, PitchStage.PitchRunning) => true,
+        (PitchStage.VotingOpen, PitchStage.VotingClosed) => true,
+        (PitchStage.VotingOpen, PitchStage.QA) => true,
+        (PitchStage.VotingClosed, PitchStage.Finished) => true,
+        (PitchStage.VotingClosed, PitchStage.VotingOpen) => true,
+        _ => false
     };
 
     // =========================================================================
