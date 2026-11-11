@@ -1,6 +1,8 @@
+using ArenaVoicePocBackend.Domain;
 using ArenaVoicePocBackend.Domain.DTOs;
 using ArenaVoicePocBackend.Domain.Entities;
 using ArenaVoicePocBackend.Domain.Enums;
+using ArenaVoicePocBackend.DTOs;
 using ArenaVoicePocBackend.Hubs;
 using ArenaVoicePocBackend.Persistence;
 using ArenaVoicePocBackend.Persistence.Options;
@@ -52,6 +54,22 @@ var effectiveStorageEngine = !string.IsNullOrWhiteSpace(storageEngineEnv)
     ? storageEngineEnv
     : persistenceOptions.StorageEngine;
 
+// =========================================================================
+// AUDIT TRAIL & LIGHTWEIGHT EVENT SOURCING INFRASTRUCTURE (MILESTONE 4C.1 & 4C.2)
+// =========================================================================
+builder.Services.AddSingleton(Channel.CreateBounded<AuditEventRecord>(new BoundedChannelOptions(10_000)
+{
+    FullMode = BoundedChannelFullMode.Wait,
+    SingleReader = true
+}));
+builder.Services.AddSingleton<IAuditEventPublisher, AuditEventPublisher>();
+builder.Services.AddHostedService<AuditEventWriter>();
+
+// =========================================================================
+// AUDIT QUERY LAYER — CQRS LEITURA (MILESTONE 4C.4)
+// =========================================================================
+builder.Services.AddScoped<IAuditQueryService, AuditQueryService>();
+
 if (string.Equals(effectiveStorageEngine, "memory", StringComparison.OrdinalIgnoreCase))
 {
     // Modo de Compatibilidade: Memória Volátil pura (sem dependência de banco de dados)
@@ -96,7 +114,8 @@ app.MapPost("/api/chair-press", async (ChairPressRequest request, HttpContext ht
     var timestamp = DateTimeOffset.UtcNow;
     var horaFormatada = timestamp.ToLocalTime().ToString("HH:mm:ss.fff");
 
-    var result = store.TryTurnChair(id, "HTTP_API");
+    var effectiveSource = !string.IsNullOrWhiteSpace(request.Source) ? request.Source : "HTTP_API";
+    var result = store.TryTurnChair(id, effectiveSource);
 
     if (result.IsInvalidChair)
     {
@@ -1274,7 +1293,119 @@ app.MapPost("/api/rounds/archive", async (IArenaProjectStore store, IHubContext<
 });
 
 // =========================================================================
-// 6. MAPEAMENTO DO HUB SIGNALR
+// 6. AUDIT TRAIL — QUERY LAYER & TIMELINE (MILESTONE 4C.4)
+// =========================================================================
+
+// GET /api/audit — Timeline geral com paginação e filtros (ADR-022)
+app.MapGet("/api/audit", async (
+    IAuditQueryService auditQuery,
+    int? page, int? pageSize,
+    string? eventType, string? aggregateType, string? actorType,
+    DateTimeOffset? from, DateTimeOffset? to,
+    bool? includeTechnical,
+    CancellationToken ct) =>
+{
+    var filter = new AuditQueryFilter
+    {
+        Page = page ?? 1,
+        PageSize = pageSize ?? AuditQueryFilter.DefaultPageSize,
+        EventType = eventType,
+        AggregateType = aggregateType,
+        ActorType = actorType,
+        From = from,
+        To = to,
+        IncludeTechnical = includeTechnical ?? false
+    };
+
+    var result = await auditQuery.QueryAsync(filter, ct);
+    return Results.Ok(result);
+});
+
+// GET /api/audit/{id} — Consulta evento de auditoria por ID
+app.MapGet("/api/audit/{id:long}", async (long id, IAuditQueryService auditQuery, CancellationToken ct) =>
+{
+    var dto = await auditQuery.GetByIdAsync(id, ct);
+    return dto != null
+        ? Results.Ok(dto)
+        : Results.NotFound(new { error = "Evento de auditoria não encontrado.", id });
+});
+
+// GET /api/audit/project/{projectId} — Histórico de auditoria por projeto
+app.MapGet("/api/audit/project/{projectId}", async (
+    string projectId,
+    IAuditQueryService auditQuery,
+    int? page, int? pageSize,
+    string? eventType, string? aggregateType, string? actorType,
+    DateTimeOffset? from, DateTimeOffset? to,
+    bool? includeTechnical,
+    CancellationToken ct) =>
+{
+    var filter = new AuditQueryFilter
+    {
+        Page = page ?? 1,
+        PageSize = pageSize ?? AuditQueryFilter.DefaultPageSize,
+        EventType = eventType,
+        AggregateType = aggregateType,
+        ActorType = actorType,
+        From = from,
+        To = to,
+        IncludeTechnical = includeTechnical ?? false
+    };
+
+    var result = await auditQuery.GetByProjectIdAsync(projectId, filter, ct);
+    return Results.Ok(result);
+});
+
+// GET /api/audit/event/{eventId} — Histórico de auditoria por evento (arena event)
+app.MapGet("/api/audit/event/{eventId}", async (
+    string eventId,
+    IAuditQueryService auditQuery,
+    int? page, int? pageSize,
+    string? eventType, string? aggregateType, string? actorType,
+    DateTimeOffset? from, DateTimeOffset? to,
+    bool? includeTechnical,
+    CancellationToken ct) =>
+{
+    var filter = new AuditQueryFilter
+    {
+        Page = page ?? 1,
+        PageSize = pageSize ?? AuditQueryFilter.DefaultPageSize,
+        EventType = eventType,
+        AggregateType = aggregateType,
+        ActorType = actorType,
+        From = from,
+        To = to,
+        IncludeTechnical = includeTechnical ?? false
+    };
+
+    var result = await auditQuery.GetByArenaEventIdAsync(eventId, filter, ct);
+    return Results.Ok(result);
+});
+
+// GET /api/audit/session — Timeline de sessão (checkpoints, session updates)
+app.MapGet("/api/audit/session", async (
+    IAuditQueryService auditQuery,
+    int? page, int? pageSize,
+    string? eventType,
+    DateTimeOffset? from, DateTimeOffset? to,
+    CancellationToken ct) =>
+{
+    var filter = new AuditQueryFilter
+    {
+        Page = page ?? 1,
+        PageSize = pageSize ?? AuditQueryFilter.DefaultPageSize,
+        EventType = eventType,
+        From = from,
+        To = to,
+        IncludeTechnical = true  // Session endpoint sempre inclui eventos técnicos
+    };
+
+    var result = await auditQuery.GetSessionTimelineAsync(filter, ct);
+    return Results.Ok(result);
+});
+
+// =========================================================================
+// 7. MAPEAMENTO DO HUB SIGNALR
 // =========================================================================
 app.MapHub<ArenaPocHub>("/hubs/arena-poc");
 app.MapHub<ArenaPocHub>("/arenaHub"); // Rota retrocompatível
@@ -1293,6 +1424,12 @@ Console.WriteLine($"   GET  http://localhost:{port}/api/status       (Health che
 Console.WriteLine(" Hubs SignalR:");
 Console.WriteLine($"   WS   http://localhost:{port}/hubs/arena-poc   (Voice Studio)");
 Console.WriteLine($"   WS   http://localhost:{port}/arenaHub         (Retrocompatível)");
+Console.WriteLine(" Audit Trail (4C.4):");
+Console.WriteLine($"   GET  http://localhost:{port}/api/audit               (Timeline)");
+Console.WriteLine($"   GET  http://localhost:{port}/api/audit/{{id}}          (Por ID)");
+Console.WriteLine($"   GET  http://localhost:{port}/api/audit/project/{{id}}  (Por Projeto)");
+Console.WriteLine($"   GET  http://localhost:{port}/api/audit/event/{{id}}    (Por Evento)");
+Console.WriteLine($"   GET  http://localhost:{port}/api/audit/session        (Sessão)");
 Console.WriteLine("-------------------------------------------------------------");
 Console.WriteLine(" Endereços IP locais desta máquina detectados:");
 try
@@ -1309,7 +1446,7 @@ Console.WriteLine("=============================================================
 app.Run();
 
 // Modelo do payload aceito
-public record ChairPressRequest(int? ChairId, int? SeatNumber)
+public record ChairPressRequest(int? ChairId, int? SeatNumber, string? Source = null)
 {
     public int GetEffectiveChairId() => ChairId ?? SeatNumber ?? 0;
 }
