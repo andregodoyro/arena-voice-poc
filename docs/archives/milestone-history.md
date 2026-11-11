@@ -1,9 +1,9 @@
 ﻿# Índice Histórico de Marcos (Milestone History)
 ## Plataforma Arena Voice / Arena de Inovação
 
-> **Status Geral do Projeto:** FASE 3 CONCLUÍDA E HOMOLOGADA (Milestones 3A, 3B, 3C, 3D e 3E Concluídos)  
+> **Status Geral do Projeto:** Fases 1 a 3 e Milestone 4A Concluídos e Homologados  
 > **Tag Estável Mais Recente:** `v0.3.0-phase3` (Encerramento da Fase 3)  
-> **Cobertura Automatizada:** 466 verificações em 9 suítes (100% aprovadas, zero regressões)  
+> **Cobertura Automatizada:** 497 verificações em 10 suítes (100% aprovadas, zero regressões)  
 > **Última Atualização:** Novembro de 2026 (Consolidação Final e Fechamento da Fase 3)
 
 ---
@@ -70,7 +70,14 @@ Este documento é a **fonte oficial de índice de marcos**, permitindo rastrear 
 - **3D (Round History & Result Engine):** Arquivamento imutável de rodadas (`RoundHistoryEntry`) ao transicionar para `Finished` ou encerrar evento com rodada em andamento. Result Engine com classificação em dois níveis: `Result` (Approved/Rejected/Inconclusive) e `ApprovalMode` (Unanimous/Majority/Minority/None). Snapshot da rodada inclui histórico de estágios, composição da banca e registro individual de cadeiras. Proteção idempotente contra duplo arquivamento. Endpoints `GET /api/history` e `GET /api/history/{id}`. Evento `RoundArchived` via SignalR. Painel de histórico consultável no cockpit. Suíte automatizada expandida para **416 testes** (100% verdes).
 - **3E (Judge Catalog & Event Jury Assignment):** Catálogo global de jurados corporativos (`Judge`) com campos `Id`, `Name`, `Company`, `Role`, `Specialty`, `Bio`, `PhotoUrl`, `IsActive`, `Email`. Alocação de jurados nas cadeiras 1 a 5 do evento via `EventJuryAssignment` e endpoint `PUT /api/events/{id}/jury`. Aba `/operator/judges` completa com CRUD e painel de alocação. Dock cênico nominal no telão (`StageJuryDock`) com avatares, nomes e anéis de neon reativos ao acionamento. Integração dos nomes de jurados com `RoundHistoryEntry`. Evento `EventJuryUpdated` via SignalR. Suíte automatizada expandida para **466 testes** (100% verdes). Tag `v0.3.0-phase3` emitida.
 
-### Fase 4 — Platform Reliability & Data Resilience (Próxima Fase)
+### Fase 4 — Platform Reliability & Data Resilience (Em Andamento)
+
+> **Branch:** eat/phase4-data-resilience  
+> **Estratégia:** PostgreSQL Portable 18.6 local com EF Core 10 e Npgsql 10 (ADR-016, ADR-018, ADR-019)  
+> **Prioridade:** Confiabilidade operacional antes de expansão de features (ADR-017)  
+> **Status:** Milestone 4A Concluído e Homologado (Novembro de 2026)
+
+- **4A (Storage Engine & Relational Schema — CONCLUÍDO):** Integração do PostgreSQL Portable 18.6 sem instalador de sistema operacional. Mapeamento relacional completo com EF Core 10 via Fluent API para 6 tabelas (Events, Projects, Judges, EventJuryAssignments, RoundHistoryEntries e ActiveSessionState). Uso de tipos nativos avançados (	ext[] para expertises, int[] para cadeiras viradas, jsonb para snapshots imutáveis de timer e Owned Types). Implementação do DatabaseStartupValidator executando TCP socket check e migrações idempotentes no boot. Store híbrido PostgresArenaProjectStore com IDbContextFactory para contextos de curta duração. Bateria completa de testes aprovada: 497 testes em 10 suítes (0 regressões) e validação da sobrevivência física dos dados pós-restart. Tag 0.4.0-phase4a.
 
 > **Branch planejada:** `feat/phase4-data-resilience`  
 > **Estratégia:** SQLite em WAL mode com `Microsoft.Data.Sqlite` (ADR-016)  

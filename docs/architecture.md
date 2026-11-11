@@ -1,8 +1,8 @@
-# Arquitetura — Arena Voice
+﻿# Arquitetura — Arena Voice
 
 > **Status:** Fase 1, Fase 2 e Fase 3 Concluídas e Homologadas (`v0.3.0-phase3`)  
 > **Referência de Produto:** [Roadmap Oficial e Arquitetura de Produto (docs/roadmap.md)](roadmap.md)  
-> **Cobertura Automatizada:** 466 verificações em 9 suítes de testes automatizados (100% de aprovação, zero falhas, zero regressões).
+> **Cobertura Automatizada:** 497 verificações em 10 suítes de testes automatizados (100% de aprovação, zero falhas, zero regressões).
 
 ---
 

@@ -926,3 +926,46 @@
   - **4D:** BackupOrchestrator gerenciando backups a quente via pg_dump e snapshots automáticos por rodada (ound_N_<timestamp>.pgdump).
   - **4E:** Suíte de caos testando indisponibilidade de porta, reinicialização rápida e resiliência de cluster.
 - **Garantia Arquitetural:** Zero alterações nos 34 contratos REST e 9 contratos SignalR; a camada de aplicação continua consumindo unicamente IArenaProjectStore.
+---
+
+# FASE 4 — Platform Reliability & Data Resilience
+
+## Milestone 4A — Storage Engine & Relational Schema (PostgreSQL Portable 18.6 & EF Core 10)
+- **Status:** ✅ Concluído e Homologado (10 de Novembro de 2026)
+- **Tag Oficial:** 0.4.0-phase4a
+- **Cobertura de Testes:** 497 asserções em 10 suítes automatizadas (100% aprovadas, zero regressões).
+- **Contexto:** Até a Fase 3, a Arena Voice operava com armazenamento exclusivamente volátil em memória RAM (ArenaProjectStore). O Milestone 4A substituiu essa camada por uma infraestrutura relacional corporativa permanente usando PostgreSQL Portable 18.6 e Entity Framework Core 10, sem quebrar os 34 endpoints REST ou os 9 eventos SignalR já consolidados.
+- **Entregas Técnicas Realizadas:**
+  1. **Pacotes NuGet:** Adicionados Npgsql.EntityFrameworkCore.PostgreSQL (10.0.3) e Microsoft.EntityFrameworkCore.Design (10.0.14) no .csproj.
+  2. **Configurações Fortemente Tipadas:** Implementação de ArenaPersistenceOptions com chave ArenaPersistence em ppsettings.json, connection timeout de 3 segundos e suporte a alternância de engine (postgres / memory).
+  3. **Contexto de Banco e Entidades:** Criação de ArenaDbContext com 6 DbSets (Events, Projects, Judges, EventJuryAssignments, RoundHistoryEntries, ActiveSessionStates).
+  4. **ActiveSessionState:** Entidade singleton (singleton_id = 1) criada para servir de ponto de ancoragem para o motor de reidratação do Milestone 4B.
+  5. **Mapeamento Fluent API Avançado (ackend/Persistence/Configurations/):**
+     - EventConfiguration: Mapeamento de BrandingConfig e TimerConfig como Owned Types.
+     - ProjectConfiguration: Relação com Events (ON DELETE CASCADE) e owned type ProjectMedia.
+     - JudgeConfiguration: Mapeamento nativo de PostgreSQL array 	ext[] para tags de Expertise.
+     - EventJuryAssignmentConfiguration: Chave composta (event_id, chair_id), índice único e foreign keys.
+     - RoundHistoryConfiguration: Mapeamento nativo de array int[] para 	urned_chairs, JSONB para 	imer_config_snapshot, índices compostos e check constraints (ck_round_result, ck_round_approval_mode, ck_round_last_stage).
+     - ActiveSessionStateConfiguration: Mapeamento do singleton com JSONB e arrays nativos.
+  6. **Design-Time Factory:** ArenaDbContextFactory (IDesignTimeDbContextFactory<ArenaDbContext>) viabilizando inspeção de modelo e tooling via dotnet-ef.
+  7. **Code-First Migration:** Geração da migração inicial 20261110142657_InitialCreate.cs e snapshot de modelo ArenaDbContextModelSnapshot.cs.
+  8. **DatabaseStartupValidator:** Validador executado no boot com teste de socket TCP na porta 5432 (timeout 3s), exibição de banner no terminal e execução idempotente de db.Database.Migrate().
+  9. **PostgresArenaProjectStore:** Implementação corporativa de IArenaProjectStore suportada por IDbContextFactory<ArenaDbContext> (contextos efêmeros por operação), com normalização estrita de datas em UTC (.ToUniversalTime()), geração de IDs com prefixos semânticos (evt-, proj-, judge-) e máquina de estados canônica do pitch integrada.
+  10. **Program.cs Wire-up:** Registro no container de DI via AddPooledDbContextFactory<ArenaDbContext>, injeção condicional de IArenaProjectStore e chamada ao validador de startup.
+  11. **Suíte Dedicada de Persistência:** Implementado 	ests/test-postgres-persistence.cjs com 31 asserções cobrindo CRUD de eventos, projetos, jurados com 	ext[], alocação de banca, histórico arquivado com jsonb e prova de sobrevivência física dos dados pós-restart completo do backend.
+- **Arquivos Criados/Alterados:**
+  - ackend/ArenaVoicePocBackend.csproj
+  - ackend/appsettings.json
+  - ackend/Domain/Entities/ActiveSessionState.cs
+  - ackend/Domain/DTOs/UpdateProjectDto.cs
+  - ackend/Persistence/ArenaDbContext.cs
+  - ackend/Persistence/ArenaDbContextFactory.cs
+  - ackend/Persistence/Options/ArenaPersistenceOptions.cs
+  - ackend/Persistence/Startup/DatabaseStartupValidator.cs
+  - ackend/Persistence/Configurations/*.cs (6 configurações)
+  - ackend/Persistence/Migrations/* (InitialCreate + ModelSnapshot)
+  - ackend/Services/PostgresArenaProjectStore.cs
+  - ackend/Program.cs
+  - 	ests/test-postgres-persistence.cjs
+  - 	ests/test-projects-api.cjs
+- **Resultados de Homologação:** 497/497 testes aprovados em 10 suítes (100% de sucesso, 0 falhas, 0 regressões).

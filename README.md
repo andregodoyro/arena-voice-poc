@@ -1,7 +1,7 @@
 ﻿# Arena Voice — Plataforma de Avaliação e Espetáculo de Inovação
 
-> **Status:** Fase 3 Concluída e Homologada (Milestones 3A a 3E) \| 466/466 Testes Aprovados (100% Verde)  
-> **Versão Estável Atual:** `v0.3.0-phase3`  
+> **Status:** Fases 1 a 3 e Milestone 4A Concluídos e Homologados \| 497/497 Testes Aprovados (100% Verde)  
+> **Versão Estável Atual:** `v0.4.0-phase4a`  
 > **Objetivo:** Plataforma completa para condução de bancas avaliadoras, pitch days e demo days corporativos com dinamismo cênico em tempo real, backend autoritativo, telão 3D procedural e cockpit operacional da mesa técnica.
 
 ---
@@ -32,6 +32,7 @@ A plataforma separa com rigor quatro papéis funcionais interligados por rede lo
                       │ • Round History & Result Engine              │
                       │ • Catálogo de Jurados & Alocação de Banca    │
                       │ • Hub SignalR Realtime em /hubs/arena-poc    │
+                       │ • Persistência Relacional (PostgreSQL 18.6)  │
                       └──────────────┬───────────────────────────────┘
                                      │
            ┌─────────────────────────┴────────────────────────┐
@@ -105,6 +106,12 @@ O frontend é uma SPA reativa desenvolvida em **React 19**, **Vite** e **Tailwin
 
 ---
 
+### 3.6. Persistência Relacional & Storage Engine (Milestone 4A)
+- **PostgreSQL Portable 18.6:** Cluster ACID local executado sem instalador de SO e sem necessidade de permissões de administrador de TI.
+- **EF Core 10 & Npgsql 10:** Modelagem objeto-relacional avançada com suporte nativo a 	ext[] (expertises de jurados), int[] (cadeiras que votaram) e jsonb (snapshots imutáveis de temporizadores).
+- **DatabaseStartupValidator:** Teste de conectividade TCP em localhost:5432 no boot e aplicação automática e idempotente de migrações (InitialCreate).
+- **Store Híbrido com IDbContextFactory:** PostgresArenaProjectStore isola contextos efêmeros por operação de banco e mantém o estado de palco em tempo real em memória.
+- **Sobrevivência Pós-Restart:** Registros de eventos, startups, jurados e histórico persistem intactos após encerramento forçado e reinicialização a frio.
 ## 📡 4. Contratos de Comunicação e APIs
 
 ### Endpoints REST Auditados
@@ -231,6 +238,7 @@ node tests/homologation-2d5.cjs
 node tests/test-timers-lockout.cjs
 node tests/test-round-history.cjs
 node tests/test-judges-jury.cjs
+node tests/test-postgres-persistence.cjs
 ```
 
 
@@ -242,7 +250,7 @@ Consulte o **[Índice Mestre da Documentação (`docs/README.md`)](docs/README.m
 
 | Área Temática | Documentos Principais |
 | :--- | :--- |
-| **Arquitetura & Decisões** | [Arquitetura Geral (`docs/architecture.md`)](docs/architecture.md) • [Catálogo de ADRs — ADR-001 a ADR-017 (`docs/decision-records/`)](docs/decision-records/) |
+| **Arquitetura & Decisões** | [Arquitetura Geral (`docs/architecture.md`)](docs/architecture.md) • [Catálogo de ADRs — ADR-001 a ADR-019 (`docs/decision-records/`)](docs/decision-records/) |
 | **Produto & Visão** | [Roadmap e Planejamento Progressivo (`docs/roadmap.md`)](docs/roadmap.md) |
 | **Infraestrutura & Campo** | [Guia de Hardware ESP32 (`docs/hardware.md`)](docs/hardware.md) • [Guia de Rede e Hotspot (`docs/network.md`)](docs/network.md) |
 | **Histórico Operacional** | [Tabela Mestra de Marcos (`docs/archives/milestone-history.md`)](docs/archives/milestone-history.md) • [Diário Técnico (`docs/archives/implementation-history.md`)](docs/archives/implementation-history.md) |

@@ -1,7 +1,7 @@
 ﻿# Índice Mestre da Documentação — Arena Voice
 
 > **Status da Plataforma:** Fase 3 Concluída e Homologada (`v0.3.0-phase3`)  
-> **Cobertura Automatizada:** 466 verificações em 9 suítes (100% aprovadas, zero falhas, zero regressões)  
+> **Cobertura Automatizada:** 497 verificações em 10 suítes (100% aprovadas, zero falhas, zero regressões)  
 > **Última Atualização:** Novembro de 2026
 
 Bem-vindo ao índice central da documentação técnica e de produto do **Arena Voice**. Utilize este guia para navegar pelos documentos oficiais organizados por área temática.
@@ -13,7 +13,7 @@ Bem-vindo ao índice central da documentação técnica e de produto do **Arena 
 Documentos que regem as regras de negócio, contratos de integração, padrões de projeto e decisões formais de engenharia:
 
 - **[Arquitetura do Sistema (`docs/architecture.md`)](architecture.md):** Documento mestre da arquitetura. Detalha a separação dos quatro papéis (Operator, Stage, Backend, Infraestrutura), `ActiveContext`, ciclo de vida de eventos (5 estados), ciclo do pitch (6 estágios), cronômetros autoritativos, lockout físico/digital (HTTP 409), Result Engine em dois níveis, catálogo de jurados, tabela completa com os 34 endpoints REST e 9 contratos SignalR.
-- **[Registros de Decisão Arquitetural — ADRs (`docs/decision-records/`)](decision-records/):** Catálogo formal de todas as 17 decisões arquiteturais homologadas no projeto:
+- **[Registros de Decisão Arquitetural — ADRs (`docs/decision-records/`)](decision-records/):** Catálogo formal de todas as 19 decisões arquiteturais homologadas no projeto:
   - `ADR-001` a `ADR-010`: Fundações da Fase 1 e Fase 2 (Backend autoritativo, Snapshot-First, Desacoplamento Cênico, etc.).
   - `ADR-011` a `ADR-015`: Decisões críticas da Fase 3 (Governança de Eventos, Pitch Lifecycle, Timers & Lockout, Result Engine, Identidade de Jurados).
   - `ADR-016` e `ADR-017`: Decisões estratégicas da Fase 4 e Roadmap V2 (Persistência Offline-First com SQLite e Priorização de Confiabilidade sobre Telas Prematuras).
@@ -44,6 +44,17 @@ Registros acumulados de evolução contínua mantidos ativamente em todas as fas
 
 ---
 
+---
+
+## 💾 Documentação do Milestone 4A (Storage Engine & Relational Schema)
+
+Documentos de encerramento, governança e memória técnica do Milestone 4A:
+
+- **[Relatório de Encerramento do 4A (docs/Phase4A-Closure-Report.md)](Phase4A-Closure-Report.md):** Relatório executivo com escopo planejado x realizado, benefícios, critérios de aceite e evidências.
+- **[Histórico de Implementação do 4A (docs/Phase4A-Implementation-History.md)](Phase4A-Implementation-History.md):** Registro passo a passo de todas as 10 etapas (4A.1 a 4A.10).
+- **[Resumo Arquitetural do 4A (docs/Phase4A-Architecture-Summary.md)](Phase4A-Architecture-Summary.md):** Diagrama e fluxo de inicialização detalhado da camada relacional híbrida.
+- **[Decisões Arquiteturais do 4A (docs/Phase4A-Architectural-Decisions.md)](Phase4A-Architectural-Decisions.md):** Justificativas técnicas e ajustes homologados.
+- **[Lições Aprendidas do 4A (docs/Phase4A-Lessons-Learned.md)](Phase4A-Lessons-Learned.md):** Desafios, erros evitados e recomendações críticas para o Milestone 4B.
 ## 🔄 Retrospectivas de Fase
 
 Documentos formais de fechamento, lições aprendidas e governança emitidos ao final de cada fase:
