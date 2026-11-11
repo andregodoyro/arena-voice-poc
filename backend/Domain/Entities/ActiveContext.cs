@@ -13,5 +13,12 @@ public record ActiveContext
     public DateTimeOffset? PausedAt { get; init; }
     public double TotalPausedSeconds { get; init; } = 0.0;
     public bool IsVotingAllowed => PitchStage == PitchStage.VotingOpen && !IsPaused;
+
+    // Metadados operacionais de Crash Recovery (Milestone 4B)
+    public bool RecoveredFromCrash { get; init; } = false;
+    public PitchStage? InterruptedStage { get; init; }
+    public DateTimeOffset? RecoveredAt { get; init; }
+    public DateTimeOffset? LastCheckpointAt { get; init; }
+
     public DateTimeOffset LastUpdated { get; init; } = DateTimeOffset.UtcNow;
 }

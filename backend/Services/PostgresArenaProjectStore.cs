@@ -11,9 +11,10 @@ public class PostgresArenaProjectStore : IArenaProjectStore
 {
     private readonly IDbContextFactory<ArenaDbContext> _contextFactory;
     private readonly object _contextLock = new();
+    private readonly object _dbPersistenceLock = new();
 
     // -------------------------------------------------------------------------
-    // ESTADO VOLÁTIL EM MEMÓRIA (Preservado no Milestone 4A; Escopo de 4B)
+    // HOT-CACHE EM MEMÓRIA (Milestone 4B: Sincronizado via Snapshot Pattern)
     // -------------------------------------------------------------------------
     private readonly ConcurrentDictionary<int, bool> _chairStates = new(new[]
     {
@@ -34,6 +35,12 @@ public class PostgresArenaProjectStore : IArenaProjectStore
     private double _totalPausedSeconds = 0.0;
     private DateTimeOffset _lastUpdated = DateTimeOffset.UtcNow;
 
+    // Metadados operacionais de Crash Recovery (Milestone 4B)
+    private bool _recoveredFromCrash = false;
+    private PitchStage? _interruptedStage = null;
+    private DateTimeOffset? _recoveredAt = null;
+    private DateTimeOffset? _lastCheckpointAt = null;
+
     private bool _isCurrentRoundArchived = false;
     private bool _hasReachedVoting = false;
     private DateTimeOffset? _currentRoundStartedAt = DateTimeOffset.UtcNow;
@@ -42,6 +49,165 @@ public class PostgresArenaProjectStore : IArenaProjectStore
     {
         _contextFactory = contextFactory;
         InitializeAndSeedDatabase();
+        RehydrateSessionState();
+    }
+
+    // =========================================================================
+    // SNAPSHOT PATTERN: PERSISTÊNCIA FORA DO LOCK PRINCIPAL (Milestone 4B.2)
+    // =========================================================================
+    private ActiveSessionSnapshot CreateSnapshotUnderLock()
+    {
+        int[] turnedChairs = _chairStates
+            .Where(kvp => kvp.Value)
+            .Select(kvp => kvp.Key)
+            .OrderBy(c => c)
+            .ToArray();
+
+        return new ActiveSessionSnapshot(
+            SingletonId: 1,
+            CurrentEventId: _currentEventId,
+            CurrentProjectId: _currentProjectId,
+            PitchStage: _pitchStage,
+            PitchStageStartedAt: _pitchStageStartedAt,
+            CurrentStageDurationSeconds: _stageDurationSeconds,
+            IsPaused: _isTimerPaused,
+            PausedAt: _timerPausedAt,
+            TotalPausedSeconds: _totalPausedSeconds,
+            TurnedChairs: turnedChairs,
+            RecoveredFromCrash: _recoveredFromCrash,
+            InterruptedStage: _interruptedStage,
+            RecoveredAt: _recoveredAt,
+            LastCheckpointAt: _lastCheckpointAt,
+            LastUpdated: _lastUpdated
+        );
+    }
+
+    private void PersistSnapshot(ActiveSessionSnapshot snapshot)
+    {
+        lock (_dbPersistenceLock)
+        {
+            using var context = _contextFactory.CreateDbContext();
+            var entity = context.ActiveSessionState.FirstOrDefault(s => s.SingletonId == snapshot.SingletonId);
+            var now = DateTimeOffset.UtcNow;
+
+            if (entity == null)
+            {
+                entity = new ActiveSessionState
+                {
+                    SingletonId = snapshot.SingletonId,
+                    CurrentEventId = snapshot.CurrentEventId,
+                    CurrentProjectId = snapshot.CurrentProjectId,
+                    PitchStage = snapshot.PitchStage,
+                    PitchStageStartedAt = snapshot.PitchStageStartedAt,
+                    CurrentStageDurationSeconds = snapshot.CurrentStageDurationSeconds,
+                    IsPaused = snapshot.IsPaused,
+                    PausedAt = snapshot.PausedAt,
+                    TotalPausedSeconds = snapshot.TotalPausedSeconds,
+                    TurnedChairs = snapshot.TurnedChairs,
+                    RecoveredFromCrash = snapshot.RecoveredFromCrash,
+                    InterruptedStage = snapshot.InterruptedStage,
+                    RecoveredAt = snapshot.RecoveredAt,
+                    LastCheckpointAt = now,
+                    LastUpdated = snapshot.LastUpdated
+                };
+                context.ActiveSessionState.Add(entity);
+            }
+            else
+            {
+                entity.CurrentEventId = snapshot.CurrentEventId;
+                entity.CurrentProjectId = snapshot.CurrentProjectId;
+                entity.PitchStage = snapshot.PitchStage;
+                entity.PitchStageStartedAt = snapshot.PitchStageStartedAt;
+                entity.CurrentStageDurationSeconds = snapshot.CurrentStageDurationSeconds;
+                entity.IsPaused = snapshot.IsPaused;
+                entity.PausedAt = snapshot.PausedAt;
+                entity.TotalPausedSeconds = snapshot.TotalPausedSeconds;
+                entity.TurnedChairs = snapshot.TurnedChairs;
+                entity.RecoveredFromCrash = snapshot.RecoveredFromCrash;
+                entity.InterruptedStage = snapshot.InterruptedStage;
+                entity.RecoveredAt = snapshot.RecoveredAt;
+                entity.LastCheckpointAt = now;
+                entity.LastUpdated = snapshot.LastUpdated;
+            }
+
+            context.SaveChanges();
+
+            // Atualiza timestamp de checkpoint no Hot-Cache em memória
+            lock (_contextLock)
+            {
+                _lastCheckpointAt = now;
+            }
+        }
+    }
+
+    // =========================================================================
+    // REHYDRATION ENGINE: BOOT & RESTAURAÇÃO DE CONTEXTO (Milestone 4B.3)
+    // =========================================================================
+    private void RehydrateSessionState()
+    {
+        lock (_dbPersistenceLock)
+        {
+            using var context = _contextFactory.CreateDbContext();
+            var session = context.ActiveSessionState.AsNoTracking().FirstOrDefault(s => s.SingletonId == 1);
+
+            if (session == null)
+            {
+                // Primeira execução: cria a tupla singleton com o evento ativo padrão
+                ActiveSessionSnapshot initialSnapshot;
+                lock (_contextLock)
+                {
+                    initialSnapshot = CreateSnapshotUnderLock();
+                }
+                PersistSnapshot(initialSnapshot);
+                return;
+            }
+
+            lock (_contextLock)
+            {
+                // 1. Restaura contexto de Evento e Projeto
+                if (!string.IsNullOrEmpty(session.CurrentEventId) && context.Events.Any(e => e.Id == session.CurrentEventId))
+                {
+                    _currentEventId = session.CurrentEventId;
+                }
+
+                if (!string.IsNullOrEmpty(session.CurrentProjectId) && context.Projects.Any(p => p.Id == session.CurrentProjectId))
+                {
+                    _currentProjectId = session.CurrentProjectId;
+                }
+
+                // 2. Restaura Máquina de Estados e Timers
+                _pitchStage = session.PitchStage;
+                _pitchStageStartedAt = session.PitchStageStartedAt;
+                _stageDurationSeconds = session.CurrentStageDurationSeconds;
+                _isTimerPaused = session.IsPaused;
+                _timerPausedAt = session.PausedAt;
+                _totalPausedSeconds = session.TotalPausedSeconds;
+                _lastUpdated = session.LastUpdated;
+
+                // 3. Restaura Metadados de Recuperação e Checkpoint
+                _recoveredFromCrash = session.RecoveredFromCrash;
+                _interruptedStage = session.InterruptedStage;
+                _recoveredAt = session.RecoveredAt;
+                _lastCheckpointAt = session.LastCheckpointAt;
+
+                // 4. Restaura Estado das Cadeiras Físicas (turned_chairs)
+                for (int i = 1; i <= 5; i++)
+                {
+                    _chairStates[i] = false;
+                }
+
+                if (session.TurnedChairs != null && session.TurnedChairs.Length > 0)
+                {
+                    foreach (var chairId in session.TurnedChairs)
+                    {
+                        if (chairId >= 1 && chairId <= 5)
+                        {
+                            _chairStates[chairId] = true;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // =========================================================================
@@ -355,6 +521,10 @@ public class PostgresArenaProjectStore : IArenaProjectStore
                 IsPaused = _isTimerPaused,
                 PausedAt = _timerPausedAt,
                 TotalPausedSeconds = _totalPausedSeconds,
+                RecoveredFromCrash = _recoveredFromCrash,
+                InterruptedStage = _interruptedStage,
+                RecoveredAt = _recoveredAt,
+                LastCheckpointAt = _lastCheckpointAt,
                 LastUpdated = _lastUpdated
             };
         }
@@ -386,6 +556,7 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         var exists = context.Events.Any(e => e.Id == eventId);
         if (!exists) return false;
 
+        ActiveSessionSnapshot snapshot;
         lock (_contextLock)
         {
             _currentEventId = eventId;
@@ -399,7 +570,11 @@ public class PostgresArenaProjectStore : IArenaProjectStore
                     _currentProjectId = null;
                 }
             }
+
+            snapshot = CreateSnapshotUnderLock();
         }
+
+        PersistSnapshot(snapshot);
         return true;
     }
 
@@ -407,11 +582,14 @@ public class PostgresArenaProjectStore : IArenaProjectStore
     {
         if (projectId == null)
         {
+            ActiveSessionSnapshot nullSnapshot;
             lock (_contextLock)
             {
                 _currentProjectId = null;
                 _lastUpdated = DateTimeOffset.UtcNow;
+                nullSnapshot = CreateSnapshotUnderLock();
             }
+            PersistSnapshot(nullSnapshot);
             return true;
         }
 
@@ -419,12 +597,16 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         var proj = context.Projects.AsNoTracking().FirstOrDefault(p => p.Id == projectId);
         if (proj == null) return false;
 
+        ActiveSessionSnapshot snapshot;
         lock (_contextLock)
         {
             if (_currentEventId != null && proj.EventId != _currentEventId) return false;
             _currentProjectId = projectId;
             _lastUpdated = DateTimeOffset.UtcNow;
+            snapshot = CreateSnapshotUnderLock();
         }
+
+        PersistSnapshot(snapshot);
         return true;
     }
 
@@ -438,6 +620,8 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         }
 
         Round? archivedRound = null;
+        ActiveSessionSnapshot snapshot;
+        Project? previousProj = null;
 
         lock (_contextLock)
         {
@@ -452,7 +636,6 @@ public class PostgresArenaProjectStore : IArenaProjectStore
                 archivedRound = ArchiveCurrentRoundInternal(context, "Mudança de Projeto no Palco");
             }
 
-            Project? previousProj = null;
             if (_currentProjectId != null)
             {
                 previousProj = context.Projects.FirstOrDefault(p => p.Id == _currentProjectId);
@@ -481,10 +664,12 @@ public class PostgresArenaProjectStore : IArenaProjectStore
             _currentRoundStartedAt = DateTimeOffset.UtcNow;
             _lastUpdated = DateTimeOffset.UtcNow;
 
-            ResetChairs();
-
-            return new SelectProjectResult(true, newProj, previousProj, null, archivedRound);
+            ResetChairsInternal();
+            snapshot = CreateSnapshotUnderLock();
         }
+
+        PersistSnapshot(snapshot);
+        return new SelectProjectResult(true, newProj, previousProj, null, archivedRound);
     }
 
     // =========================================================================
@@ -582,6 +767,7 @@ public class PostgresArenaProjectStore : IArenaProjectStore
 
         context.SaveChanges();
 
+        ActiveSessionSnapshot snapshot;
         lock (_contextLock)
         {
             _currentEventId = targetEvent.Id;
@@ -598,9 +784,11 @@ public class PostgresArenaProjectStore : IArenaProjectStore
             _isCurrentRoundArchived = false;
             _lastUpdated = DateTimeOffset.UtcNow;
 
-            ResetChairs();
+            ResetChairsInternal();
+            snapshot = CreateSnapshotUnderLock();
         }
 
+        PersistSnapshot(snapshot);
         return new ActivateEventResult(true, targetEvent, previousActiveEvent);
     }
 
@@ -614,6 +802,7 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         target.UpdatedAt = DateTimeOffset.UtcNow;
         context.SaveChanges();
 
+        ActiveSessionSnapshot? snapshotToPersist = null;
         lock (_contextLock)
         {
             if (_currentEventId == eventId)
@@ -626,8 +815,14 @@ public class PostgresArenaProjectStore : IArenaProjectStore
                 _currentProjectId = null;
                 _pitchStage = PitchStage.Waiting;
                 _lastUpdated = DateTimeOffset.UtcNow;
-                ResetChairs();
+                ResetChairsInternal();
+                snapshotToPersist = CreateSnapshotUnderLock();
             }
+        }
+
+        if (snapshotToPersist != null)
+        {
+            PersistSnapshot(snapshotToPersist);
         }
 
         return target;
@@ -1081,6 +1276,10 @@ public class PostgresArenaProjectStore : IArenaProjectStore
 
     public PitchTransitionResult TransitionPitch(PitchStage targetStage)
     {
+        Round? archivedRound = null;
+        ActiveSessionSnapshot? snapshotToPersist = null;
+        PitchStage previousStage;
+
         lock (_contextLock)
         {
             if (string.IsNullOrEmpty(_currentProjectId))
@@ -1119,7 +1318,7 @@ public class PostgresArenaProjectStore : IArenaProjectStore
                 );
             }
 
-            var previousStage = _pitchStage;
+            previousStage = _pitchStage;
             _pitchStage = targetStage;
             _pitchStageStartedAt = DateTimeOffset.UtcNow;
             _isTimerPaused = false;
@@ -1144,7 +1343,6 @@ public class PostgresArenaProjectStore : IArenaProjectStore
                 _hasReachedVoting = true;
             }
 
-            Round? archivedRound = null;
             if (targetStage == PitchStage.Finished)
             {
                 var project = context.Projects.FirstOrDefault(p => p.Id == _currentProjectId);
@@ -1162,12 +1360,22 @@ public class PostgresArenaProjectStore : IArenaProjectStore
                 context.SaveChanges();
             }
 
-            return new PitchTransitionResult(true, previousStage, _pitchStage, _pitchStageStartedAt, null, ArchivedRound: archivedRound);
+            snapshotToPersist = CreateSnapshotUnderLock();
         }
+
+        if (snapshotToPersist != null)
+        {
+            PersistSnapshot(snapshotToPersist);
+        }
+
+        return new PitchTransitionResult(true, previousStage, _pitchStage, _pitchStageStartedAt, null, ArchivedRound: archivedRound);
     }
 
     public PitchResetResult ResetPitch()
     {
+        ActiveSessionSnapshot snapshot;
+        PitchResetResult result;
+
         lock (_contextLock)
         {
             _pitchStage = PitchStage.Waiting;
@@ -1180,14 +1388,26 @@ public class PostgresArenaProjectStore : IArenaProjectStore
             _hasReachedVoting = false;
             _isCurrentRoundArchived = false;
 
-            ResetChairs();
+            // Limpa metadados de recovery ao resetar
+            _recoveredFromCrash = false;
+            _interruptedStage = null;
+            _recoveredAt = null;
 
-            return new PitchResetResult(true, _pitchStage, _pitchStageStartedAt.Value, _currentProjectId);
+            ResetChairsInternal();
+            snapshot = CreateSnapshotUnderLock();
+
+            result = new PitchResetResult(true, _pitchStage, _pitchStageStartedAt.Value, _currentProjectId);
         }
+
+        PersistSnapshot(snapshot);
+        return result;
     }
 
     public PitchTimerActionResult PausePitchTimer()
     {
+        ActiveSessionSnapshot? snapshotToPersist = null;
+        PitchTimerActionResult result;
+
         lock (_contextLock)
         {
             if (_pitchStage == PitchStage.Waiting || _pitchStage == PitchStage.Finished)
@@ -1203,12 +1423,23 @@ public class PostgresArenaProjectStore : IArenaProjectStore
             _timerPausedAt = DateTimeOffset.UtcNow;
             _lastUpdated = DateTimeOffset.UtcNow;
 
-            return new PitchTimerActionResult(true, true, _timerPausedAt, CalculateRemainingSeconds(), _stageDurationSeconds);
+            snapshotToPersist = CreateSnapshotUnderLock();
+            result = new PitchTimerActionResult(true, true, _timerPausedAt, CalculateRemainingSeconds(), _stageDurationSeconds);
         }
+
+        if (snapshotToPersist != null)
+        {
+            PersistSnapshot(snapshotToPersist);
+        }
+
+        return result;
     }
 
     public PitchTimerActionResult ResumePitchTimer()
     {
+        ActiveSessionSnapshot? snapshotToPersist = null;
+        PitchTimerActionResult result;
+
         lock (_contextLock)
         {
             if (!_isTimerPaused || !_timerPausedAt.HasValue)
@@ -1222,19 +1453,34 @@ public class PostgresArenaProjectStore : IArenaProjectStore
             _timerPausedAt = null;
             _lastUpdated = DateTimeOffset.UtcNow;
 
-            return new PitchTimerActionResult(true, false, null, CalculateRemainingSeconds(), _stageDurationSeconds);
+            snapshotToPersist = CreateSnapshotUnderLock();
+            result = new PitchTimerActionResult(true, false, null, CalculateRemainingSeconds(), _stageDurationSeconds);
         }
+
+        if (snapshotToPersist != null)
+        {
+            PersistSnapshot(snapshotToPersist);
+        }
+
+        return result;
     }
 
     public PitchTimerActionResult AdjustPitchTimer(int addSeconds)
     {
+        ActiveSessionSnapshot snapshot;
+        PitchTimerActionResult result;
+
         lock (_contextLock)
         {
             _stageDurationSeconds = Math.Max(0, _stageDurationSeconds + addSeconds);
             _lastUpdated = DateTimeOffset.UtcNow;
 
-            return new PitchTimerActionResult(true, _isTimerPaused, _timerPausedAt, CalculateRemainingSeconds(), _stageDurationSeconds);
+            snapshot = CreateSnapshotUnderLock();
+            result = new PitchTimerActionResult(true, _isTimerPaused, _timerPausedAt, CalculateRemainingSeconds(), _stageDurationSeconds);
         }
+
+        PersistSnapshot(snapshot);
+        return result;
     }
 
     private double CalculateRemainingSeconds()
@@ -1272,7 +1518,7 @@ public class PostgresArenaProjectStore : IArenaProjectStore
     };
 
     // =========================================================================
-    // 8. CADEIRAS DA ARENA & LOCKOUT (Mantidos em Memória / Hardware State)
+    // 8. CADEIRAS DA ARENA & LOCKOUT (Persistência Fora do Lock Principal)
     // =========================================================================
     public ChairPressResult TryTurnChair(int chairId, string source)
     {
@@ -1284,6 +1530,9 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         using var context = _contextFactory.CreateDbContext();
         var currentEvent = context.Events.AsNoTracking().FirstOrDefault(e => e.Id == _currentEventId);
         var lockoutEnabled = currentEvent?.Timers.LockoutEnabled ?? false;
+
+        ActiveSessionSnapshot? snapshotToPersist = null;
+        ChairPressResult result;
 
         lock (_contextLock)
         {
@@ -1306,20 +1555,38 @@ public class PostgresArenaProjectStore : IArenaProjectStore
 
             _chairStates[chairId] = true;
             _lastUpdated = DateTimeOffset.UtcNow;
-            return new ChairPressResult(true, false, false, false, chairId, GetActiveChairCount());
+
+            snapshotToPersist = CreateSnapshotUnderLock();
+            result = new ChairPressResult(true, false, false, false, chairId, GetActiveChairCount());
         }
+
+        if (snapshotToPersist != null)
+        {
+            PersistSnapshot(snapshotToPersist);
+        }
+
+        return result;
     }
 
-    public void ResetChairs()
+    private void ResetChairsInternal()
     {
         for (int i = 1; i <= 5; i++)
         {
             _chairStates[i] = false;
         }
+        _lastUpdated = DateTimeOffset.UtcNow;
+    }
+
+    public void ResetChairs()
+    {
+        ActiveSessionSnapshot snapshot;
         lock (_contextLock)
         {
-            _lastUpdated = DateTimeOffset.UtcNow;
+            ResetChairsInternal();
+            snapshot = CreateSnapshotUnderLock();
         }
+
+        PersistSnapshot(snapshot);
     }
 
     public IReadOnlyDictionary<int, bool> GetChairStates() => _chairStates;
