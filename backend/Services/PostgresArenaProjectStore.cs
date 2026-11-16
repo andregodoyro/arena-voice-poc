@@ -12,6 +12,7 @@ public class PostgresArenaProjectStore : IArenaProjectStore
 {
     private readonly IDbContextFactory<ArenaDbContext> _contextFactory;
     private readonly IAuditEventPublisher? _auditPublisher;
+    private readonly IBackupOrchestrator? _backupOrchestrator;
     private readonly object _contextLock = new();
     private readonly object _dbPersistenceLock = new();
 
@@ -49,10 +50,12 @@ public class PostgresArenaProjectStore : IArenaProjectStore
 
     public PostgresArenaProjectStore(
         IDbContextFactory<ArenaDbContext> contextFactory,
-        IAuditEventPublisher? auditPublisher = null)
+        IAuditEventPublisher? auditPublisher = null,
+        IBackupOrchestrator? backupOrchestrator = null)
     {
         _contextFactory = contextFactory;
         _auditPublisher = auditPublisher;
+        _backupOrchestrator = backupOrchestrator;
         InitializeAndSeedDatabase();
         RehydrateSessionState();
     }
@@ -749,6 +752,7 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         }
 
         Round? archivedRound = null;
+        int archivedRoundNumber = 0;
         ActiveSessionSnapshot snapshot;
         Project? previousProj = null;
 
@@ -781,6 +785,10 @@ public class PostgresArenaProjectStore : IArenaProjectStore
             newProj.UpdatedAt = DateTimeOffset.UtcNow;
 
             context.SaveChanges();
+            if (archivedRound != null)
+            {
+                archivedRoundNumber = context.RoundHistoryEntries.Count(r => r.EventId == archivedRound.EventId);
+            }
 
             _currentProjectId = projectId;
             _pitchStage = PitchStage.Waiting;
@@ -798,6 +806,11 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         }
 
         PersistSnapshot(snapshot);
+
+        if (archivedRound != null && archivedRoundNumber > 0)
+        {
+            OnRoundArchived(archivedRound, archivedRoundNumber, "Mudança de Projeto no Palco");
+        }
 
         if (previousProj != null && previousProj.Id != projectId)
         {
@@ -1037,13 +1050,20 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         context.SaveChanges();
 
         ActiveSessionSnapshot? snapshotToPersist = null;
+        Round? archivedRound = null;
+        int archivedRoundNumber = 0;
         lock (_contextLock)
         {
             if (_currentEventId == eventId)
             {
                 if (!_isCurrentRoundArchived && _currentProjectId != null)
                 {
-                    ArchiveCurrentRoundInternal(context, "Encerramento do Evento");
+                    archivedRound = ArchiveCurrentRoundInternal(context, "Encerramento do Evento");
+                    if (archivedRound != null)
+                    {
+                        context.SaveChanges();
+                        archivedRoundNumber = context.RoundHistoryEntries.Count(r => r.EventId == archivedRound.EventId);
+                    }
                 }
                 _currentEventId = null;
                 _currentProjectId = null;
@@ -1057,6 +1077,11 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         if (snapshotToPersist != null)
         {
             PersistSnapshot(snapshotToPersist);
+        }
+
+        if (archivedRound != null && archivedRoundNumber > 0)
+        {
+            OnRoundArchived(archivedRound, archivedRoundNumber, "Encerramento do Evento");
         }
 
         _auditPublisher?.Publish(new AuditEventRecord(
@@ -1504,13 +1529,115 @@ public class PostgresArenaProjectStore : IArenaProjectStore
 
     public Round? ArchiveCurrentRound(string reason = "Manual")
     {
+        Round? round = null;
+        int roundNumber = 1;
+
         lock (_contextLock)
         {
             if (_isCurrentRoundArchived) return null;
             using var context = _contextFactory.CreateDbContext();
-            var round = ArchiveCurrentRoundInternal(context, reason);
-            context.SaveChanges();
-            return round;
+            round = ArchiveCurrentRoundInternal(context, reason);
+            if (round != null)
+            {
+                context.SaveChanges();
+                roundNumber = context.RoundHistoryEntries.Count(r => r.EventId == round.EventId);
+            }
+        }
+
+        if (round != null)
+        {
+            OnRoundArchived(round, roundNumber, reason);
+        }
+
+        return round;
+    }
+
+    private void OnRoundArchived(Round round, int roundNumber, string reason)
+    {
+        _auditPublisher?.Publish(new AuditEventRecord(
+            EventType: "RoundArchived",
+            AggregateType: "Round",
+            AggregateId: round.Id,
+            ArenaEventId: round.EventId,
+            ProjectId: round.ProjectId,
+            ActorType: ActorType.System,
+            Payload: new
+            {
+                roundId = round.Id,
+                result = round.Result.ToString(),
+                turnedChairs = round.TurnedChairs,
+                effectiveDurationSeconds = round.EffectiveDurationSeconds,
+                reason,
+                roundNumber
+            },
+            AfterState: new { status = "Archived" },
+            EventVersion: 1
+        ));
+
+        TriggerAutoSnapshot(round, roundNumber);
+    }
+
+    private void TriggerAutoSnapshot(Round round, int roundNumber)
+    {
+        if (_backupOrchestrator == null)
+        {
+            return;
+        }
+
+        try
+        {
+            var backupId = Guid.NewGuid().ToString("N")[..8];
+            var requestedAt = DateTimeOffset.UtcNow;
+
+            _auditPublisher?.Publish(new AuditEventRecord(
+                EventType: "AutoSnapshotTriggered",
+                AggregateType: "System",
+                AggregateId: backupId,
+                ActorType: ActorType.System,
+                ActorName: "PostgresArenaProjectStore",
+                ArenaEventId: round.EventId,
+                ProjectId: round.ProjectId,
+                Payload: new
+                {
+                    backupId,
+                    trigger = "RoundArchived",
+                    roundNumber,
+                    roundId = round.Id,
+                    requestedAt
+                },
+                EventVersion: 1
+            ));
+
+            var request = new BackupRequest(
+                BackupId: backupId,
+                TriggerType: "RoundArchived",
+                RequestedAt: requestedAt,
+                ActorId: "system",
+                ActorName: "PostgresArenaProjectStore",
+                RoundNumber: roundNumber,
+                CorrelationId: round.Id
+            );
+
+            _ = _backupOrchestrator.EnqueueBackupAsync(request);
+        }
+        catch (Exception ex)
+        {
+            _auditPublisher?.Publish(new AuditEventRecord(
+                EventType: "AutoSnapshotFailed",
+                AggregateType: "System",
+                AggregateId: round.Id,
+                ActorType: ActorType.System,
+                ActorName: "PostgresArenaProjectStore",
+                Success: false,
+                ErrorMessage: $"Falha ao disparar snapshot automático: {ex.Message}",
+                Payload: new
+                {
+                    error = ex.Message,
+                    roundId = round.Id,
+                    roundNumber
+                },
+                EventVersion: 1
+            ));
         }
     }
 
@@ -1633,6 +1760,7 @@ public class PostgresArenaProjectStore : IArenaProjectStore
     public PitchTransitionResult TransitionPitch(PitchStage targetStage)
     {
         Round? archivedRound = null;
+        int archivedRoundNumber = 0;
         ActiveSessionSnapshot? snapshotToPersist = null;
         PitchStage previousStage;
 
@@ -1714,6 +1842,10 @@ public class PostgresArenaProjectStore : IArenaProjectStore
                     archivedRound = ArchiveCurrentRoundInternal(context, "Finished");
                 }
                 context.SaveChanges();
+                if (archivedRound != null)
+                {
+                    archivedRoundNumber = context.RoundHistoryEntries.Count(r => r.EventId == archivedRound.EventId);
+                }
             }
 
             snapshotToPersist = CreateSnapshotUnderLock();
@@ -1722,6 +1854,11 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         if (snapshotToPersist != null)
         {
             PersistSnapshot(snapshotToPersist);
+        }
+
+        if (archivedRound != null && archivedRoundNumber > 0)
+        {
+            OnRoundArchived(archivedRound, archivedRoundNumber, "Finished");
         }
 
         // Instrumentação do ciclo de vida do Pitch (Milestone 4C.3)

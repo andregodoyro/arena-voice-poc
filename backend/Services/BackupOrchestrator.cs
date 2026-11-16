@@ -115,8 +115,11 @@ public class BackupOrchestrator : IBackupOrchestrator
                 _logger.LogInformation("✅ Backup {BackupId} concluído com sucesso em {DurationMs}ms. Tamanho: {Bytes} bytes.",
                     request.BackupId, sw.ElapsedMilliseconds, fileInfo.Length);
 
+                var isAutoSnapshot = request.TriggerType.Equals("RoundArchived", StringComparison.OrdinalIgnoreCase);
+                var successEventType = isAutoSnapshot ? "AutoSnapshotCreated" : "BackupSucceeded";
+
                 _auditPublisher.Publish(new AuditEventRecord(
-                    EventType: "BackupSucceeded",
+                    EventType: successEventType,
                     AggregateType: "System",
                     AggregateId: request.BackupId,
                     ActorType: ActorType.System,
@@ -148,8 +151,11 @@ public class BackupOrchestrator : IBackupOrchestrator
                 var errorMsg = $"pg_dump finalizou com código {process.ExitCode}. Erro: {standardError}";
                 _logger.LogError("❌ Falha no pg_dump para backup {BackupId}: {Error}", request.BackupId, errorMsg);
 
+                var isAutoSnapshot = request.TriggerType.Equals("RoundArchived", StringComparison.OrdinalIgnoreCase);
+                var failureEventType = isAutoSnapshot ? "AutoSnapshotFailed" : "BackupFailed";
+
                 _auditPublisher.Publish(new AuditEventRecord(
-                    EventType: "BackupFailed",
+                    EventType: failureEventType,
                     AggregateType: "System",
                     AggregateId: request.BackupId,
                     ActorType: ActorType.System,
@@ -162,7 +168,8 @@ public class BackupOrchestrator : IBackupOrchestrator
                         backupId = request.BackupId,
                         error = errorMsg,
                         exitCode = process.ExitCode,
-                        trigger = request.TriggerType
+                        trigger = request.TriggerType,
+                        roundNumber = request.RoundNumber
                     }
                 ));
 
@@ -179,8 +186,11 @@ public class BackupOrchestrator : IBackupOrchestrator
             sw.Stop();
             _logger.LogError(ex, "❌ Exceção ao executar backup {BackupId}.", request.BackupId);
 
+            var isAutoSnapshot = request.TriggerType.Equals("RoundArchived", StringComparison.OrdinalIgnoreCase);
+            var failureEventType = isAutoSnapshot ? "AutoSnapshotFailed" : "BackupFailed";
+
             _auditPublisher.Publish(new AuditEventRecord(
-                EventType: "BackupFailed",
+                EventType: failureEventType,
                 AggregateType: "System",
                 AggregateId: request.BackupId,
                 ActorType: ActorType.System,
@@ -192,7 +202,8 @@ public class BackupOrchestrator : IBackupOrchestrator
                 {
                     backupId = request.BackupId,
                     error = ex.Message,
-                    trigger = request.TriggerType
+                    trigger = request.TriggerType,
+                    roundNumber = request.RoundNumber
                 }
             ));
 
