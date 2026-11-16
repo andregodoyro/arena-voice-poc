@@ -1,3 +1,4 @@
+using ArenaVoicePocBackend.Configuration;
 using ArenaVoicePocBackend.Domain;
 using ArenaVoicePocBackend.Domain.DTOs;
 using ArenaVoicePocBackend.Domain.Entities;
@@ -69,6 +70,20 @@ builder.Services.AddHostedService<AuditEventWriter>();
 // AUDIT QUERY LAYER — CQRS LEITURA (MILESTONE 4C.4)
 // =========================================================================
 builder.Services.AddScoped<IAuditQueryService, AuditQueryService>();
+
+// =========================================================================
+// BACKUP ORCHESTRATION & DISASTER RECOVERY (MILESTONE 4D.1)
+// =========================================================================
+var backupSection = builder.Configuration.GetSection(BackupOptions.SectionName);
+builder.Services.Configure<BackupOptions>(backupSection);
+
+builder.Services.AddSingleton(Channel.CreateBounded<BackupRequest>(new BoundedChannelOptions(100)
+{
+    FullMode = BoundedChannelFullMode.Wait,
+    SingleReader = true
+}));
+builder.Services.AddSingleton<IBackupOrchestrator, BackupOrchestrator>();
+builder.Services.AddHostedService<BackupWorker>();
 
 if (string.Equals(effectiveStorageEngine, "memory", StringComparison.OrdinalIgnoreCase))
 {
@@ -1405,7 +1420,60 @@ app.MapGet("/api/audit/session", async (
 });
 
 // =========================================================================
-// 7. MAPEAMENTO DO HUB SIGNALR
+// 7. ENDPOINTS ADMINISTRATIVOS: BACKUP & DISASTER RECOVERY (MILESTONE 4D.1)
+// =========================================================================
+
+// POST /api/admin/backup — Solicitação assíncrona de backup manual
+app.MapPost("/api/admin/backup", async (
+    IBackupOrchestrator orchestrator,
+    IAuditEventPublisher auditPublisher,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    var backupId = Guid.NewGuid().ToString("N")[..8];
+    var clientIp = http.Connection.RemoteIpAddress?.ToString() ?? "local";
+    var requestedAt = DateTimeOffset.UtcNow;
+
+    var request = new BackupRequest(
+        BackupId: backupId,
+        TriggerType: "Manual",
+        RequestedAt: requestedAt,
+        ActorId: "operator-admin",
+        ActorName: "Operator",
+        SourceIp: clientIp
+    );
+
+    auditPublisher.Publish(new AuditEventRecord(
+        EventType: "BackupTriggered",
+        AggregateType: "System",
+        AggregateId: backupId,
+        ActorType: ActorType.Operator,
+        ActorName: "Operator",
+        SourceIp: clientIp,
+        Payload: new { backupId, trigger = "Manual", requestedAt }
+    ));
+
+    await orchestrator.EnqueueBackupAsync(request, ct);
+
+    return Results.Accepted("/api/admin/backups", new
+    {
+        jobId = backupId,
+        status = "queued",
+        trigger = "Manual",
+        requestedAt = requestedAt,
+        message = "Backup manual enfileirado com sucesso. Execução assíncrona iniciada."
+    });
+});
+
+// GET /api/admin/backups — Listagem dos backups disponíveis via Filesystem
+app.MapGet("/api/admin/backups", (IBackupOrchestrator orchestrator) =>
+{
+    var backups = orchestrator.GetAvailableBackups();
+    return Results.Ok(backups);
+});
+
+// =========================================================================
+// 8. MAPEAMENTO DO HUB SIGNALR
 // =========================================================================
 app.MapHub<ArenaPocHub>("/hubs/arena-poc");
 app.MapHub<ArenaPocHub>("/arenaHub"); // Rota retrocompatível
@@ -1430,6 +1498,9 @@ Console.WriteLine($"   GET  http://localhost:{port}/api/audit/{{id}}          (P
 Console.WriteLine($"   GET  http://localhost:{port}/api/audit/project/{{id}}  (Por Projeto)");
 Console.WriteLine($"   GET  http://localhost:{port}/api/audit/event/{{id}}    (Por Evento)");
 Console.WriteLine($"   GET  http://localhost:{port}/api/audit/session        (Sessão)");
+Console.WriteLine(" Backup & Disaster Recovery (4D.1):");
+Console.WriteLine($"   POST http://localhost:{port}/api/admin/backup        (Disparar backup manual)");
+Console.WriteLine($"   GET  http://localhost:{port}/api/admin/backups       (Listar backups disponíveis)");
 Console.WriteLine("-------------------------------------------------------------");
 Console.WriteLine(" Endereços IP locais desta máquina detectados:");
 try
