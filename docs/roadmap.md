@@ -1,4 +1,4 @@
-# ROADMAP ARENA VOICE / ARENA DE INOVAÇÃO
+﻿# ROADMAP ARENA VOICE / ARENA DE INOVAÇÃO
 ## Versão 2.0 — Roadmap V2: Show-Ready & Production-Ready First
 
 > **Classificação:** Documento Mestre de Produto e Arquitetura  
@@ -607,12 +607,13 @@ NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
   │     ├─ [x] 4D: Automated Snapshots, Backup & Disaster Recovery (BackupOrchestrator, pg_dump, Auto-Snapshots, Out-of-Process Restore & Runbook)
   │     └─ [⤹] 4E: Chaos Engineering & Reliability Test Suite (REABSORVIDO NA FASE 7)
   │
-  ├─► FASE 5: Live Show Experience & Audio Atmosphere ◄── [PRÓXIMO MARCO]
-  │     ├─ 5A: Web Audio Engine no Stage (/stage) & Unlock Policy
-  │     ├─ 5B: Sincronização Sonora com SignalR (Whoosh, Ticker e Gongo)
-  │     ├─ 5C: Efeitos de Clímax Cênico & Ambientação de Palco (Fanfarra e Tensão)
-  │     ├─ 5D: Soundboard do Operador no Cockpit (/operator) & Mute de Emergência
-  │     └─ 5E: Homologação Integrada de Áudio, Latência e Regressão Global
+  ├─► FASE 5: Live Show Experience & Immersive Stage ◄── [PRÓXIMO MARCO]
+  │     ├─ 5A: Audio Engine Infrastructure & Visual Rendering Foundation
+  │     ├─ 5B: Audio & Visual Event Synchronization (Whoosh, Glow e Ticker)
+  │     ├─ 5C: Stage Visual FX & Immersive Atmosphere (Volumetric, PBR e Confetes)
+  │     ├─ 5D: Cinematic Camera & Stage Direction (Modos de Palco e Câmeras)
+  │     ├─ 5E: Operator Show Control (Soundboard, Mute e Diretor de Palco)
+  │     └─ 5F: Live Show Validation & Performance Certification (60 FPS e Áudio < 50ms)
   │
   ├─► FASE 6: Awards Ceremony, Ranking & Executive Reports
   │     ├─ 6A: Motor de Ranking Oficial (Desempate por Modo de Aprovação e Votos)
@@ -702,58 +703,48 @@ NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
 
 ---
 
-### FASE 5: Live Show Experience & Audio Atmosphere
-*Elevar o valor sensorial e a dramaticidade cênica do telão 3D através de áudio estéreo imersivo em tempo real.*
+### FASE 5: Live Show Experience & Immersive Stage
+*Transformar a Arena Voice de uma plataforma operacional robusta em uma experiência de espetáculo ao vivo, integrando áudio cinemático Web Audio API, computação gráfica 3D com React Three Fiber e direção de palco.*
 
-- **STATUS:** 📅 PLANEJADA (Roadmap V2 — Próxima Fase Prioritária)
-- **OBJETIVO:** Integrar um motor de áudio imersivo de baixa latência no telão (`/stage`) via Web Audio API, atrelando efeitos sonoros cinemáticos e trilhas de tensão às mudanças de estado da apresentação e acionamentos soberanos da banca examinadora.
-- **PRÉ-REQUISITOS:** Fase 3 (Governança, Ciclo do Pitch, Timers e Result Engine) e Fase 4 (Persistência e Estabilidade de Sessão).
+- **STATUS:** 🚀 EM IMPLEMENTAÇÃO (Roadmap V2 — Milestone 5A Iniciado)
+- **OBJETIVO:** Integrar simultaneamente um motor de áudio imersivo de baixa latência e um pipeline visual cinematográfico no telão (/stage), sincronizando som, iluminação, materiais PBR, câmeras dirigidas e pós-processamento aos eventos de domínio em tempo real via SignalR.
+- **STACK OFICIAL HOMOLOGADO (ADR-026):** React 19 + Three.js + React Three Fiber + Drei + GSAP + SignalR + React Three Postprocessing.
+- **PRÉ-REQUISITOS:** Fase 3 (Governança, Ciclo de Pitch, Timers e Result Engine) e Fase 4 (Persistência ACID, Crash Recovery, Audit Trail e Disaster Recovery).
 - **SUBFASES E ESCOPO DETALHADO:**
 
-  - **Milestone 5A — Web Audio Engine no Stage (`/stage`) & Unlock Policy:**
-    - *Objetivo:* Construir a fundação de síntese e reprodução de áudio desacoplada do ciclo de renderização Three.js.
-    - *Arquitetura:* Singleton `AudioEngine` baseado no `AudioContext` nativo do navegador, expondo nós de ganho master/efeitos e hook reativo `useAudioScene`. Banner/overlay não-obstrusivo "Clique para Ativar Áudio Cênico" em conformidade com as políticas rígidas de *Autoplay* dos navegadores modernos.
-    - *Dependências:* `StagePage.jsx`, Web Audio API, React 19.
-    - *Critério de Aceite:* Áudio desbloqueado com 1 clique no palco; zero warnings de autoplay no console do navegador; ganho ajustável sem clipping.
-    - *Entregáveis:* `frontend/src/audio/AudioEngine.js`, `frontend/src/hooks/useAudioScene.js`, componente `AudioUnlockOverlay.jsx`.
-    - *Riscos:* Bloqueio silencioso de autoplay em navegadores Chromium; mitigado pelo listener de desbloqueio em qualquer toque na tela.
+  - **Milestone 5A — Audio Engine Infrastructure & Visual Rendering Foundation:**
+    - *Dimensão Sonora:* Singleton AudioEngine baseado na Web Audio API, gerenciamento de nós (AudioBufferSourceNode -> GainNode), useAudioScene hook, AudioUnlockOverlay para conformidade com a política de Autoplay dos navegadores e carregamento de assets sonoros.
+    - *Dimensão Visual 3D:* Integração de @react-three/postprocessing com EffectComposer, Bloom (Selective Luminance Threshold para brilho de neons), ToneMapping e pipeline de renderização cinemático mantendo 60 FPS cravados.
+    - *Critério de Aceite:* Áudio desbloqueado com 1 clique; pós-processamento operando sem artefatos ou quedas de frames; zero regressões nas suítes existentes.
 
-  - **Milestone 5B — Sincronização Sonora com SignalR & Eventos de Pitch:**
-    - *Objetivo:* Disparar efeitos sonoros pontuais com latência imperceptível (< 50ms) sincronizados às animações 3D de palco.
-    - *Arquitetura:* Carregamento antecipado de buffers de áudio (`AudioBufferSourceNode`) no bootstrap do Stage. Disparo sonoro imediato em manipuladores SignalR: som mecânico de rotação (*catraca/whoosh*) no `ChairTurned`, alerta sonoro rítmico de urgência nos últimos 15s (`PitchTimerUpdated`) e gongo dramático de encerramento no `VotingClosed`.
-    - *Dependências:* 5A homologado, listeners de SignalR existentes em `StagePage.jsx`.
-    - *Critério de Aceite:* Áudio e rotação física/3D da cadeira ocorrem simultaneamente (drift < 50ms); gongo de votação soa imediatamente ao expirar o tempo.
-    - *Entregáveis:* Catálogo de áudio sintetizado em `frontend/public/audio/`, listeners reativos integrados.
-    - *Riscos:* Latência perceptível entre animação Three.js e início do som; mitigado pelo pré-carregamento total em memória (`fetch` + `decodeAudioData`).
+  - **Milestone 5B — Audio & Visual Event Synchronization:**
+    - *Dimensão Sonora:* Efeito sonoro mecânico de rotação (*catraca/whoosh*) no ChairTurned, alerta sonoro cadenciado nos últimos 15s (PitchTimerUpdated) e gongo dramático de encerramento no VotingClosed.
+    - *Dimensão Visual 3D:* Iluminação e materiais reativos; emissive pulse nos anéis da cadeira; transição gradual das primitivas de cadeira para o modelo GLTF fotorrealista com pivot e botão emissivo.
+    - *Critério de Aceite:* Latência sincronizada entre áudio e animação 3D < 50ms; disparo preciso de som e luz na virada da cadeira.
 
-  - **Milestone 5C — Efeitos de Clímax Cênico & Ambientação de Palco:**
-    - *Objetivo:* Construir a paisagem sonora dramática durante o pitch e o momento ápice da avaliação.
-    - *Arquitetura:* Trilha musical procedural de suspense contínuo iniciada no `PitchStarted` e atenuada no `PitchPaused`. Fanfarra comemorativa orquestral e celebração sonora quando o `ResultEngine` computa Unanimidade (5/5 votos favoráveis), sincronizada com tweens de neons e confetes 3D no palco.
-    - *Dependências:* 5B homologado, `ResultEngine` da Fase 3D.
-    - *Critério de Aceite:* Unanimidade 5/5 dispara fanfarra com fade-in suave e explosão acústica sem estourar limiter; transição para Rejected encerra trilha com acorde menor.
-    - *Entregáveis:* Módulos de síntese sonora de clímax, integração com temas visuais do Three.js.
-    - *Riscos:* Sobreposição desordenada de trilhas sonoras; mitigado por máquina de estados de áudio mutuamente exclusiva.
+  - **Milestone 5C — Stage Visual FX & Immersive Atmosphere:**
+    - *Dimensão Sonora:* Trilha musical procedural de suspense contínuo durante PitchRunning/VotingOpen com ducking automático em pausas; fanfarra comemorativa orquestral de Unanimidade (5/5).
+    - *Dimensão Visual 3D:* Piso reflexivo PBR de estúdio de TV (MeshReflectorMaterial), refletores com iluminação volumétrica, aura de pulso de suspense no palco central e chuva de confetes 3D instanciados na celebração de 5/5.
+    - *Critério de Aceite:* Unanimidade dispara fanfarra e confetes em < 100ms sem estourar limiter ou GPU.
 
-  - **Milestone 5D — Soundboard do Operador no Cockpit (`/operator`) & Mute de Emergência:**
-    - *Objetivo:* Permitir ao operador da mesa de som controlar remotamente a atmosfera acústica do telão.
-    - *Arquitetura:* Slider de Volume Master e botão "MUTE GERAL" (Pânico) no cockpit do operador transmitidos via SignalR (`AudioVolumeChanged`, `AudioMuted`) para o telão; botões de pré-escuta e disparos manuais de teste sonoro para ensaio de mesa.
-    - *Dependências:* Hub SignalR, `OperatorContext.jsx`, 5A homologado.
-    - *Critério de Aceite:* Operador consegue silenciar 100% do áudio do telão instantaneamente (< 100ms) com 1 clique na mesa técnica.
-    - *Entregáveis:* Componente `AudioCockpitControl.jsx` na sidebar do Operator UI, novos métodos no Hub .NET.
-    - *Riscos:* Feedback acústico ou operador mutar acidentalmente; mitigado por confirmação visual nítida (badge "MUTADO").
+  - **Milestone 5D — Cinematic Camera & Stage Direction:**
+    - *Dimensão Visual 3D:* Câmera cinematográfica dirigida por estados do SignalR: *Modo Espera* (órbita lenta panorâmica), *Modo Pitch* (foco médio no pódio do empreendedor), *Modo Votação* (enquadramento dramático nas costas dos jurados), *Modo Vitória* (câmera baixa heroica) e *Modo Resultado* (enquadramento institucional).
+    - *Dimensão Sonora:* Atenuação de áudio e transições acústicas suaves acompanhando os cortes de câmera.
+    - *Critério de Aceite:* Transições suaves de câmera com interpolação GSAP sem cortes bruscos ou desorientação visual.
 
-  - **Milestone 5E — Homologação Integrada de Áudio, Latência e Regressão Global:**
-    - *Objetivo:* Validar a concorrência entre áudio Web Audio API e renderização WebGL 3D a 60 FPS sem dropouts.
-    - *Arquitetura:* Suíte automatizada `tests/test-audio-sync.cjs` verificando contratos de eventos de áudio, estados de mute e conformidade de payloads; auditoria de consumo de CPU/GPU no Chromium.
-    - *Dependências:* 5A a 5D concluídos, orquestrador `run-regression-suite.cjs`.
-    - *Critério de Aceite:* Telão sustenta 60 FPS com Three.js e Web Audio tocando simultaneamente sem queda de frames; regressão geral com 15 suítes 100% verdes.
-    - *Entregáveis:* Suíte `tests/test-audio-sync.cjs`, relatório de encerramento da Fase 5 e release `v0.5.0-phase5`.
-    - *Riscos:* Glitching de áudio por concorrência de thread principal; mitigado por nós de áudio nativos do Web Audio API fora do loop JavaScript.
+  - **Milestone 5E — Operator Show Control:**
+    - *Dimensão Sonora:* Soundboard completo no cockpit do operador (/operator), controle de Volume Master e botão de pânico **MUTE GERAL** transmitidos via SignalR (AudioMuted, AudioVolumeChanged).
+    - *Dimensão Visual 3D:* Painel de Diretor de Palco com atalhos manuais para forçar presets visuais ("Câmera Pódio", "Câmera Banca", "Blackout Cênico", "Teste de Confetes").
+    - *Critério de Aceite:* Operador consegue silenciar ou trocar o preset do telão em menos de 100ms na mesa técnica.
 
-- **ORDEM DE EXECUÇÃO RECOMENDADA:** 5A ➔ 5B ➔ 5C ➔ 5D ➔ 5E.
+  - **Milestone 5F — Live Show Validation & Performance Certification:**
+    - *Homologação Geral:* Auditoria de latência de áudio (< 50ms), sustentação estrita de 60 FPS com Three.js e Web Audio concorrentes em resolução Full HD e 4K.
+    - *Regressão Consolidada:* Criação da suíte 	ests/test-live-show.cjs e validação de 100% de aprovação nas 15 suítes automatizadas.
+    - *Critério de Aceite:* Zero falhas, zero regressões, certificação formal de performance para show ao vivo e emissão da tag 0.5.0-phase5.
+
+- **ORDEM DE EXECUÇÃO SEQUENCIAL:** 5A ➔ 5B ➔ 5C ➔ 5D ➔ 5E ➔ 5F.
 
 ---
-
 ### FASE 6: Awards Ceremony, Ranking & Executive Reports
 *Consolidar a apuração do evento com pódio visual no telão e emissão de ata executiva formal.*
 

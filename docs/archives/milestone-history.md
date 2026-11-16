@@ -1,4 +1,4 @@
-# Índice Histórico de Marcos (Milestone History)
+﻿# Índice Histórico de Marcos (Milestone History)
 ## Plataforma Arena Voice / Arena de Inovação
 
 > **Status Geral do Projeto:** Fases 1 a 3 e Fase 4 (4A, 4B, 4C, 4D) Concluídos e Homologados  

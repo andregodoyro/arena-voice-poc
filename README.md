@@ -179,7 +179,7 @@ O frontend é uma SPA reativa desenvolvida em **React 19**, **Vite** e **Tailwin
 | **Fase 3D** | Round History & Result Engine (Approved, Rejected, Inconclusive) | ✅ **Concluída e Homologada** |
 | **Fase 3E** | Judge Catalog & Event Jury Assignment (Banca 1..5, Palco Nominal) | ✅ **Concluída e Homologada** |
 | **Fase 4** | Platform Reliability & Data Resilience (PostgreSQL Portable, Crash Recovery, Audit, Backup, DR) | ✅ **Concluída e Homologada (v0.4.3-phase4d)** |
-| **Fase 5** | Live Show Experience & Audio Atmosphere (Áudio Cênico, Web Audio API, Sound FX) | 📅 **Planejada (Próxima Fase)** |
+| **Fase 5** | Live Show Experience & Immersive Stage (Web Audio API, R3F Postprocessing, Sound FX, Câmeras) | 🚀 **Em Implementação (Milestone 5A)** |
 | **Fase 6** | Awards Ceremony, Ranking & Executive Reports (Pódio 3D, Ata Oficial PDF/CSV) | 📅 **Roadmap V2** |
 | **Fase 7** | Operational Hardening, Contingency & Fleet Telemetry (Bypass no Cockpit, ESP32, Chaos) | 📅 **Roadmap V2** |
 | **Fase 8** | Evaluator Portal & Qualitative Rubrics (Módulo Satélite / Complementar) | 📅 **Roadmap V2** |
