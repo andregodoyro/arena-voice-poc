@@ -1,8 +1,90 @@
 import React from 'react';
-import { History, Clock, RotateCcw, Flame } from 'lucide-react';
+import { 
+  History, 
+  Clock, 
+  RotateCcw, 
+  Flame, 
+  Play, 
+  Pause, 
+  CheckCircle2, 
+  AlertTriangle, 
+  Sparkles, 
+  Users, 
+  Layers, 
+  Info 
+} from 'lucide-react';
+
+/**
+ * Retorna as classes de estilo e o ícone de acordo com o tipo/categoria do evento.
+ */
+function getEventBadgeProps(evt) {
+  switch (evt.type) {
+    case 'RESET':
+      return {
+        bg: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
+        icon: <RotateCcw className="w-3.5 h-3.5" />
+      };
+    case 'CHAIR_TURNED':
+      return {
+        bg: 'bg-red-500/10 text-red-400 border border-red-500/20',
+        icon: <Flame className="w-3.5 h-3.5" />
+      };
+    case 'PITCH_STARTED':
+      return {
+        bg: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
+        icon: <Play className="w-3.5 h-3.5" />
+      };
+    case 'PITCH_PAUSED':
+      return {
+        bg: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
+        icon: <Pause className="w-3.5 h-3.5" />
+      };
+    case 'PITCH_RESUMED':
+      return {
+        bg: 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20',
+        icon: <Play className="w-3.5 h-3.5" />
+      };
+    case 'PITCH_COMPLETED':
+    case 'PROJECT_COMPLETED':
+      return {
+        bg: 'bg-green-500/10 text-green-400 border border-green-500/20',
+        icon: <CheckCircle2 className="w-3.5 h-3.5" />
+      };
+    case 'PITCH_EXPIRED':
+      return {
+        bg: 'bg-orange-500/10 text-orange-400 border border-orange-500/20',
+        icon: <AlertTriangle className="w-3.5 h-3.5" />
+      };
+    case 'PROJECT_ACTIVATED':
+      return {
+        bg: 'bg-purple-500/10 text-purple-400 border border-purple-500/20',
+        icon: <Sparkles className="w-3.5 h-3.5" />
+      };
+    case 'JUDGE_ASSIGNED':
+    case 'JUDGE_UNASSIGNED':
+      return {
+        bg: 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20',
+        icon: <Users className="w-3.5 h-3.5" />
+      };
+    case 'EVENT_ACTIVATED':
+    case 'EVENT_CREATED':
+      return {
+        bg: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20',
+        icon: <Layers className="w-3.5 h-3.5" />
+      };
+    default:
+      return {
+        bg: 'bg-gray-500/10 text-gray-400 border border-gray-500/20',
+        icon: <Info className="w-3.5 h-3.5" />
+      };
+  }
+}
 
 /**
  * ActivityLog — Linha do tempo de eventos da sessão em linguagem de produto.
+ * 
+ * Suporta histórico reidratado via Audit Trail (Milestone 4C.5 / ADR-022)
+ * combinado com eventos SignalR em tempo real.
  */
 export function ActivityLog({ events = [] }) {
   return (
@@ -32,7 +114,8 @@ export function ActivityLog({ events = [] }) {
           </div>
         ) : (
           events.map((evt) => {
-            const isReset = evt.type === 'RESET';
+            const badgeProps = getEventBadgeProps(evt);
+            const subLabel = evt.subtext || (evt.type === 'RESET' ? 'Comando do sistema' : 'Voto computado');
 
             return (
               <div
@@ -41,17 +124,9 @@ export function ActivityLog({ events = [] }) {
               >
                 <div className="flex items-start gap-2.5">
                   <div
-                    className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                      isReset
-                        ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                        : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                    }`}
+                    className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${badgeProps.bg}`}
                   >
-                    {isReset ? (
-                      <RotateCcw className="w-3.5 h-3.5" />
-                    ) : (
-                      <Flame className="w-3.5 h-3.5" />
-                    )}
+                    {badgeProps.icon}
                   </div>
 
                   <div>
@@ -59,7 +134,7 @@ export function ActivityLog({ events = [] }) {
                       {evt.description}
                     </p>
                     <span className="text-[10px] text-gray-500 block mt-0.5">
-                      {isReset ? 'Comando do sistema' : 'Voto computado'}
+                      {subLabel}
                     </span>
                   </div>
                 </div>

@@ -4,6 +4,8 @@ import { eventsApi } from '../api/eventsApi';
 import { pitchApi } from '../api/pitchApi';
 import { roundsApi } from '../api/roundsApi';
 import { judgesApi } from '../api/judgesApi';
+import { auditApi } from '../api/auditApi';
+import { mapAuditEventToActivityItem } from '../utils/auditMapper';
 import { isCurrentProject } from '../utils/projectStatus';
 import { useSignalR } from '../services/useSignalR';
 import { getBackendUrl } from '../api/apiClient';
@@ -19,15 +21,17 @@ const DEFAULT_CHAIRS = [
 ];
 
 /**
- * OperatorProvider — Provedor de Estado Operacional e Integração Realtime (Milestone 2C.5 / 3A).
+ * OperatorProvider — Provedor de Estado Operacional e Integração Realtime (Milestone 2C.5 / 3A / 4C.5).
  * 
  * Centraliza a única conexão SignalR do sistema e orquestra o estado autoritativo:
  * - ADR-001 (Backend Authoritative): O backend dita o estado final em todas as circunstâncias.
  * - ADR-002 (Snapshot First): O estado inicial e o resync pós-reconexão vêm do snapshot REST.
  * - ADR-003 (ActiveContext): O projeto e evento ativos são refletidos ponta a ponta.
  * - ADR-004 (Rich SignalR Payloads): Consome os metadados ricos enviados pelo Hub.
+ * - ADR-022 (Audit Timeline Segregation): Eventos técnicos ocultados por padrão; timeline reidratada no boot.
  * - Milestone 3A (Event Lifecycle): Gerencia o catálogo de eventos e a reatividade de ativação.
  * - Milestone 3D (Round History): Preserva o histórico das rodadas arquivadas em memória.
+ * - Milestone 4C (Audit Trail & ActivityLog Rehydration): Reidratação durável após F5 via tabela audit_events.
  */
 export function OperatorProvider({ children }) {
   // ── Estado Institucional e de Projetos (Fase 2 & Fase 3A) ──────────────────
@@ -42,10 +46,20 @@ export function OperatorProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // ── Estado das Cadeiras e Histórico Cênico (Fase 1 / 2C.5.4) ──────────────
+  // ── Estado das Cadeiras e Histórico Cênico (Fase 1 / 4C.5) ─────────────────
   const [chairs, setChairs] = useState(DEFAULT_CHAIRS);
   const [eventsHistory, setEventsHistory] = useState([]);
   const [isResyncing, setIsResyncing] = useState(false);
+
+  // ── Helper para adicionar eventos ao log em tempo real com desduplicação ───
+  const addRealtimeActivity = useCallback((newItem) => {
+    setEventsHistory((prev) => {
+      // Evita duplicar item idêntico se já existir
+      const exists = prev.some((e) => e.id === newItem.id);
+      if (exists) return prev;
+      return [newItem, ...prev].slice(0, 50);
+    });
+  }, []);
 
   // ── Ações de Cadeiras (Fase 1 / Realtime) ─────────────────────────────────
   const turnChair = useCallback((chairId, source = 'SIGNALR') => {
@@ -55,32 +69,38 @@ export function OperatorProvider({ children }) {
 
     const now = new Date().toLocaleTimeString('pt-BR');
     const eventItem = {
-      id: `${Date.now()}-${chairId}`,
+      id: `rt-${Date.now()}-${chairId}`,
       chairId,
       type: 'CHAIR_TURNED',
+      category: 'chair',
       description: `Cadeira #${chairId} virou`,
+      subtext: 'Voto computado',
       source,
       time: now,
+      timestamp: Date.now(),
     };
 
-    setEventsHistory((prev) => [eventItem, ...prev].slice(0, 20));
-  }, []);
+    addRealtimeActivity(eventItem);
+  }, [addRealtimeActivity]);
 
   const resetAllChairs = useCallback(() => {
     setChairs((prev) => prev.map((c) => ({ ...c, isTurned: false })));
 
     const now = new Date().toLocaleTimeString('pt-BR');
     const eventItem = {
-      id: `${Date.now()}-reset`,
+      id: `rt-${Date.now()}-reset`,
       type: 'RESET',
+      category: 'chair',
       description: 'Arena retornada à posição inicial',
+      subtext: 'Comando do sistema',
       time: now,
+      timestamp: Date.now(),
     };
 
-    setEventsHistory((prev) => [eventItem, ...prev].slice(0, 20));
-  }, []);
+    addRealtimeActivity(eventItem);
+  }, [addRealtimeActivity]);
 
-  // ── Busca de Snapshot Autoritativo (ADR-002 / Milestone 3A) ──────────────
+  // ── Busca de Snapshot Autoritativo e Reidratação de Auditoria (ADR-002 / 4C.5) ─
   const fetchOperationalData = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true);
     try {
@@ -136,17 +156,54 @@ export function OperatorProvider({ children }) {
         console.warn('[OperatorContext] Aviso ao buscar catálogo de jurados:', jErr);
       }
 
+      // ── Reidratação do ActivityLog via Audit Trail (Milestone 4C.5 / ADR-022) ─
+      try {
+        const auditResponse = await auditApi.getTimeline({
+          page: 1,
+          pageSize: 30,
+          includeTechnical: false, // Regra mandatória da ADR-022
+        });
+
+        if (auditResponse?.items && Array.isArray(auditResponse.items)) {
+          const rehydratedItems = auditResponse.items
+            .map(mapAuditEventToActivityItem)
+            .filter(Boolean);
+
+          setEventsHistory((prev) => {
+            // Preserva eventos efêmeros que acabaram de chegar em tempo real (< 5s)
+            const recentRealtime = prev.filter(
+              (p) => p.id?.startsWith('rt-') && Date.now() - (p.timestamp || 0) < 5000
+            );
+
+            // Mescla sem duplicar e ordena cronologicamente
+            const combined = [...recentRealtime, ...rehydratedItems];
+            const seen = new Set();
+            const unique = [];
+            for (const item of combined) {
+              const key = item.auditId ? `audit-${item.auditId}` : item.id;
+              if (!seen.has(key)) {
+                seen.add(key);
+                unique.push(item);
+              }
+            }
+            return unique.slice(0, 50);
+          });
+        }
+      } catch (auditErr) {
+        console.warn('[OperatorContext] Aviso ao reidratar timeline de auditoria:', auditErr);
+      }
+
       setError(null);
     } catch (err) {
-      console.error('[OperatorContext] Falha ao sincronizar snapshot operacional:', err);
-      setError(err.message || 'Erro ao comunicar com o servidor');
+      console.error('[OperatorContext] Falha ao carregar snapshot inicial:', err);
+      setError(err);
     } finally {
       if (showLoading) setLoading(false);
     }
   }, []);
 
-  const refresh = useCallback(async () => {
-    await fetchOperationalData(true);
+  const refresh = useCallback(() => {
+    return fetchOperationalData(false);
   }, [fetchOperationalData]);
 
   // ── Sincronização em Tempo Real (Milestone 2C.5.2: Projetos) ─────────────
@@ -174,11 +231,23 @@ export function OperatorProvider({ children }) {
           return p;
         });
       });
+
+      // Adiciona evento na timeline em tempo real
+      const now = new Date().toLocaleTimeString('pt-BR');
+      addRealtimeActivity({
+        id: `rt-${Date.now()}-proj-active`,
+        type: 'PROJECT_ACTIVATED',
+        category: 'project',
+        description: `Projeto chamado ao palco: "${newCurrent.title}"`,
+        subtext: 'Pitch selecionado para apresentação',
+        time: now,
+        timestamp: Date.now(),
+      });
     }
 
     // 2. Re-hidratação autoritativa silenciosa em background (ADR-002)
     fetchOperationalData(false);
-  }, [fetchOperationalData]);
+  }, [fetchOperationalData, addRealtimeActivity]);
 
   // ── Sincronização em Tempo Real (Milestone 2C.5.3: Branding) ──────────────
   const handleEventBrandingUpdated = useCallback((payload) => {
@@ -212,9 +281,20 @@ export function OperatorProvider({ children }) {
     setCurrentEvent(payload.event);
     setCurrentProject(null); // Projeto no palco é resetado para a nova fila
 
+    const now = new Date().toLocaleTimeString('pt-BR');
+    addRealtimeActivity({
+      id: `rt-${Date.now()}-evt-active`,
+      type: 'EVENT_ACTIVATED',
+      category: 'event',
+      description: `Evento ativado: "${payload.event.title}"`,
+      subtext: 'Governança de evento',
+      time: now,
+      timestamp: Date.now(),
+    });
+
     // 2. Re-hidratação autoritativa completa em background
     fetchOperationalData(false);
-  }, [fetchOperationalData]);
+  }, [fetchOperationalData, addRealtimeActivity]);
 
   // ── Sincronização em Tempo Real (Milestone 3B: Pitch Lifecycle Engine) ──
   const handlePitchStageChanged = useCallback((payload) => {
@@ -240,9 +320,35 @@ export function OperatorProvider({ children }) {
       setChairs((prevChairs) => prevChairs.map((c) => ({ ...c, isTurned: false })));
     }
 
+    // Registra transição relevante no log operacional
+    const now = new Date().toLocaleTimeString('pt-BR');
+    let evtType = 'PITCH_STAGE';
+    let evtDesc = `Estágio alterado para: ${stageName}`;
+    let evtSub = payload.fromStage ? `De ${payload.fromStage}` : 'Ciclo de pitch';
+
+    if (stageName === 'PitchRunning') {
+      evtType = 'PITCH_STARTED';
+      evtDesc = 'Pitch iniciado no palco';
+      evtSub = 'Apresentação em andamento';
+    } else if (stageName === 'Finished') {
+      evtType = 'PITCH_COMPLETED';
+      evtDesc = 'Apresentação do pitch concluída';
+      evtSub = 'Transição para encerramento';
+    }
+
+    addRealtimeActivity({
+      id: `rt-${Date.now()}-${stageName}`,
+      type: evtType,
+      category: 'pitch',
+      description: evtDesc,
+      subtext: evtSub,
+      time: now,
+      timestamp: Date.now(),
+    });
+
     // Re-hidratação silenciosa em background (para allowedTransitions e status)
     fetchOperationalData(false);
-  }, [fetchOperationalData]);
+  }, [fetchOperationalData, addRealtimeActivity]);
 
   // ── Sincronização em Tempo Real (Milestone 3C: Timers, Pause, Resume, AddTime) ──
   const handlePitchTimerUpdated = useCallback((payload) => {
@@ -265,7 +371,18 @@ export function OperatorProvider({ children }) {
     if (!payload?.round) return;
     console.log('[OperatorContext] Sincronizando rodada arquivada no histórico:', payload.round);
     setRounds((prev) => [payload.round, ...prev.filter((r) => r.id !== payload.round.id)]);
-  }, []);
+
+    const now = new Date().toLocaleTimeString('pt-BR');
+    addRealtimeActivity({
+      id: `rt-${Date.now()}-round-archived`,
+      type: 'PROJECT_COMPLETED',
+      category: 'project',
+      description: `Rodada arquivada: "${payload.round.projectTitle || 'Projeto'}"`,
+      subtext: `Resultado: ${payload.round.result} (${payload.round.approvalMode})`,
+      time: now,
+      timestamp: Date.now(),
+    });
+  }, [addRealtimeActivity]);
 
   // ── Sincronização em Tempo Real (Milestone 3E: Judges & Jury) ─────────────
   const handleEventJuryUpdated = useCallback((payload) => {
