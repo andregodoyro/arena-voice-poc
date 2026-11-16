@@ -191,7 +191,7 @@ async function runRegression() {
       try {
         output = execSync(`"${NODE_EXE}" "${suitePath}"`, {
           cwd: __dirname,
-          env: { ...process.env, ARENA_API_URL: BASE_URL },
+          env: { ...process.env, ARENA_API_URL: BASE_URL, BASE_URL: BASE_URL },
           encoding: 'utf8',
           maxBuffer: 10 * 1024 * 1024
         });

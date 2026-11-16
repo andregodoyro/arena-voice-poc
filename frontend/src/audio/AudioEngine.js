@@ -3,17 +3,20 @@
  * ARENA VOICE — AUDIO ENGINE SINGLETON (WEB AUDIO API)
  * ==============================================================================
  * 
- * Milestone 5A: Audio Engine Infrastructure & Visual Rendering Foundation
- * Conforme Decisão Arquitetural ADR-026.
+ * Milestone 5A & 5B: Live Show Experience & Immersive Stage (ADR-026 & ADR-027)
  * 
  * Responsabilidades:
  * - Gerenciamento do ciclo de vida do AudioContext nativo do navegador;
  * - Resolução de políticas de Autoplay (Unlock sob gesto do usuário);
  * - Barramento de ganho hierárquico (SFX, Ambiente e Master com anti-popping);
  * - Preloading e cache de buffers de áudio decodificados em RAM;
- * - Sintetizador procedural integrado (osciladores) para feedbacks acústicos imediatos;
+ * - Sintetizador procedural em runtime (SoundSynthesizer) para assinaturas
+ *   acústicas de eventos (ChairTurned, VotingOpen, Timer15Seconds, VotingClosed,
+ *   Celebration e Reset) com ZERO dependência de download de assets externos;
  * - Padrão Observer para sincronização reativa de estado com componentes React.
  */
+
+import SoundSynthesizer from './SoundSynthesizer';
 
 class AudioEngine {
   constructor() {
@@ -228,6 +231,65 @@ class AudioEngine {
     setTimeout(() => {
       this.playProceduralTone(659.25, 'sine', 0.35, 0.18); // Mi 5
     }, 120);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // DISPATCHERS DE EVENTOS DA ARENA (MILESTONE 5B — PROCEDURAIS OFFLINE-FIRST)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Disparado quando um jurado vira a cadeira (ChairTurned).
+   * Whoosh de vento pneumático + trava de catraca mecânica.
+   */
+  playWhoosh() {
+    if (!this.isUnlocked || !this.ctx || this.isMuted) return;
+    SoundSynthesizer.synthesizeWhoosh(this.ctx, this.sfxGainNode);
+  }
+
+  /**
+   * Disparado quando a votação é aberta pelo operador (PitchStageChanged: VotingOpen).
+   * Acorde estéreo cintilante anunciando o início da votação.
+   */
+  playVotingOpen() {
+    if (!this.isUnlocked || !this.ctx || this.isMuted) return;
+    SoundSynthesizer.synthesizeVotingOpen(this.ctx, this.sfxGainNode);
+  }
+
+  /**
+   * Disparado nos últimos 15 segundos do pitch (Timer15Seconds).
+   * Sub-kick de tensão / batimento cardíaco sincopado.
+   * @param {boolean} [isCritical=false] - true para os últimos 5 segundos
+   */
+  playTimerTicker(isCritical = false) {
+    if (!this.isUnlocked || !this.ctx || this.isMuted) return;
+    SoundSynthesizer.synthesizeTimerTicker(this.ctx, this.sfxGainNode, isCritical);
+  }
+
+  /**
+   * Disparado quando a votação é encerrada (PitchStageChanged: VotingClosed / Finished).
+   * Gongo ressonante profundo com impacto sub-bass.
+   */
+  playVotingClosed() {
+    if (!this.isUnlocked || !this.ctx || this.isMuted) return;
+    SoundSynthesizer.synthesizeVotingClosed(this.ctx, this.sfxGainNode);
+  }
+
+  /**
+   * Disparado quando há aprovação unânime de todas as 5 cadeiras (UnanimousApproval).
+   * Fanfarra triunfal em arpejo ascendente de 5 notas.
+   */
+  playCelebration() {
+    if (!this.isUnlocked || !this.ctx || this.isMuted) return;
+    SoundSynthesizer.synthesizeCelebration(this.ctx, this.sfxGainNode);
+  }
+
+  /**
+   * Disparado quando a arena é resetada pelo operador (ChairsReset / Waiting).
+   * Tom suave descendente futurista de retorno ao repouso.
+   */
+  playReset() {
+    if (!this.isUnlocked || !this.ctx || this.isMuted) return;
+    SoundSynthesizer.synthesizeReset(this.ctx, this.sfxGainNode);
   }
 
   /**

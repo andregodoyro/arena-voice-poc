@@ -4,9 +4,10 @@ import { audioEngine } from '../audio/AudioEngine';
 /**
  * useAudioScene — Hook reativo para consumo do motor de áudio Web Audio API.
  * 
- * Milestone 5A: Audio Engine Infrastructure & Visual Rendering Foundation
+ * Milestone 5A & 5B: Live Show Experience & Immersive Stage (ADR-026 & ADR-027)
  * Permite que componentes React no Stage e Operator controlem volume, mute e
- * disparem efeitos sonoros mantendo reatividade instantânea.
+ * disparem efeitos sonoros procedurais (Whoosh, VotingOpen, TimerTicker, VotingClosed,
+ * Celebration e Reset) mantendo reatividade instantânea e zero downloads.
  */
 export function useAudioScene() {
   const [audioState, setAudioState] = useState(() => audioEngine.getState());
@@ -44,6 +45,31 @@ export function useAudioScene() {
     return await audioEngine.loadBuffer(name, url);
   }, []);
 
+  // ── Dispatchers de Eventos Procedurais (Milestone 5B) ───────────────────────
+  const playWhoosh = useCallback(() => {
+    audioEngine.playWhoosh();
+  }, []);
+
+  const playVotingOpen = useCallback(() => {
+    audioEngine.playVotingOpen();
+  }, []);
+
+  const playTimerTicker = useCallback((isCritical = false) => {
+    audioEngine.playTimerTicker(isCritical);
+  }, []);
+
+  const playVotingClosed = useCallback(() => {
+    audioEngine.playVotingClosed();
+  }, []);
+
+  const playCelebration = useCallback(() => {
+    audioEngine.playCelebration();
+  }, []);
+
+  const playReset = useCallback(() => {
+    audioEngine.playReset();
+  }, []);
+
   return {
     isUnlocked: audioState.isUnlocked,
     isMuted: audioState.isMuted,
@@ -57,6 +83,13 @@ export function useAudioScene() {
     playSfx,
     playProceduralTone,
     loadBuffer,
+    // Eventos 5B
+    playWhoosh,
+    playVotingOpen,
+    playTimerTicker,
+    playVotingClosed,
+    playCelebration,
+    playReset,
   };
 }
 
