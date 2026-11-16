@@ -1,4 +1,4 @@
-﻿# Diário Técnico de Implementação (Implementation History)
+# Diário Técnico de Implementação (Implementation History)
 ## Plataforma Arena Voice / Arena de Inovação
 
 > **Status:** Documento Vivo de Memória Arquitetural  
@@ -876,7 +876,7 @@
     - Fase 7: Operational Hardening & Fleet Management
     - Fase 8: Evaluator Portal & Scorecards (Módulo Satélite)
 
-#### Decisão de Persistência: SQLite com Offline-First (ADR-016)
+#### Decisão de Persistência: SQLite com Offline-First (ADR-016 v1.0 — Posteriormente Revisado para PostgreSQL Portable)
 - **Tecnologia aprovada:** Microsoft.Data.Sqlite (NuGet, embedded, zero-setup).
 - **Modo de operação:** WAL (Write-Ahead Logging) para concorrência leitura/escrita não-bloqueante.
 - **Estratégia:** Offline-First — plataforma 100% operacional sem rede externa; banco local no notebook do operador.
@@ -895,7 +895,7 @@
 | **4B** | State Persistence & Session Re-hydration | SqliteArenaProjectStore, Crash Boot Recovery |
 | **4C** | Operational Audit Trail & Event Sourcing Leve | Tabela AuditEvents, ActivityLog persistido |
 | **4D** | Automated Snapshots, Backup & Disaster Recovery | VACUUM INTO hot-backup, RecoveryManager |
-| **4E** | Chaos Engineering & Reliability Test Suite | 	est-chaos-reliability.cjs, 50+ asserções de caos |
+| **4E** | Chaos Engineering & Reliability Test Suite | *(Escopo reabsorvido pela Phase 7 — Milestone 7D)* |
 
 - **Branch planejada:** eat/phase4-data-resilience (a criar após aprovação desta documentação).
 - **Tag planejada:** 0.4.0-phase4 ao encerrar a Fase 4.
@@ -909,3 +909,103 @@
 - docs/architecture.md — Seção 6 adicionada (Persistência e Resiliência de Dados)
 - docs/archives/milestone-history.md — Tabela Mestra atualizada com Fases 4–8
 - docs/archives/implementation-history.md — Esta entrada de transição
+
+### [2026-11-10] — Rebase de Storage Engine: Adoção Oficial do PostgreSQL Portable (ADR-016 Revisado)
+- **Status:** ✅ Documentado / Decisão Arquitetural Homologada
+- **Contexto:** Validação prática bem-sucedida do PostgreSQL 18.6 Portable no ambiente corporativo (sem instaladores, sem serviços de fundo bloqueados, sem Docker/WSL, sem privilégios administrativos).
+- **Decisão Revisada:** O ADR-016 foi revisado formalmente (v2.0), substituindo o SQLite pelo **PostgreSQL Portable** como o Storage Engine oficial da Fase 4 e da Arena Voice.
+- **Motivações Estratégicas:**
+  - Alinhamento total com as práticas e pilhas de mercado corporativo (ASP.NET Core + Npgsql + PostgreSQL).
+  - Capacidade analítica superior (window functions, CTEs recursivas, JSONB, particionamento) para apoiar os rankings e relatórios da Fase 6 em diante.
+  - Concorrência de leitura e escrita nativa via MVCC (eliminando riscos de locks locais).
+  - Facilidade de transição para nuvem/multi-arena corporativa a longo prazo (apenas alteração de connection string).
+- **Adequação dos Milestones da Fase 4:**
+  - **4A:** Implementação do driver Npgsql e schema relacional no PostgreSQL Portable, com ConnectionLifecycleManager para checagem de porta 5432 na inicialização do backend.
+  - **4B:** PostgresArenaProjectStore implementando a interface IArenaProjectStore com reidratação e sanitização idênticas.
+  - **4C:** AuditEvents append-only no PostgreSQL.
+  - **4D:** BackupOrchestrator gerenciando backups a quente via pg_dump e snapshots automáticos por rodada (ound_N_<timestamp>.pgdump).
+  - **4E:** Suíte de caos e resiliência holística (reabsorvida na Phase 7 — Milestone 7D).
+- **Garantia Arquitetural:** Zero alterações nos 34 contratos REST e 9 contratos SignalR; a camada de aplicação continua consumindo unicamente IArenaProjectStore.
+---
+
+# FASE 4 — Platform Reliability & Data Resilience
+
+## Milestone 4A — Storage Engine & Relational Schema (PostgreSQL Portable 18.6 & EF Core 10)
+- **Status:** ✅ Concluído e Homologado (10 de Novembro de 2026)
+- **Tag Oficial:** 0.4.0-phase4a
+- **Cobertura de Testes:** 497 asserções em 10 suítes automatizadas (100% aprovadas, zero regressões).
+- **Contexto:** Até a Fase 3, a Arena Voice operava com armazenamento exclusivamente volátil em memória RAM (ArenaProjectStore). O Milestone 4A substituiu essa camada por uma infraestrutura relacional corporativa permanente usando PostgreSQL Portable 18.6 e Entity Framework Core 10, sem quebrar os 34 endpoints REST ou os 9 eventos SignalR já consolidados.
+- **Entregas Técnicas Realizadas:**
+  1. **Pacotes NuGet:** Adicionados Npgsql.EntityFrameworkCore.PostgreSQL (10.0.3) e Microsoft.EntityFrameworkCore.Design (10.0.14) no .csproj.
+  2. **Configurações Fortemente Tipadas:** Implementação de ArenaPersistenceOptions com chave ArenaPersistence em ppsettings.json, connection timeout de 3 segundos e suporte a alternância de engine (postgres / memory).
+  3. **Contexto de Banco e Entidades:** Criação de ArenaDbContext com 6 DbSets (Events, Projects, Judges, EventJuryAssignments, RoundHistoryEntries, ActiveSessionStates).
+  4. **ActiveSessionState:** Entidade singleton (singleton_id = 1) criada para servir de ponto de ancoragem para o motor de reidratação do Milestone 4B.
+  5. **Mapeamento Fluent API Avançado (ackend/Persistence/Configurations/):**
+     - EventConfiguration: Mapeamento de BrandingConfig e TimerConfig como Owned Types.
+     - ProjectConfiguration: Relação com Events (ON DELETE CASCADE) e owned type ProjectMedia.
+     - JudgeConfiguration: Mapeamento nativo de PostgreSQL array 	ext[] para tags de Expertise.
+     - EventJuryAssignmentConfiguration: Chave composta (event_id, chair_id), índice único e foreign keys.
+     - RoundHistoryConfiguration: Mapeamento nativo de array int[] para 	urned_chairs, JSONB para 	imer_config_snapshot, índices compostos e check constraints (ck_round_result, ck_round_approval_mode, ck_round_last_stage).
+     - ActiveSessionStateConfiguration: Mapeamento do singleton com JSONB e arrays nativos.
+  6. **Design-Time Factory:** ArenaDbContextFactory (IDesignTimeDbContextFactory<ArenaDbContext>) viabilizando inspeção de modelo e tooling via dotnet-ef.
+  7. **Code-First Migration:** Geração da migração inicial 20261110142657_InitialCreate.cs e snapshot de modelo ArenaDbContextModelSnapshot.cs.
+  8. **DatabaseStartupValidator:** Validador executado no boot com teste de socket TCP na porta 5432 (timeout 3s), exibição de banner no terminal e execução idempotente de db.Database.Migrate().
+  9. **PostgresArenaProjectStore:** Implementação corporativa de IArenaProjectStore suportada por IDbContextFactory<ArenaDbContext> (contextos efêmeros por operação), com normalização estrita de datas em UTC (.ToUniversalTime()), geração de IDs com prefixos semânticos (evt-, proj-, judge-) e máquina de estados canônica do pitch integrada.
+  10. **Program.cs Wire-up:** Registro no container de DI via AddPooledDbContextFactory<ArenaDbContext>, injeção condicional de IArenaProjectStore e chamada ao validador de startup.
+  11. **Suíte Dedicada de Persistência:** Implementado 	ests/test-postgres-persistence.cjs com 31 asserções cobrindo CRUD de eventos, projetos, jurados com 	ext[], alocação de banca, histórico arquivado com jsonb e prova de sobrevivência física dos dados pós-restart completo do backend.
+- **Arquivos Criados/Alterados:**
+  - ackend/ArenaVoicePocBackend.csproj
+  - ackend/appsettings.json
+  - ackend/Domain/Entities/ActiveSessionState.cs
+  - ackend/Domain/DTOs/UpdateProjectDto.cs
+  - ackend/Persistence/ArenaDbContext.cs
+  - ackend/Persistence/ArenaDbContextFactory.cs
+  - ackend/Persistence/Options/ArenaPersistenceOptions.cs
+  - ackend/Persistence/Startup/DatabaseStartupValidator.cs
+  - ackend/Persistence/Configurations/*.cs (6 configurações)
+  - ackend/Persistence/Migrations/* (InitialCreate + ModelSnapshot)
+  - ackend/Services/PostgresArenaProjectStore.cs
+  - ackend/Program.cs
+  - 	ests/test-postgres-persistence.cjs
+  - 	ests/test-projects-api.cjs
+- **Resultados de Homologação:** 497/497 testes aprovados em 10 suítes (100% de sucesso, 0 falhas, 0 regressões).
+
+---
+
+## Milestone 4B — State Persistence & Session Re-hydration
+- **Status:** ✅ Concluído e Homologado (Novembro de 2026)
+- **Tag Oficial:** `v0.4.1-phase4b`
+- **Cobertura de Testes:** 530 asserções em 11 suítes automatizadas (100% verde).
+- **Detalhes Completos:** Consulte [`docs/archives/milestones/Phase4B-Implementation-History.md`](milestones/Phase4B-Implementation-History.md).
+
+---
+
+## Milestone 4C — Operational Audit Trail & Event Sourcing Leve
+- **Status:** ✅ Concluído e Homologado (16 de Novembro de 2026)
+- **Tag Oficial:** `v0.4.2-phase4c`
+- **Cobertura de Testes:** 609 asserções em 12 suítes automatizadas (100% verde).
+- **Detalhes Completos:** Consulte [`docs/archives/milestones/Phase4C-Implementation-History.md`](milestones/Phase4C-Implementation-History.md).
+
+---
+
+## Milestone 4D — Automated Snapshots, Backup & Disaster Recovery
+- **Status:** ✅ Concluído e Homologado (16 de Novembro de 2026)
+- **Tag Oficial:** `v0.4.3-phase4d`
+- **Cobertura de Testes:** 688 asserções em 14 suítes automatizadas (100% verde).
+- **Entregas Técnicas:**
+  - Backup assíncrono isolado em segundo plano (`BackupOrchestrator`, `BackupWorker`, `Channel<BackupRequest>`);
+  - Backup sob demanda via `POST /api/admin/backup` e listagem pelo filesystem via `GET /api/admin/backups`;
+  - Snapshots automáticos físicos acoplados ao evento de domínio `RoundArchived` (`round_N_<timestamp>.pgdump`);
+  - Trilha de auditoria integrada (`ManualBackupRequested`, `BackupSucceeded`, `BackupFailed`, `AutoSnapshotTriggered`, `AutoSnapshotCreated`, `AutoSnapshotFailed`);
+  - Motor canônico de restauração out-of-process via `pg_restore` (`scripts/restore-backup.cjs` e `scripts/restore-backup.cmd`);
+  - Suíte de Disaster Recovery automatizada (`tests/test-disaster-recovery.cjs`) com 28 asserções comprovando 100% de paridade pré e pós-restore em banco temporário;
+  - Runbook Operacional de Disaster Recovery (`docs/runbooks/disaster-recovery-runbook.md`) com RTO < 30s e RPO = 0;
+  - Decisões formais registradas em ADR-023, ADR-024 e ADR-025.
+- **Detalhes Completos:** Consulte [`docs/archives/milestones/Phase4D-Implementation-History.md`](milestones/Phase4D-Implementation-History.md).
+
+---
+
+## Milestone 4E — Chaos Engineering & Reliability Test Suite
+- **Status:** 🔄 Reabsorvido na Phase 7 (Milestone 7D)
+- **Data da Decisão:** 16 de Novembro de 2026 (Post Phase 4 Decision Workshop)
+- **Justificativa Arquitetural:** Com o encerramento do Milestone 4D, a plataforma atingiu 688 testes verdes em 14 suítes, persistência ACID relacional, Crash Recovery automático em modo `Paused`, Audit Trail append-only com reidratação de timeline, snapshots automáticos físicos por rodada e Disaster Recovery validado com 100% de paridade. O escopo restante de testes de caos e estresse não justificava mais um marco independente em isolamento de banco de dados, sendo oficialmente unificado à **Fase 7 (Milestone 7D — Chaos Engineering & Resiliência Holística de Campo)** para validação integrada com hardware ESP32, rede local Wi-Fi, áudio e contingências reais de palco.

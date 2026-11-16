@@ -1,8 +1,8 @@
 # Arena Voice — Plataforma de Avaliação e Espetáculo de Inovação
 
-> **Status:** Fase 3 Concluída e Homologada (Milestones 3A a 3E) \| 466/466 Testes Aprovados (100% Verde)  
-> **Versão Estável Atual:** `v0.3.0-phase3`  
-> **Objetivo:** Plataforma completa para condução de bancas avaliadoras, pitch days e demo days corporativos com dinamismo cênico em tempo real, backend autoritativo, telão 3D procedural e cockpit operacional da mesa técnica.
+> **Status:** Fases 1 a 3 e Milestones 4A/4B Concluídos e Homologados \| 530/530 Testes Aprovados (100% Verde)  
+> **Versão Estável Atual:** `v0.4.1-phase4b`  
+> **Objetivo:** Plataforma completa para condução de bancas avaliadoras, pitch days e demo days corporativos com dinamismo cênico em tempo real, backend autoritativo, telão 3D procedural, cockpit operacional da mesa técnica e persistência relacional resiliente com recuperação automática pós-crash.
 
 ---
 
@@ -32,6 +32,7 @@ A plataforma separa com rigor quatro papéis funcionais interligados por rede lo
                       │ • Round History & Result Engine              │
                       │ • Catálogo de Jurados & Alocação de Banca    │
                       │ • Hub SignalR Realtime em /hubs/arena-poc    │
+                       │ • Persistência Relacional (PostgreSQL 18.6)  │
                       └──────────────┬───────────────────────────────┘
                                      │
            ┌─────────────────────────┴────────────────────────┐
@@ -105,6 +106,12 @@ O frontend é uma SPA reativa desenvolvida em **React 19**, **Vite** e **Tailwin
 
 ---
 
+### 3.6. Persistência Relacional & Storage Engine (Milestone 4A)
+- **PostgreSQL Portable 18.6:** Cluster ACID local executado sem instalador de SO e sem necessidade de permissões de administrador de TI.
+- **EF Core 10 & Npgsql 10:** Modelagem objeto-relacional avançada com suporte nativo a 	ext[] (expertises de jurados), int[] (cadeiras que votaram) e jsonb (snapshots imutáveis de temporizadores).
+- **DatabaseStartupValidator:** Teste de conectividade TCP em localhost:5432 no boot e aplicação automática e idempotente de migrações (InitialCreate).
+- **Store Híbrido com IDbContextFactory:** PostgresArenaProjectStore isola contextos efêmeros por operação de banco e mantém o estado de palco em tempo real em memória.
+- **Sobrevivência Pós-Restart:** Registros de eventos, startups, jurados e histórico persistem intactos após encerramento forçado e reinicialização a frio.
 ## 📡 4. Contratos de Comunicação e APIs
 
 ### Endpoints REST Auditados
@@ -171,25 +178,30 @@ O frontend é uma SPA reativa desenvolvida em **React 19**, **Vite** e **Tailwin
 | **Fase 3C** | Pitch Timers, Pause/Resume & Voting Lockout (HTTP 409 Conflict) | ✅ **Concluída e Homologada** |
 | **Fase 3D** | Round History & Result Engine (Approved, Rejected, Inconclusive) | ✅ **Concluída e Homologada** |
 | **Fase 3E** | Judge Catalog & Event Jury Assignment (Banca 1..5, Palco Nominal) | ✅ **Concluída e Homologada** |
-| **Fase 4** | Platform Reliability & Data Resilience (SQLite, Crash Recovery, Audit, Backup) | 📅 **Planejada (Próxima Fase)** |
-| **Fase 5** | Live Show Experience & Audio Atmosphere (Áudio Cênico, Web Audio API, Sound FX) | 📅 **Roadmap V2** |
+| **Fase 4** | Platform Reliability & Data Resilience (PostgreSQL Portable, Crash Recovery, Audit, Backup, DR) | ✅ **Concluída e Homologada (v0.4.3-phase4d)** |
+| **Fase 5** | Live Show Experience & Audio Atmosphere (Áudio Cênico, Web Audio API, Sound FX) | 📅 **Planejada (Próxima Fase)** |
 | **Fase 6** | Awards Ceremony, Ranking & Executive Reports (Pódio 3D, Ata Oficial PDF/CSV) | 📅 **Roadmap V2** |
-| **Fase 7** | Operational Hardening, Contingency & Fleet Telemetry (Bypass no Cockpit, ESP32) | 📅 **Roadmap V2** |
+| **Fase 7** | Operational Hardening, Contingency & Fleet Telemetry (Bypass no Cockpit, ESP32, Chaos) | 📅 **Roadmap V2** |
 | **Fase 8** | Evaluator Portal & Qualitative Rubrics (Módulo Satélite / Complementar) | 📅 **Roadmap V2** |
 
-### Bateria Consolidada de Testes Automatizados (466 Asserções / 100% Verde):
+### Bateria Consolidada de Testes Automatizados (688 Asserções em 14 Suítes / 100% Verde):
 ```text
-  tests/test-api.cjs               -> 48 / 48 PASS  (Hardware Bridge & Base API)
-  tests/test-projects-api.cjs      -> 53 / 53 PASS  (Projects API & ActiveContext)
-  tests/test-events-api.cjs        -> 38 / 38 PASS  (Event Lifecycle & Governance 3A)
-  tests/test-signalr-e2e.cjs       -> 55 / 55 PASS  (SignalR Broadcasts & Sincronização)
-  tests/test-pitch-lifecycle.cjs   -> 76 / 76 PASS  (Pitch Lifecycle Engine 3B)
-  tests/homologation-2d5.cjs       -> 35 / 35 PASS  (Homologação E2E Palco 3D & Unanimidade)
-  tests/test-timers-lockout.cjs    -> 50 / 50 PASS  (Timers, Pause/Resume & Lockout 3C)
-  tests/test-round-history.cjs     -> 61 / 61 PASS  (Round History & Result Engine 3D)
-  tests/test-judges-jury.cjs       -> 50 / 50 PASS  (Judge Catalog & Event Jury 3E)
+  tests/test-backend-api.cjs         -> 48 / 48 PASS  (Hardware Bridge & Base API)
+  tests/test-signalr.cjs             -> 46 / 46 PASS  (SignalR Broadcasts & Sincronização)
+  tests/test-projects-api.cjs        -> 62 / 62 PASS  (Projects API & ActiveContext)
+  tests/test-events-api.cjs          -> 38 / 38 PASS  (Event Lifecycle & Governance 3A)
+  tests/test-pitch-lifecycle.cjs     -> 76 / 76 PASS  (Pitch Lifecycle Engine 3B)
+  tests/test-pitch-timers.cjs        -> 50 / 50 PASS  (Timers, Pause/Resume & Lockout 3C)
+  tests/test-round-history.cjs       -> 61 / 61 PASS  (Round History & Result Engine 3D)
+  tests/test-judge-jury.cjs          -> 50 / 50 PASS  (Judge Catalog & Event Jury 3E)
+  tests/test-stage-homologation.cjs  -> 35 / 35 PASS  (Homologação E2E Palco 3D & Unanimidade)
+  tests/test-postgres-persistence.cjs-> 31 / 31 PASS  (PostgreSQL 18.6 ACID Persistence 4A)
+  tests/test-audit-query-layer.cjs   -> 79 / 79 PASS  (Audit Trail & ActivityLog Sync 4C)
+  tests/test-backup-manual.cjs       -> 24 / 24 PASS  (Manual Backup Engine & pg_dump 4D.1)
+  tests/test-disaster-recovery.cjs   -> 28 / 28 PASS  (Physical Restore & Parity Validation 4D.3)
+  tests/test-crash-rehydration.cjs   -> 33 / 33 PASS  (Crash Recovery & Paused Rehydration 4B)
   ──────────────────────────────────────────────────────────────────────────────
-  TOTAL CONSOLIDADO                -> 466 / 466 PASS (Zero falhas, zero regressões)
+  TOTAL CONSOLIDADO                  -> 688 / 688 PASS (Zero falhas, zero regressões)
 ```
 
 ---
@@ -231,6 +243,7 @@ node tests/homologation-2d5.cjs
 node tests/test-timers-lockout.cjs
 node tests/test-round-history.cjs
 node tests/test-judges-jury.cjs
+node tests/test-postgres-persistence.cjs
 ```
 
 
@@ -242,7 +255,7 @@ Consulte o **[Índice Mestre da Documentação (`docs/README.md`)](docs/README.m
 
 | Área Temática | Documentos Principais |
 | :--- | :--- |
-| **Arquitetura & Decisões** | [Arquitetura Geral (`docs/architecture.md`)](docs/architecture.md) • [Catálogo de ADRs — ADR-001 a ADR-017 (`docs/decision-records/`)](docs/decision-records/) |
+| **Arquitetura & Decisões** | [Arquitetura Geral (`docs/architecture.md`)](docs/architecture.md) • [Catálogo de ADRs — ADR-001 a ADR-019 (`docs/decision-records/`)](docs/decision-records/) |
 | **Produto & Visão** | [Roadmap e Planejamento Progressivo (`docs/roadmap.md`)](docs/roadmap.md) |
 | **Infraestrutura & Campo** | [Guia de Hardware ESP32 (`docs/hardware.md`)](docs/hardware.md) • [Guia de Rede e Hotspot (`docs/network.md`)](docs/network.md) |
 | **Histórico Operacional** | [Tabela Mestra de Marcos (`docs/archives/milestone-history.md`)](docs/archives/milestone-history.md) • [Diário Técnico (`docs/archives/implementation-history.md`)](docs/archives/implementation-history.md) |

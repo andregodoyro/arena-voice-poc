@@ -1,12 +1,20 @@
+using ArenaVoicePocBackend.Configuration;
+using ArenaVoicePocBackend.Domain;
 using ArenaVoicePocBackend.Domain.DTOs;
 using ArenaVoicePocBackend.Domain.Entities;
 using ArenaVoicePocBackend.Domain.Enums;
+using ArenaVoicePocBackend.DTOs;
 using ArenaVoicePocBackend.Hubs;
+using ArenaVoicePocBackend.Persistence;
+using ArenaVoicePocBackend.Persistence.Options;
+using ArenaVoicePocBackend.Persistence.Startup;
 using ArenaVoicePocBackend.Services;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
+using System.Threading.Channels;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,9 +42,79 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddSignalR();
-builder.Services.AddSingleton<IArenaProjectStore, ArenaProjectStore>();
+
+// =========================================================================
+// CONFIGURAÇÃO DE PERSISTÊNCIA & REGISTRO CONDICIONAL DE SERVIÇOS (MILESTONE 4A)
+// =========================================================================
+var persistenceSection = builder.Configuration.GetSection(ArenaPersistenceOptions.SectionName);
+builder.Services.Configure<ArenaPersistenceOptions>(persistenceSection);
+
+var persistenceOptions = persistenceSection.Get<ArenaPersistenceOptions>() ?? new ArenaPersistenceOptions();
+var storageEngineEnv = Environment.GetEnvironmentVariable("ARENA_STORAGE_ENGINE") ?? Environment.GetEnvironmentVariable("ARENA_STORAGE");
+var effectiveStorageEngine = !string.IsNullOrWhiteSpace(storageEngineEnv)
+    ? storageEngineEnv
+    : persistenceOptions.StorageEngine;
+
+// =========================================================================
+// AUDIT TRAIL & LIGHTWEIGHT EVENT SOURCING INFRASTRUCTURE (MILESTONE 4C.1 & 4C.2)
+// =========================================================================
+builder.Services.AddSingleton(Channel.CreateBounded<AuditEventRecord>(new BoundedChannelOptions(10_000)
+{
+    FullMode = BoundedChannelFullMode.Wait,
+    SingleReader = true
+}));
+builder.Services.AddSingleton<IAuditEventPublisher, AuditEventPublisher>();
+builder.Services.AddHostedService<AuditEventWriter>();
+
+// =========================================================================
+// AUDIT QUERY LAYER — CQRS LEITURA (MILESTONE 4C.4)
+// =========================================================================
+builder.Services.AddScoped<IAuditQueryService, AuditQueryService>();
+
+// =========================================================================
+// BACKUP ORCHESTRATION & DISASTER RECOVERY (MILESTONE 4D.1)
+// =========================================================================
+var backupSection = builder.Configuration.GetSection(BackupOptions.SectionName);
+builder.Services.Configure<BackupOptions>(backupSection);
+
+builder.Services.AddSingleton(Channel.CreateBounded<BackupRequest>(new BoundedChannelOptions(100)
+{
+    FullMode = BoundedChannelFullMode.Wait,
+    SingleReader = true
+}));
+builder.Services.AddSingleton<IBackupOrchestrator, BackupOrchestrator>();
+builder.Services.AddHostedService<BackupWorker>();
+
+if (string.Equals(effectiveStorageEngine, "memory", StringComparison.OrdinalIgnoreCase))
+{
+    // Modo de Compatibilidade: Memória Volátil pura (sem dependência de banco de dados)
+    builder.Services.AddSingleton<IArenaProjectStore, ArenaProjectStore>();
+}
+else
+{
+    // Modo Oficial: PostgreSQL Portable via EF Core 10 + Npgsql
+    builder.Services.AddPooledDbContextFactory<ArenaDbContext>(opt =>
+    {
+        opt.UseNpgsql(persistenceOptions.ConnectionString, npgsqlOpt =>
+        {
+            npgsqlOpt.CommandTimeout(persistenceOptions.CommandTimeoutSeconds);
+        });
+
+        if (persistenceOptions.EnableSensitiveDataLogging)
+        {
+            opt.EnableSensitiveDataLogging();
+        }
+    });
+
+    builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<ArenaDbContext>>().CreateDbContext());
+    builder.Services.AddSingleton<IArenaProjectStore, PostgresArenaProjectStore>();
+}
 
 var app = builder.Build();
+
+// Validação de inicialização e aplicação automática de migrações no boot
+var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseStartup");
+DatabaseStartupValidator.ValidateAndMigrate(app.Services, logger);
 
 app.UseCors();
 
@@ -51,7 +129,8 @@ app.MapPost("/api/chair-press", async (ChairPressRequest request, HttpContext ht
     var timestamp = DateTimeOffset.UtcNow;
     var horaFormatada = timestamp.ToLocalTime().ToString("HH:mm:ss.fff");
 
-    var result = store.TryTurnChair(id, "HTTP_API");
+    var effectiveSource = !string.IsNullOrWhiteSpace(request.Source) ? request.Source : "HTTP_API";
+    var result = store.TryTurnChair(id, effectiveSource);
 
     if (result.IsInvalidChair)
     {
@@ -821,6 +900,11 @@ app.MapPut("/api/projects/{id}", async (string id, UpdateProjectDto dto, IArenaP
         };
     }
 
+    if (dto.Status.HasValue)
+    {
+        project.Status = dto.Status.Value;
+    }
+
     store.UpdateProject(project);
 
     var activeContext = store.GetActiveContext();
@@ -1224,7 +1308,172 @@ app.MapPost("/api/rounds/archive", async (IArenaProjectStore store, IHubContext<
 });
 
 // =========================================================================
-// 6. MAPEAMENTO DO HUB SIGNALR
+// 6. AUDIT TRAIL — QUERY LAYER & TIMELINE (MILESTONE 4C.4)
+// =========================================================================
+
+// GET /api/audit — Timeline geral com paginação e filtros (ADR-022)
+app.MapGet("/api/audit", async (
+    IAuditQueryService auditQuery,
+    int? page, int? pageSize,
+    string? eventType, string? aggregateType, string? actorType,
+    DateTimeOffset? from, DateTimeOffset? to,
+    bool? includeTechnical,
+    CancellationToken ct) =>
+{
+    var filter = new AuditQueryFilter
+    {
+        Page = page ?? 1,
+        PageSize = pageSize ?? AuditQueryFilter.DefaultPageSize,
+        EventType = eventType,
+        AggregateType = aggregateType,
+        ActorType = actorType,
+        From = from,
+        To = to,
+        IncludeTechnical = includeTechnical ?? false
+    };
+
+    var result = await auditQuery.QueryAsync(filter, ct);
+    return Results.Ok(result);
+});
+
+// GET /api/audit/{id} — Consulta evento de auditoria por ID
+app.MapGet("/api/audit/{id:long}", async (long id, IAuditQueryService auditQuery, CancellationToken ct) =>
+{
+    var dto = await auditQuery.GetByIdAsync(id, ct);
+    return dto != null
+        ? Results.Ok(dto)
+        : Results.NotFound(new { error = "Evento de auditoria não encontrado.", id });
+});
+
+// GET /api/audit/project/{projectId} — Histórico de auditoria por projeto
+app.MapGet("/api/audit/project/{projectId}", async (
+    string projectId,
+    IAuditQueryService auditQuery,
+    int? page, int? pageSize,
+    string? eventType, string? aggregateType, string? actorType,
+    DateTimeOffset? from, DateTimeOffset? to,
+    bool? includeTechnical,
+    CancellationToken ct) =>
+{
+    var filter = new AuditQueryFilter
+    {
+        Page = page ?? 1,
+        PageSize = pageSize ?? AuditQueryFilter.DefaultPageSize,
+        EventType = eventType,
+        AggregateType = aggregateType,
+        ActorType = actorType,
+        From = from,
+        To = to,
+        IncludeTechnical = includeTechnical ?? false
+    };
+
+    var result = await auditQuery.GetByProjectIdAsync(projectId, filter, ct);
+    return Results.Ok(result);
+});
+
+// GET /api/audit/event/{eventId} — Histórico de auditoria por evento (arena event)
+app.MapGet("/api/audit/event/{eventId}", async (
+    string eventId,
+    IAuditQueryService auditQuery,
+    int? page, int? pageSize,
+    string? eventType, string? aggregateType, string? actorType,
+    DateTimeOffset? from, DateTimeOffset? to,
+    bool? includeTechnical,
+    CancellationToken ct) =>
+{
+    var filter = new AuditQueryFilter
+    {
+        Page = page ?? 1,
+        PageSize = pageSize ?? AuditQueryFilter.DefaultPageSize,
+        EventType = eventType,
+        AggregateType = aggregateType,
+        ActorType = actorType,
+        From = from,
+        To = to,
+        IncludeTechnical = includeTechnical ?? false
+    };
+
+    var result = await auditQuery.GetByArenaEventIdAsync(eventId, filter, ct);
+    return Results.Ok(result);
+});
+
+// GET /api/audit/session — Timeline de sessão (checkpoints, session updates)
+app.MapGet("/api/audit/session", async (
+    IAuditQueryService auditQuery,
+    int? page, int? pageSize,
+    string? eventType,
+    DateTimeOffset? from, DateTimeOffset? to,
+    CancellationToken ct) =>
+{
+    var filter = new AuditQueryFilter
+    {
+        Page = page ?? 1,
+        PageSize = pageSize ?? AuditQueryFilter.DefaultPageSize,
+        EventType = eventType,
+        From = from,
+        To = to,
+        IncludeTechnical = true  // Session endpoint sempre inclui eventos técnicos
+    };
+
+    var result = await auditQuery.GetSessionTimelineAsync(filter, ct);
+    return Results.Ok(result);
+});
+
+// =========================================================================
+// 7. ENDPOINTS ADMINISTRATIVOS: BACKUP & DISASTER RECOVERY (MILESTONE 4D.1)
+// =========================================================================
+
+// POST /api/admin/backup — Solicitação assíncrona de backup manual
+app.MapPost("/api/admin/backup", async (
+    IBackupOrchestrator orchestrator,
+    IAuditEventPublisher auditPublisher,
+    HttpContext http,
+    CancellationToken ct) =>
+{
+    var backupId = Guid.NewGuid().ToString("N")[..8];
+    var clientIp = http.Connection.RemoteIpAddress?.ToString() ?? "local";
+    var requestedAt = DateTimeOffset.UtcNow;
+
+    var request = new BackupRequest(
+        BackupId: backupId,
+        TriggerType: "Manual",
+        RequestedAt: requestedAt,
+        ActorId: "operator-admin",
+        ActorName: "Operator",
+        SourceIp: clientIp
+    );
+
+    auditPublisher.Publish(new AuditEventRecord(
+        EventType: "BackupTriggered",
+        AggregateType: "System",
+        AggregateId: backupId,
+        ActorType: ActorType.Operator,
+        ActorName: "Operator",
+        SourceIp: clientIp,
+        Payload: new { backupId, trigger = "Manual", requestedAt }
+    ));
+
+    await orchestrator.EnqueueBackupAsync(request, ct);
+
+    return Results.Accepted("/api/admin/backups", new
+    {
+        jobId = backupId,
+        status = "queued",
+        trigger = "Manual",
+        requestedAt = requestedAt,
+        message = "Backup manual enfileirado com sucesso. Execução assíncrona iniciada."
+    });
+});
+
+// GET /api/admin/backups — Listagem dos backups disponíveis via Filesystem
+app.MapGet("/api/admin/backups", (IBackupOrchestrator orchestrator) =>
+{
+    var backups = orchestrator.GetAvailableBackups();
+    return Results.Ok(backups);
+});
+
+// =========================================================================
+// 8. MAPEAMENTO DO HUB SIGNALR
 // =========================================================================
 app.MapHub<ArenaPocHub>("/hubs/arena-poc");
 app.MapHub<ArenaPocHub>("/arenaHub"); // Rota retrocompatível
@@ -1243,6 +1492,15 @@ Console.WriteLine($"   GET  http://localhost:{port}/api/status       (Health che
 Console.WriteLine(" Hubs SignalR:");
 Console.WriteLine($"   WS   http://localhost:{port}/hubs/arena-poc   (Voice Studio)");
 Console.WriteLine($"   WS   http://localhost:{port}/arenaHub         (Retrocompatível)");
+Console.WriteLine(" Audit Trail (4C.4):");
+Console.WriteLine($"   GET  http://localhost:{port}/api/audit               (Timeline)");
+Console.WriteLine($"   GET  http://localhost:{port}/api/audit/{{id}}          (Por ID)");
+Console.WriteLine($"   GET  http://localhost:{port}/api/audit/project/{{id}}  (Por Projeto)");
+Console.WriteLine($"   GET  http://localhost:{port}/api/audit/event/{{id}}    (Por Evento)");
+Console.WriteLine($"   GET  http://localhost:{port}/api/audit/session        (Sessão)");
+Console.WriteLine(" Backup & Disaster Recovery (4D.1):");
+Console.WriteLine($"   POST http://localhost:{port}/api/admin/backup        (Disparar backup manual)");
+Console.WriteLine($"   GET  http://localhost:{port}/api/admin/backups       (Listar backups disponíveis)");
 Console.WriteLine("-------------------------------------------------------------");
 Console.WriteLine(" Endereços IP locais desta máquina detectados:");
 try
@@ -1259,7 +1517,7 @@ Console.WriteLine("=============================================================
 app.Run();
 
 // Modelo do payload aceito
-public record ChairPressRequest(int? ChairId, int? SeatNumber)
+public record ChairPressRequest(int? ChairId, int? SeatNumber, string? Source = null)
 {
     public int GetEffectiveChairId() => ChairId ?? SeatNumber ?? 0;
 }

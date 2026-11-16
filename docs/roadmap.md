@@ -3,7 +3,7 @@
 
 > **Classificação:** Documento Mestre de Produto e Arquitetura  
 > **Status:** Fase 1, Fase 2 e Fase 3 Concluídas e Homologadas (`v0.3.0-phase3`)  
-> **Cobertura Automatizada:** 466 verificações em 9 suítes de testes (100% aprovadas, zero falhas, zero regressões)  
+> **Cobertura Automatizada:** 497 verificações em 10 suítes de testes (100% aprovadas, zero falhas, zero regressões)  
 > **Data de Atualização:** Novembro de 2026  
 > **Público-alvo:** Desenvolvedores, arquitetos de software, product engineers e operadores de evento
 
@@ -592,31 +592,38 @@ FASES ENTREGUES E HOMOLOGADAS (CONCLUÍDAS)
   ✅ FASE 1: Operator + Stage Foundation (v0.1.0-phase1)
   ✅ FASE 2: Event Setup & Project Management (v0.2.0-phase2)
   ✅ FASE 3: Event Governance, Pitch Dynamics & Jury (v0.3.0-phase3)
+  ✅ FASE 4A: Storage Engine & Relational Schema (v0.4.0-phase4a — PostgreSQL Portable, EF Core 10)
+  ✅ FASE 4B: State Persistence & Session Re-hydration (v0.4.1-phase4b — Crash Recovery & Snapshot Pattern)
+  ✅ FASE 4C: Operational Audit Trail & Event Sourcing Leve (v0.4.2-phase4c — AuditEvents & ActivityLog Sync)
+  ✅ FASE 4D: Automated Snapshots, Backup & Disaster Recovery (v0.4.3-phase4d — BackupOrchestrator, pg_dump, Auto-Snapshots, Out-of-Process Restore & Runbook)
 ════════════════════════════════════════════════════════════════════════════════
 NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
 ════════════════════════════════════════════════════════════════════════════════
   │
-  ├─► FASE 4: Platform Reliability & Data Resilience ◄── [PRÓXIMA FASE OFICIAL]
-  │     ├─ 4A: Storage Engine & Relational Schema (SQLite WAL Mode & Integridade Nativa)
-  │     ├─ 4B: State Persistence & Session Re-hydration (SqliteArenaProjectStore & Crash Boot)
-  │     ├─ 4C: Operational Audit Trail & Event Sourcing Leve (AuditEvents & ActivityLog Sync)
-  │     ├─ 4D: Automated Snapshots, Backup & Disaster Recovery (VACUUM INTO & Auto-Snapshots)
-  │     └─ 4E: Chaos Engineering & Reliability Test Suite (Simulação de kill -9 & 100 Restarts)
+  ├─► FASE 4: Platform Reliability & Data Resilience (CONCLUÍDA)
+  │     ├─ [x] 4A: Storage Engine & Relational Schema (PostgreSQL Portable 18.6, EF Core 10 & Schema Relacional)
+  │     ├─ [x] 4B: State Persistence & Session Re-hydration (Snapshot Pattern, Crash Recovery Paused & TurnedChairs)
+  │     ├─ [x] 4C: Operational Audit Trail & Event Sourcing Leve (AuditEvents & ActivityLog Sync)
+  │     ├─ [x] 4D: Automated Snapshots, Backup & Disaster Recovery (BackupOrchestrator, pg_dump, Auto-Snapshots, Out-of-Process Restore & Runbook)
+  │     └─ [⤹] 4E: Chaos Engineering & Reliability Test Suite (REABSORVIDO NA FASE 7)
   │
-  ├─► FASE 5: Live Show Experience & Audio Atmosphere
-  │     ├─ 5A: Motor de Áudio Cênico Web Audio API no Telão (/stage)
-  │     ├─ 5B: Sincronização Sonora: Whoosh de Rotação, Buzzer e Gongo de Encerramento
-  │     └─ 5C: Efeitos de Celebração Cênica: Fanfarra e Iluminação de Unanimidade (5/5)
+  ├─► FASE 5: Live Show Experience & Audio Atmosphere ◄── [PRÓXIMO MARCO]
+  │     ├─ 5A: Web Audio Engine no Stage (/stage) & Unlock Policy
+  │     ├─ 5B: Sincronização Sonora com SignalR (Whoosh, Ticker e Gongo)
+  │     ├─ 5C: Efeitos de Clímax Cênico & Ambientação de Palco (Fanfarra e Tensão)
+  │     ├─ 5D: Soundboard do Operador no Cockpit (/operator) & Mute de Emergência
+  │     └─ 5E: Homologação Integrada de Áudio, Latência e Regressão Global
   │
   ├─► FASE 6: Awards Ceremony, Ranking & Executive Reports
   │     ├─ 6A: Motor de Ranking Oficial (Desempate por Modo de Aprovação e Votos)
   │     ├─ 6B: Telão Cênico de Premiação e Pódio (/stage com visual de celebração)
   │     └─ 6C: Emissão da Ata da Banca (Exportação Executiva em PDF e CSV)
   │
-  ├─► FASE 7: Operational Hardening, Contingency & Fleet Telemetry
+  ├─► FASE 7: Operational Hardening, Contingency & Fleet Telemetry (Com Chaos Engineering Reabsorvido)
   │     ├─ 7A: Cockpit de Contingência (Bypass de Voto Manual em 1 Clique na Mesa)
   │     ├─ 7B: Telemetria da Frota de ESP32 (Monitor de Liveness e Status das 5 Cadeiras)
-  │     └─ 7C: Runbook Operacional de Produção e Checklist de Ensaio Técnico
+  │     ├─ 7C: Runbook Operacional de Produção e Checklist de Ensaio Técnico
+  │     └─ 7D: Chaos Engineering & Resiliência Holística de Campo (Reabsorvido do 4E)
   │
   └─► FASE 8 (Módulo Satélite / Complementar): Evaluator Portal & Qualitative Rubrics
         ├─ 8A: Parametrização Opcional de Critérios e Rubricas por Evento
@@ -654,49 +661,96 @@ NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
 
 ---
 
-### FASE 4: Platform Reliability & Data Resilience (PRÓXIMA FASE OFICIAL)
+### FASE 4: Platform Reliability & Data Resilience (✅ CONCLUÍDA — v0.4.3-phase4d)
 *Blindar a plataforma contra falhas, quedas de energia e perda de dados em eventos ao vivo.*
 
-- **STATUS:** 📅 PLANEJADA (Branch eat/phase4-data-resilience)
-- **OBJETIVO:** Substituir o armazenamento volátil em memória por persistência local transacional ACID (SQLite WAL mode), garantindo reidratação instantânea pós-queda, trilha de auditoria e backups atômicos a quente.
-- **PRÉ-REQUISITOS:** Fase 3 concluída (0.3.0-phase3).
-- **SUBFASES E ESCOPO:**
-  - **Milestone 4A — Storage Engine & Relational Schema:**
-    - Driver Microsoft.Data.Sqlite in-process (zero instaladores, zero serviços de background);
-    - Ativação do modo WAL (PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;);
-    - Criação do schema DDL relacional estrito com constraints de integridade para Events, Projects, Judges, EventJuryAssignments, RoundHistoryEntries e ActiveSessionState.
-  - **Milestone 4B — State Persistence & Session Re-hydration:**
-    - Implementação de SqliteArenaProjectStore encapsulando IArenaProjectStore;
-    - Boot com reidratação automática do evento ativo, projeto corrente e banca;
-    - Regra de sanitização pós-queda: pitch interrompido no meio volta com segurança para Waiting e cadeiras em 0°.
-  - **Milestone 4C — Operational Audit Trail & Event Sourcing Leve:**
-    - Tabela append-only AuditEvents registrando todas as mutações operacionais (ativação, transições, pausas, acionamentos de votos, backups);
-    - Endpoint GET /api/audit-log e reidratação do ActivityLog no cockpit do operador após recarga de página.
-  - **Milestone 4D — Automated Snapshots, Backup & Disaster Recovery:**
-    - Backup a quente atômico via VACUUM INTO através do endpoint POST /api/admin/backup;
-    - Snapshot automático a cada rodada arquivada (ound_N_snapshot.db);
-    - Procedimento documentado de restauração rápida em máquina secundária via pendrive.
-  - **Milestone 4E — Chaos Engineering & Reliability Test Suite:**
-    - Suíte automatizada especializada 	ests/test-chaos-reliability.cjs;
-    - Simulação de terminação abrupta de processo (kill -9) durante escritas e votações concorrentes;
-    - Validação de 100 reinicializações rápidas consecutivas e PRAGMA integrity_check no boot;
-    - Homologação formal e emissão da tag 0.4.0-phase4.
-- **CRITÉRIO DE ACEITE:** Desligar forçadamente o processo .NET durante qualquer momento da operação e reiniciar o servidor sem perda de nenhuma rodada, voto ou configuração.
-- **DECISÕES ARQUITETURAIS:** [ADR-016](decision-records/ADR-016-offline-first-persistence-strategy.md) e [ADR-017](decision-records/ADR-017-platform-reliability-over-feature-expansion.md).
+- **STATUS:** ✅ 4A, 4B, 4C e 4D CONCLUÍDOS E HOMOLOGADOS (Branch `feat/phase4-data-resilience`)
+- **OBJETIVO:** Substituir o armazenamento volátil em memória por persistência local transacional ACID (PostgreSQL Portable via EF Core 10), garantindo reidratação instantânea pós-queda, tolerância a falhas via *Paused Recovery*, trilha de auditoria e backups operacionais via pg_dump com restauração física out-of-process.
+- **BASELINE ATUAL:** **688 asserções automatizadas em 14 suítes aprovadas (100% verde)**.
+- **MARCOS ENTREGUES:**
+  - **✅ Milestone 4A — Storage Engine & Relational Schema (v0.4.0-phase4a):**
+    - Cluster PostgreSQL Portable 18.6 com Npgsql 10 e EF Core 10.
+    - Contexto `ArenaDbContext` mapeando as 6 tabelas relacionais do domínio.
+    - Suíte de persistência `test-postgres-persistence.cjs` (31 testes verdes).
+  - **✅ Milestone 4B — State Persistence & Session Re-hydration (v0.4.1-phase4b):**
+    - Evolução de `ActiveSessionState` com suporte a `turned_chairs int[]`, `recovered_from_crash`, `interrupted_stage`, `recovered_at` e `last_checkpoint_at`.
+    - **Snapshot Pattern & Lock Separation:** isolamento estrito entre `_contextLock` (Hot Cache em RAM) e `_dbPersistenceLock` (PostgreSQL I/O).
+    - **Crash Recovery Engine:** detecção de quedas e aplicação da estratégia *Paused Recovery* (timer congelado no último checkpoint, sem descarte automático para Waiting).
+    - Suíte de reidratação e crash `test-crash-rehydration.cjs` (33 testes verdes).
+  - **✅ Milestone 4C — Operational Audit Trail & Event Sourcing Leve (v0.4.2-phase4c):**
+    - Tabela append-only `audit_events` registrando 100% das mutações operacionais de domínio;
+    - Pipeline assíncrono não-bloqueante (`Channel<AuditEventRecord>` bounded 10k + `AuditEventWriter`);
+    - Camada de consulta CQRS leve (`AuditQueryService`) e endpoints `/api/audit*` com segregação de visibilidade (**ADR-022**);
+    - Reidratação durável do `ActivityLog` no cockpit do operador após F5 via `auditApi.js` e `auditMapper.js`;
+    - Suíte de auditoria `test-audit-query-layer.cjs` (79 testes verdes);
+    - Consolidação de regressão geral com 609 testes verdes em 12 suítes.
+  - **✅ Milestone 4D — Automated Snapshots, Backup & Disaster Recovery (v0.4.3-phase4d):**
+    - **BackupOrchestrator & BackupWorker:** processamento assíncrono em segundo plano via `Channel<BackupRequest>` isolado do hot-path de votação;
+    - **Physical Backup Engine:** geração de dumps binários PostgreSQL (`pg_dump -Fc`) sob demanda e retenção configurável baseada no filesystem;
+    - **Snapshots Automáticos:** disparo atômico de snapshot físico (`round_N_<timestamp>.pgdump`) atrelado ao evento `RoundArchived`;
+    - **Auditoria Operacional:** eventos `ManualBackupRequested`, `BackupSucceeded`, `BackupFailed`, `AutoSnapshotTriggered`, `AutoSnapshotCreated`, `AutoSnapshotFailed` no Audit Trail;
+    - **Out-of-Process Disaster Recovery Engine:** scripts canônicos de restauração física (`scripts/restore-backup.cjs` e `scripts/restore-backup.cmd`) via `pg_restore` com isolamento completo e sem expor comandos destrutivos via HTTP;
+    - **Suíte de Disaster Recovery:** `tests/test-disaster-recovery.cjs` (28 asserções) validando restauração real em banco isolado temporário, paridade de 100% dos dados nas 5 tabelas críticas e integridade referencial;
+    - **Disaster Recovery Runbook:** procedimento operacional documentado passo a passo para mesa técnica e recuperação em notebook sobressalente com RTO < 30s e RPO = 0;
+    - **Consolidação de Decisões de Arquitetura:** ADR-023, ADR-024 e ADR-025.
+  - **🔄 Milestone 4E — Chaos Engineering & Reliability Test Suite (REABSORVIDO NA FASE 7):**
+    - **Decisão Arquitetural:** Reabsorvido formalmente após o encerramento do Milestone 4D (Post Phase 4 Decision Workshop);
+    - **Destino:** Integrado à **Fase 7 (Milestone 7D — Chaos Engineering & Resiliência Holística de Campo)**;
+    - **Justificativa:** Retornos decrescentes em confiabilidade isolada de banco após PostgreSQL ACID, Crash Recovery, Audit Trail, Auto-Snapshots por rodada e Disaster Recovery homologados com 100% de paridade (688 testes verdes em 14 suítes). Em evento real de show ao vivo, falhas de infraestrutura são holísticas (hardware ESP32, rede Wi-Fi local, concorrência SignalR, telão, áudio e contingências operacionais simultâneas).
+- **CRITÉRIO DE ACEITE GLOBAL:** Desligar forçadamente o processo .NET e/ou o cluster PostgreSQL durante qualquer momento da operação e reiniciar o servidor sem perda de nenhuma rodada, voto ou configuração, restaurando o cluster em caso de perda total com RTO < 30s e RPO = 0.
+- **DECISÕES ARQUITETURAIS:** [ADR-016](decision-records/ADR-016-offline-first-persistence-strategy.md), [ADR-017](decision-records/ADR-017-platform-reliability-over-feature-expansion.md), [ADR-018](decision-records/ADR-018-efcore10-npgsql-migrations-portable.md), [ADR-019](decision-records/ADR-019-dbcontext-factory-hybrid-store.md), [ADR-020](decision-records/ADR-020-snapshot-pattern-and-lock-separation.md), [ADR-021](decision-records/ADR-021-crash-recovery-and-rehydration-strategy.md), [ADR-022](decision-records/ADR-022-audit-trail-and-cqrs-light.md), [ADR-023](decision-records/ADR-023-backup-orchestration-and-pgdump.md), [ADR-024](decision-records/ADR-024-round-archived-automatic-snapshots.md) e [ADR-025](decision-records/ADR-025-out-of-process-disaster-recovery.md).
 
 ---
 
 ### FASE 5: Live Show Experience & Audio Atmosphere
-*Elevar o valor sensorial e a dramaticidade cênica do telão 3D através de áudio estéreo imersivo.*
+*Elevar o valor sensorial e a dramaticidade cênica do telão 3D através de áudio estéreo imersivo em tempo real.*
 
-- **STATUS:** 📅 PLANEJADA (Roadmap V2)
-- **OBJETIVO:** Integrar um motor de áudio no telão (/stage) via Web Audio API, atrelando efeitos sonoros cinemáticos às mudanças de estado da apresentação e acionamentos da banca.
-- **PRÉ-REQUISITOS:** Fase 3 concluída (independe da Fase 4).
-- **SUBFASES E ESCOPO:**
-  - **Milestone 5A — Web Audio Engine no Stage:** Hook reativo useAudioScene com controle de volume, master mute e desbloqueio inicial de áudio (conformidade com autoplay dos navegadores).
-  - **Milestone 5B — Sincronização Sonora com SignalR:** Som de rotação da cadeira (whoosh/catraca metálica dramática no ChairTurned), sinal de alerta sonoro nos últimos 15 segundos do timer e gongo de encerramento da votação (VotingClosed).
-  - **Milestone 5C — Efeitos de Clímax Cênico:** Fanfarra comemorativa e iluminação especial de celebração quando o ResultEngine computa Unanimidade (5/5 votos favoráveis).
-- **CRITÉRIO DE ACEITE:** Telão executa efeitos sonoros em sincronia com animações GSAP a 60 FPS sem engasgos de áudio ou vídeo.
+- **STATUS:** 📅 PLANEJADA (Roadmap V2 — Próxima Fase Prioritária)
+- **OBJETIVO:** Integrar um motor de áudio imersivo de baixa latência no telão (`/stage`) via Web Audio API, atrelando efeitos sonoros cinemáticos e trilhas de tensão às mudanças de estado da apresentação e acionamentos soberanos da banca examinadora.
+- **PRÉ-REQUISITOS:** Fase 3 (Governança, Ciclo do Pitch, Timers e Result Engine) e Fase 4 (Persistência e Estabilidade de Sessão).
+- **SUBFASES E ESCOPO DETALHADO:**
+
+  - **Milestone 5A — Web Audio Engine no Stage (`/stage`) & Unlock Policy:**
+    - *Objetivo:* Construir a fundação de síntese e reprodução de áudio desacoplada do ciclo de renderização Three.js.
+    - *Arquitetura:* Singleton `AudioEngine` baseado no `AudioContext` nativo do navegador, expondo nós de ganho master/efeitos e hook reativo `useAudioScene`. Banner/overlay não-obstrusivo "Clique para Ativar Áudio Cênico" em conformidade com as políticas rígidas de *Autoplay* dos navegadores modernos.
+    - *Dependências:* `StagePage.jsx`, Web Audio API, React 19.
+    - *Critério de Aceite:* Áudio desbloqueado com 1 clique no palco; zero warnings de autoplay no console do navegador; ganho ajustável sem clipping.
+    - *Entregáveis:* `frontend/src/audio/AudioEngine.js`, `frontend/src/hooks/useAudioScene.js`, componente `AudioUnlockOverlay.jsx`.
+    - *Riscos:* Bloqueio silencioso de autoplay em navegadores Chromium; mitigado pelo listener de desbloqueio em qualquer toque na tela.
+
+  - **Milestone 5B — Sincronização Sonora com SignalR & Eventos de Pitch:**
+    - *Objetivo:* Disparar efeitos sonoros pontuais com latência imperceptível (< 50ms) sincronizados às animações 3D de palco.
+    - *Arquitetura:* Carregamento antecipado de buffers de áudio (`AudioBufferSourceNode`) no bootstrap do Stage. Disparo sonoro imediato em manipuladores SignalR: som mecânico de rotação (*catraca/whoosh*) no `ChairTurned`, alerta sonoro rítmico de urgência nos últimos 15s (`PitchTimerUpdated`) e gongo dramático de encerramento no `VotingClosed`.
+    - *Dependências:* 5A homologado, listeners de SignalR existentes em `StagePage.jsx`.
+    - *Critério de Aceite:* Áudio e rotação física/3D da cadeira ocorrem simultaneamente (drift < 50ms); gongo de votação soa imediatamente ao expirar o tempo.
+    - *Entregáveis:* Catálogo de áudio sintetizado em `frontend/public/audio/`, listeners reativos integrados.
+    - *Riscos:* Latência perceptível entre animação Three.js e início do som; mitigado pelo pré-carregamento total em memória (`fetch` + `decodeAudioData`).
+
+  - **Milestone 5C — Efeitos de Clímax Cênico & Ambientação de Palco:**
+    - *Objetivo:* Construir a paisagem sonora dramática durante o pitch e o momento ápice da avaliação.
+    - *Arquitetura:* Trilha musical procedural de suspense contínuo iniciada no `PitchStarted` e atenuada no `PitchPaused`. Fanfarra comemorativa orquestral e celebração sonora quando o `ResultEngine` computa Unanimidade (5/5 votos favoráveis), sincronizada com tweens de neons e confetes 3D no palco.
+    - *Dependências:* 5B homologado, `ResultEngine` da Fase 3D.
+    - *Critério de Aceite:* Unanimidade 5/5 dispara fanfarra com fade-in suave e explosão acústica sem estourar limiter; transição para Rejected encerra trilha com acorde menor.
+    - *Entregáveis:* Módulos de síntese sonora de clímax, integração com temas visuais do Three.js.
+    - *Riscos:* Sobreposição desordenada de trilhas sonoras; mitigado por máquina de estados de áudio mutuamente exclusiva.
+
+  - **Milestone 5D — Soundboard do Operador no Cockpit (`/operator`) & Mute de Emergência:**
+    - *Objetivo:* Permitir ao operador da mesa de som controlar remotamente a atmosfera acústica do telão.
+    - *Arquitetura:* Slider de Volume Master e botão "MUTE GERAL" (Pânico) no cockpit do operador transmitidos via SignalR (`AudioVolumeChanged`, `AudioMuted`) para o telão; botões de pré-escuta e disparos manuais de teste sonoro para ensaio de mesa.
+    - *Dependências:* Hub SignalR, `OperatorContext.jsx`, 5A homologado.
+    - *Critério de Aceite:* Operador consegue silenciar 100% do áudio do telão instantaneamente (< 100ms) com 1 clique na mesa técnica.
+    - *Entregáveis:* Componente `AudioCockpitControl.jsx` na sidebar do Operator UI, novos métodos no Hub .NET.
+    - *Riscos:* Feedback acústico ou operador mutar acidentalmente; mitigado por confirmação visual nítida (badge "MUTADO").
+
+  - **Milestone 5E — Homologação Integrada de Áudio, Latência e Regressão Global:**
+    - *Objetivo:* Validar a concorrência entre áudio Web Audio API e renderização WebGL 3D a 60 FPS sem dropouts.
+    - *Arquitetura:* Suíte automatizada `tests/test-audio-sync.cjs` verificando contratos de eventos de áudio, estados de mute e conformidade de payloads; auditoria de consumo de CPU/GPU no Chromium.
+    - *Dependências:* 5A a 5D concluídos, orquestrador `run-regression-suite.cjs`.
+    - *Critério de Aceite:* Telão sustenta 60 FPS com Three.js e Web Audio tocando simultaneamente sem queda de frames; regressão geral com 15 suítes 100% verdes.
+    - *Entregáveis:* Suíte `tests/test-audio-sync.cjs`, relatório de encerramento da Fase 5 e release `v0.5.0-phase5`.
+    - *Riscos:* Glitching de áudio por concorrência de thread principal; mitigado por nós de áudio nativos do Web Audio API fora do loop JavaScript.
+
+- **ORDEM DE EXECUÇÃO RECOMENDADA:** 5A ➔ 5B ➔ 5C ➔ 5D ➔ 5E.
 
 ---
 
@@ -707,24 +761,27 @@ NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
 - **OBJETIVO:** Computar a classificação geral dos pitches apresentados, projetar a cerimônia de premiação no palco e exportar a ata oficial em PDF e CSV para a comissão organizadora.
 - **PRÉ-REQUISITOS:** Fase 4 (Persistência) e Fase 3D (Result Engine).
 - **SUBFASES E ESCOPO:**
-  - **Milestone 6A — Motor de Ranking Oficial:** Algoritmo de classificação baseado nos snapshots do RoundHistoryEntry com desempate por: ApprovalMode (Unanimidade > Maioria) ➔ Total de Votos ➔ Ordem cronológica.
-  - **Milestone 6B — Telão Cênico de Premiação e Pódio:** Visualização de encerramento no /stage com revelação do Top 3 / Top 5 das startups apoiadas pela banca.
-  - **Milestone 6C — Emissão de Ata da Banca:** Endpoints GET /api/reports/minutes?format=pdf|csv e botão no cockpit "Exportar Ata do Evento", gerando documento executivo pronto para assinatura do comitê.
+  - **Milestone 6A — Motor de Ranking Oficial:** Algoritmo de classificação baseado nos snapshots do `RoundHistoryEntry` com desempate por: `ApprovalMode` (Unanimidade > Maioria) ➔ Total de Votos ➔ Ordem cronológica.
+  - **Milestone 6B — Telão Cênico de Premiação e Pódio:** Visualização de encerramento no `/stage` com revelação do Top 3 / Top 5 das startups apoiadas pela banca com iluminação dourada e efeitos cênicos.
+  - **Milestone 6C — Emissão de Ata da Banca:** Endpoints `GET /api/reports/minutes?format=pdf|csv` e botão no cockpit "Exportar Ata do Evento", gerando documento executivo pronto para assinatura do comitê.
 - **CRITÉRIO DE ACEITE:** Download em 1 clique de relatório PDF completo contendo cabeçalho do evento, relação de projetos, votos nominais de cada jurado e veredito final.
 
 ---
 
-### FASE 7: Operational Hardening, Contingency & Fleet Telemetry
-*Blindagem operacional de campo e procedimentos de contingência para a mesa técnica.*
+### FASE 7: Operational Hardening, Contingency & Fleet Telemetry (Com Chaos Engineering Reabsorvido)
+*Blindagem operacional de campo, procedimentos de contingência técnica e resiliência holística de evento ao vivo.*
 
 - **STATUS:** 📅 PLANEJADA (Roadmap V2)
-- **OBJETIVO:** Fornecer ao operador da mesa ferramentas de diagnóstico em tempo real e comandos de bypass manual imediato em caso de falha de hardware das cadeiras.
-- **PRÉ-REQUISITOS:** Fases 4, 5 e 6.
+- **OBJETIVO:** Fornecer à mesa técnica ferramentas de diagnóstico de frota ESP32 em tempo real, comandos de bypass manual imediato em caso de pane física, runbooks de pré-show e validação de caos holístico no ecossistema completo.
+- **PRÉ-REQUISITOS:** Fases 4, 5 e 6 homologadas.
 - **SUBFASES E ESCOPO:**
-  - **Milestone 7A — Cockpit de Contingência (Bypass Manual):** Ação no cockpit "Forçar Voto Manual da Cadeira N" para uso exclusivo em caso de quebra mecânica de botão ou bateria fraca durante o pitch.
+  - **Milestone 7A — Cockpit de Contingência (Bypass Manual):** Ação no cockpit "Forçar Voto Manual da Cadeira N" para uso exclusivo em caso de quebra mecânica de botão ou bateria fraca durante o pitch ao vivo.
   - **Milestone 7B — Telemetria da Frota de ESP32:** Monitor de liveness em background medindo ping e status de conexão Wi-Fi das 5 cadeiras físicas antes do início de cada apresentação.
   - **Milestone 7C — Runbook de Produção e Checklist Pré-Show:** Manual operacional minuto a minuto para alinhamento entre mesa técnica, mestre de cerimônias e direção de palco.
-- **CRITÉRIO DE ACEITE:** Operador consegue contornar uma falha física de botão em menos de 3 segundos sem interromper a apresentação.
+  - **Milestone 7D — Chaos Engineering & Resiliência Holística de Campo (Reabsorvido do 4E):**
+    - *Conceito:* **Chaos Engineering será executado dentro da Phase 7 em conjunto com testes de hardware ESP32, rede local, SignalR, telão, áudio e contingências operacionais reais.**
+    - *Simulações Práticas:* Desconexão abrupta de ESP32 durante votação, queda forçada de Wi-Fi, reboot súbito do backend com áudio tocando e timer ativo, estresse de mensagens simultâneas e execução do procedimento de Disaster Recovery sob pressão de tempo de palco.
+- **CRITÉRIO DE ACEITE:** Operador contorna falha física de botão em menos de 3 segundos sem interromper a apresentação; ecossistema sobrevive a desconexões e quedas de energia recuperando-se em modo Paused sem perda de votos.
 
 ---
 
@@ -745,19 +802,19 @@ NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
 | **Fase 1** | Operator + Stage Foundation | Telão passivo sem controles de mouse; operador controla a arena com linguagem de produto. | Duas abas sincronizadas via SignalR com reset remoto. |
 | **Fase 2** | Event Setup & Projects | Operador configura branding e catálogo; telão reflete startup atual e neons dinâmicos. | Alternância de pitches no palco e hidratação REST. |
 | **Fase 3** | Pitch Dynamics & Jury | 6 estágios de pitch, timers sem drift, lockout HTTP 409, histórico e jurados nominais. | 466 verificações automatizadas em 9 suítes (100% verde). |
-| **Fase 4** | Platform Reliability & Data | Reinício forçado do servidor restaura 100% do estado sem perda de histórico; backup em 1 clique. | 	ests/test-chaos-reliability.cjs (simulação de kill -9). |
-| **Fase 5** | Live Show Experience | Som de rotação e efeitos de clímax tocam sincronizados no telão a 60 FPS sem travamentos. | Teste de latência de áudio no Web Audio API com SignalR. |
+| **Fase 4** | Platform Reliability & Data | Reinício forçado do servidor restaura 100% do estado sem perda de histórico; backup em 1 clique e restore em < 30s. | `tests/test-disaster-recovery.cjs` e `tests/test-crash-rehydration.cjs` (14 suítes, 688 testes verdes). Chaos Engineering reabsorvido na Fase 7. |
+| **Fase 5** | Live Show Experience | Som de rotação, gongo e fanfarra tocam sincronizados no telão a 60 FPS sem latência (< 50ms). | `tests/test-audio-sync.cjs` e auditoria de latência Web Audio com SignalR. |
 | **Fase 6** | Ranking & Executive Reports | Ata oficial em PDF/CSV gerada com fidelidade auditável; pódio exibido no telão. | Validação de consistência do ranking e download da ata. |
-| **Fase 7** | Hardening & Contingency | Bypass manual de cadeira executado na mesa técnica em caso de falha do ESP32. | Simulação de botão desconectado com contingência manual. |
+| **Fase 7** | Hardening & Contingency | Bypass manual de cadeira executado na mesa técnica em caso de falha do ESP32; teste de caos holístico. | Simulação de botão desconectado com contingência manual e teste de resiliência integrada (7D). |
 | **Fase 8** | Evaluator Portal (Opcional) | Pareceres técnicos complementares anexados à ata sem afetar a soberania do botão físico. | Submissão de notas via smartphone em rede local. |
 
 ---
 
 ## 23. Testes por Fase
 
-Para assegurar a integridade do ecossistema que já conta com **466 verificações automatizadas aprovadas**:
-- **Regressão Zero Obrigatória:** Toda nova suíte adicionada em 	ests/ deve ser executada em conjunto com as 9 suítes existentes. Nenhuma fase é homologada sem 100% de testes verdes.
-- **Testes de Resiliência no CI/CD:** A suíte de caos da Fase 4 testará inicialização a quente e recuperação de base SQLite em todas as execuções futuras.
+Para assegurar a integridade do ecossistema que já conta com **688 verificações automatizadas aprovadas em 14 suítes (100% verde)**:
+- **Regressão Zero Obrigatória:** Toda nova suíte adicionada em `tests/` deve ser executada em conjunto com as suítes existentes. Nenhuma fase é homologada sem 100% de testes verdes.
+- **Testes de Resiliência no CI/CD e Ensaio:** A suíte de reidratação pós-crash e a suíte de Disaster Recovery garantem a sobrevivência física dos dados em todas as execuções. A suíte de caos holístico na Fase 7D testará falhas de hardware e rede em ambiente de ensaio geral.
 
 ---
 
@@ -788,7 +845,7 @@ A cada fase entregue:
 1. **[ADR-001: Backend Authoritative](decision-records/ADR-001-backend-authoritative.md):** O servidor como única fonte da verdade.
 2. **[ADR-002: Snapshot-First Hydration](decision-records/ADR-002-snapshot-first.md):** Reidratação REST antes de consumir deltas SignalR.
 3. **[ADR-011 a ADR-015: Governança, Ciclo do Pitch, Lockout, Histórico e Banca](decision-records/):** Fundações homologadas da Fase 3.
-4. **[ADR-016: Estratégia de Persistência Offline-First com SQLite](decision-records/ADR-016-offline-first-persistence-strategy.md):** Decisão formal de armazenamento local transacional in-process.
+4. **[ADR-016: Estratégia de Persistência Offline-First com PostgreSQL Portable](decision-records/ADR-016-offline-first-persistence-strategy.md):** Decisão formal de armazenamento local transacional in-process.
 5. **[ADR-017: Priorização de Confiabilidade sobre Telas Prematuras](decision-records/ADR-017-platform-reliability-over-feature-expansion.md):** Decisão formal do Roadmap V2 priorizando robustez e palco sobre scorecards móveis.
 
 ---
@@ -796,6 +853,6 @@ A cada fase entregue:
 ## 🎯 PRÓXIMA FASE OFICIAL RECOMENDADA
 
 > [!IMPORTANT]
-> **A Próxima Fase a ser desenvolvida é a FASE 4: PLATFORM RELIABILITY & DATA RESILIENCE.**  
-> Branch oficial recomendada: eat/phase4-data-resilience  
-> Esta etapa elimina o único ponto de falha existencial da plataforma (volatilidade da memória RAM), implementa o banco relacional SQLite local com modo WAL, cria o mecanismo de reidratação pós-queda, a trilha de auditoria operacional e o backup a quente em 1 clique, deixando a Arena Voice 100% blindada para eventos reais.
+> **A Próxima Fase a ser desenvolvida é a FASE 5: LIVE SHOW EXPERIENCE & AUDIO ATMOSPHERE.**  
+> Branch oficial recomendada: `feat/phase5-audio-atmosphere`  
+> Com a Fase 4 (Platform Reliability & Data Resilience) 100% homologada e consolidada com 688 testes verdes em 14 suítes, persistência ACID relacional, Crash Recovery, Audit Trail, snapshots automáticos por rodada e Disaster Recovery operacional (RTO < 30s, RPO = 0), a plataforma está totalmente blindada contra perda de dados. O foco agora se volta para a experiência sensorial e a dramaticidade cênica do telão (/stage) via Web Audio API integrada aos eventos de domínio em tempo real.

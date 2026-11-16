@@ -1,10 +1,10 @@
 # Índice Histórico de Marcos (Milestone History)
 ## Plataforma Arena Voice / Arena de Inovação
 
-> **Status Geral do Projeto:** FASE 3 CONCLUÍDA E HOMOLOGADA (Milestones 3A, 3B, 3C, 3D e 3E Concluídos)  
-> **Tag Estável Mais Recente:** `v0.3.0-phase3` (Encerramento da Fase 3)  
-> **Cobertura Automatizada:** 466 verificações em 9 suítes (100% aprovadas, zero regressões)  
-> **Última Atualização:** Novembro de 2026 (Consolidação Final e Fechamento da Fase 3)
+> **Status Geral do Projeto:** Fases 1 a 3 e Fase 4 (4A, 4B, 4C, 4D) Concluídos e Homologados  
+> **Tag Estável Mais Recente:** `v0.4.3-phase4d` (Encerramento da Fase 4 e Milestone 4D)  
+> **Cobertura Automatizada:** 688 verificações em 14 suítes (100% aprovadas, zero regressões)  
+> **Última Atualização:** 16 de Novembro de 2026 (Consolidação Final e Fechamento do Milestone 4D)
 
 ---
 
@@ -35,14 +35,14 @@ Este documento é a **fonte oficial de índice de marcos**, permitindo rastrear 
 | **3** | **3C** | Pitch Timers & Authoritative Lockout | ✅ Concluído | Cronômetro ancorado em timestamp, pause/resume sem drift, +tempo, lockout 409 Conflict fora de VotingOpen | 355 testes (305 base + 50 timers) | main |
 | **3** | **3D** | Round History & Result Engine | ✅ Concluído | Snapshot imutável de rodada, Result (Approved/Rejected/Inconclusive), ApprovalMode (Unanimous/Majority/Minority/None) | 416 testes (355 base + 61 history) | main |
 | **3** | **3E** | Judge Catalog & Event Jury Assignment | ✅ Concluído | Catálogo global de jurados, alocação nas cadeiras 1..5, StageJuryDock, integração com RoundHistoryEntry | 466 testes (416 base + 50 jury) | `v0.3.0-phase3` |
-| **4** | **4A** | Storage Engine & Relational Schema | 📅 Próximo | SQLite WAL Mode, schema relacional estrito, Foreign Keys & Check Constraints | Testes de migração e integridade | `v0.4.0-phase4` |
-| **4** | **4B** | State Persistence & Session Re-hydration | 📅 Próximo | `SqliteArenaProjectStore`, re-hidratação de sessão, Crash Boot Recovery | Testes de persistência e re-hidratação | `v0.4.0-phase4` |
-| **4** | **4C** | Operational Audit Trail & Event Sourcing Leve | 📅 Próximo | Tabela `AuditEvents`, ActivityLog persistido, rastreabilidade de operações críticas | Testes de auditoria e rastreabilidade | `v0.4.0-phase4` |
-| **4** | **4D** | Automated Snapshots, Backup & Disaster Recovery | 📅 Próximo | `VACUUM INTO` hot-backup, snapshots automáticos, Recovery Manager | Testes de backup e recuperação de desastre | `v0.4.0-phase4` |
-| **4** | **4E** | Chaos Engineering & Reliability Test Suite | 📅 Próximo | `test-chaos-reliability.cjs`, simulações de falha, validação de idempotência | 50+ asserções de caos e confiabilidade | `v0.4.0-phase4` |
-| **5** | **5A-5D** | Live Show Experience (Áudio & Dinâmicas) | 🔮 Futuro | Integração de áudio cênico, dinâmicas de show ao vivo, animações de entrada | A definir na Fase 5 | `v0.5.0-phase5` |
+| **4** | **4A** | Storage Engine & Relational Schema | ✅ Concluído | PostgreSQL Portable 18.6, EF Core 10, Schema relacional, persistência ACID | 497 testes (10 suítes) | `v0.4.0-phase4a` |
+| **4** | **4B** | State Persistence & Session Re-hydration | ✅ Concluído | Snapshot Pattern, Lock Separation, Crash Recovery Paused & TurnedChairs | 530 testes (11 suítes) | `v0.4.1-phase4b` |
+| **4** | **4C** | Operational Audit Trail & Event Sourcing Leve | ✅ Concluído | Tabela `audit_events`, pipeline assíncrono Channel, Query Layer (ADR-022) e ActivityLog F5 | 609 testes (12 suítes) | `v0.4.2-phase4c` |
+| **4** | **4D** | Automated Snapshots, Backup & Disaster Recovery | ✅ Concluído | BackupOrchestrator, pg_dump em processo separado, Auto-Snapshots, pg_restore e DR Runbook | 688 testes (14 suítes) | `v0.4.3-phase4d` |
+| **4** | **4E** | Chaos Engineering & Reliability Test Suite | 🔄 Reabsorvido na Fase 7 | Reabsorvido pela Phase 7 (Milestone 7D) pós-decisão arquitetural da Fase 4 | Incorporado ao Ensaio Geral da Fase 7 | Cancelado como marco isolado |
+| **5** | **5A-5E** | Live Show Experience (Áudio & Dinâmicas) | 📅 Próximo | Web Audio API no Stage, sincronia com SignalR, clímax e soundboard do operador | 15 suítes integradas | `v0.5.0-phase5` |
 | **6** | **6A-6C** | Awards, Ranking & Reports | 🔮 Futuro | Pódio de premiação, ranking acumulado, exportação PDF/CSV de resultados | A definir na Fase 6 | `v0.6.0-phase6` |
-| **7** | **7A-7C** | Operational Hardening & Fleet Management | 🔮 Futuro | Multi-dispositivo, monitoramento de frota, hardening operacional | A definir na Fase 7 | `v0.7.0-phase7` |
+| **7** | **7A-7D** | Operational Hardening, Contingency & Fleet (Chaos) | 🔮 Futuro | Bypass de cadeira, telemetria ESP32, runbook de pré-show e caos holístico (antigo 4E) | Suíte de resiliência integrada | `v0.7.0-phase7` |
 | **8** | **8A-8C** | Evaluator Portal & Scorecards (Satélite) | 🔮 Futuro | Portal web do avaliador, critérios quantitativos, scorecards digitais (módulo satélite) | A definir na Fase 8 | `v0.8.0-phase8` |
 
 ---
@@ -70,17 +70,22 @@ Este documento é a **fonte oficial de índice de marcos**, permitindo rastrear 
 - **3D (Round History & Result Engine):** Arquivamento imutável de rodadas (`RoundHistoryEntry`) ao transicionar para `Finished` ou encerrar evento com rodada em andamento. Result Engine com classificação em dois níveis: `Result` (Approved/Rejected/Inconclusive) e `ApprovalMode` (Unanimous/Majority/Minority/None). Snapshot da rodada inclui histórico de estágios, composição da banca e registro individual de cadeiras. Proteção idempotente contra duplo arquivamento. Endpoints `GET /api/history` e `GET /api/history/{id}`. Evento `RoundArchived` via SignalR. Painel de histórico consultável no cockpit. Suíte automatizada expandida para **416 testes** (100% verdes).
 - **3E (Judge Catalog & Event Jury Assignment):** Catálogo global de jurados corporativos (`Judge`) com campos `Id`, `Name`, `Company`, `Role`, `Specialty`, `Bio`, `PhotoUrl`, `IsActive`, `Email`. Alocação de jurados nas cadeiras 1 a 5 do evento via `EventJuryAssignment` e endpoint `PUT /api/events/{id}/jury`. Aba `/operator/judges` completa com CRUD e painel de alocação. Dock cênico nominal no telão (`StageJuryDock`) com avatares, nomes e anéis de neon reativos ao acionamento. Integração dos nomes de jurados com `RoundHistoryEntry`. Evento `EventJuryUpdated` via SignalR. Suíte automatizada expandida para **466 testes** (100% verdes). Tag `v0.3.0-phase3` emitida.
 
-### Fase 4 — Platform Reliability & Data Resilience (Próxima Fase)
+### Fase 4 — Platform Reliability & Data Resilience (Concluída e Homologada)
 
-> **Branch planejada:** `feat/phase4-data-resilience`  
-> **Estratégia:** SQLite em WAL mode com `Microsoft.Data.Sqlite` (ADR-016)  
-> **Prioridade:** Confiabilidade operacional antes de expansão de features (ADR-017)
+> **Branch:** `feat/phase4-data-resilience`  
+> **Estratégia:** PostgreSQL Portable 18.6 local com EF Core 10 e Npgsql 10 (ADR-016, ADR-018, ADR-019)  
+> **Prioridade:** Confiabilidade operacional antes de expansão de features (ADR-017)  
+> **Status:** ✅ Fase 4 Concluída e Homologada (Novembro de 2026 — `v0.4.3-phase4d`)
 
-- **4A (Storage Engine & Relational Schema):** Substituição do `ArenaProjectStore` em memória por `SqliteArenaProjectStore` com banco embedded. Schema relacional estrito com tabelas normalizadas para `Events`, `Projects`, `Judges`, `EventJuryAssignments`, `PitchHistory`, `AuditEvents`. WAL mode ativado, `PRAGMA foreign_keys = ON` e `CHECK CONSTRAINTS` em todas as colunas críticas.
-- **4B (State Persistence & Session Re-hydration):** Persistência completa do estado operacional da arena entre reinicializações do backend. Implementação do `Crash Boot Recovery`: ao inicializar, o backend detecta sessão interrompida e restaura o `ActiveContext` com o último estado coerente gravado. Zero perda de estado operacional em quedas de energia.
-- **4C (Operational Audit Trail & Event Sourcing Leve):** Tabela `AuditEvents` registrando automaticamente toda ação crítica do sistema (seleção de projeto, transição de pitch, acionamento de cadeira, encerramento de rodada). Integração com o `ActivityLog` do frontend para sincronia de histórico pós-reconexão. Rastreabilidade de operações para suporte e auditoria pós-evento.
-- **4D (Automated Snapshots, Backup & Disaster Recovery):** Sistema de hot-backup via `VACUUM INTO` para snapshots automáticos do banco. Snapshots pré-evento, pós-rodada e agendados por intervalo. `RecoveryManager` com seleção do snapshot mais recente coerente em caso de corrupção. Preservação do histórico completo de edições entre sessões.
-- **4E (Chaos Engineering & Reliability Test Suite):** Suíte `test-chaos-reliability.cjs` simulando falhas reais: queda de energia mid-session, corrupção de banco, restart durante votação ativa, replay de rollback e validação de idempotência em todas as operações críticas. Meta: 50+ asserções de confiabilidade com 100% de aprovação.
+- **4A (Storage Engine & Relational Schema — CONCLUÍDO):** Integração do PostgreSQL Portable 18.6 sem instalador de sistema operacional. Mapeamento relacional completo com EF Core 10 via Fluent API para 6 tabelas (Events, Projects, Judges, EventJuryAssignments, RoundHistoryEntries e ActiveSessionState). Uso de tipos nativos avançados (	ext[] para expertises, int[] para cadeiras viradas, jsonb para snapshots imutáveis de timer e Owned Types). Implementação do DatabaseStartupValidator executando TCP socket check e migrações idempotentes no boot. Store híbrido PostgresArenaProjectStore com IDbContextFactory para contextos de curta duração. Bateria completa de testes aprovada: 497 testes em 10 suítes (0 regressões) e validação da sobrevivência física dos dados pós-restart. Tag 0.4.0-phase4a.
+
+- **4B (State Persistence & Session Re-hydration — CONCLUÍDO):** Persistência completa do estado operacional da arena entre reinicializações do backend. Implementação do `Crash Boot Recovery`: ao inicializar, o backend detecta sessão interrompida e restaura o `ActiveContext` com a estratégia *Paused Recovery* (timer congelado no último checkpoint, sem descarte prematuro). Isolamento estrito entre `_contextLock` (RAM) e `_dbPersistenceLock` (Disco). Tag `v0.4.1-phase4b`.
+- **4C (Operational Audit Trail & Event Sourcing Leve — CONCLUÍDO):** Tabela append-only `audit_events` registrando automaticamente 100% das mutações operacionais de domínio. Pipeline assíncrono via `Channel<AuditEventRecord>` bounded (10.000 itens) e `AuditEventWriter`. Camada de consulta CQRS leve com visibilidade restrita (ADR-022) e reidratação durável do `ActivityLog` no cockpit do operador após F5. Tag `v0.4.2-phase4c`.
+- **4D (Automated Snapshots, Backup & Disaster Recovery — CONCLUÍDO):** Sistema de backup a quente (`pg_dump -Fc`) via `BackupOrchestrator` e `BackupWorker` assíncrono com canal bounded desacoplado do hot-path. Snapshots automáticos disparados no arquivamento de cada rodada (`round_N_<timestamp>.pgdump`). Motor canônico de restauração out-of-process (`scripts/restore-backup.cjs` e `scripts/restore-backup.cmd`) via `pg_restore` com flags seguras. Suíte de Disaster Recovery automatizada (`tests/test-disaster-recovery.cjs`) com 28 asserções validando 100% de paridade em banco isolado temporário. Runbook operacional documentado com RTO < 30s e RPO = 0. Homologação total: 688 testes em 14 suítes aprovados. Tag `v0.4.3-phase4d`.
+- **4E (Chaos Engineering & Reliability Test Suite — REABSORVIDO NA FASE 7):**
+  - **Status:** 🔄 Reabsorvido pela Phase 7 (Milestone 7D — Chaos Engineering & Resiliência Holística de Campo).
+  - **Data da Decisão:** 16 de Novembro de 2026 (Post Phase 4 Decision Workshop).
+  - **Motivo da Decisão Arquitetural:** Com a homologação da persistência ACID (4A), do Crash Recovery em modo Paused (4B), da trilha de auditoria append-only (4C) e do motor físico de Disaster Recovery com 100% de paridade validada (4D), a plataforma atingiu 688 testes verdes em 14 suítes. O risco residual não está mais na integridade local do PostgreSQL, mas sim na orquestração holística de evento ao vivo (hardware ESP32, rádio Wi-Fi, SignalR, telão 3D e áudio simultâneos). O escopo do 4E foi unificado à Fase 7, compondo os cenários de contingência e ensaio geral da mesa técnica.
 
 ---
 
