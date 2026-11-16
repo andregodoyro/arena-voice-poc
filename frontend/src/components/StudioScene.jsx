@@ -15,8 +15,8 @@ function ArenaFloor() {
         <cylinderGeometry args={[26, 26.5, 0.2, 64]} />
         <meshStandardMaterial
           color="#161928"
-          roughness={0.45}
-          metalness={0.5}
+          roughness={0.4}
+          metalness={0.55}
         />
       </mesh>
 
@@ -34,17 +34,24 @@ function ArenaFloor() {
 /**
  * CentralPitchStage — Palco delimitado da startup e Pódio de pitch.
  * 
- * Milestone 2D.4:
+ * Milestone 2D.4 & 5B:
  * - Fita de luz do palco da startup reativa a primaryColor;
  * - Anel de demarcação do pódio reativo a secondaryColor;
  * - Retícula central institucional reativa a primaryColor;
  * - Aura e pulso cênico institucional de Unanimidade (5 de 5 cadeiras);
+ * - Efeitos reativos de palco no Milestone 5B (ADR-027):
+ *   * Pulso de urgência nos últimos 15 segundos (isUrgent);
+ *   * Respiração de convite na Votação Aberta (isVotingOpen);
+ *   * Foco dramático e afunilamento do spotlight no encerramento (isVotingClosed);
  * - Interpolação suave de cores e intensidades via GSAP (0.8s - 1.2s).
  */
 function CentralPitchStage({
   primaryColor = '#ef233c',
   secondaryColor = '#3a86ff',
   isUnanimous = false,
+  isVotingOpen = false,
+  isUrgent = false,
+  isVotingClosed = false,
 }) {
   const stageRingMatRef = useRef();
   const podiumRingMatRef = useRef();
@@ -104,8 +111,9 @@ function CentralPitchStage({
     let pulseTween = null;
 
     if (spotLightRef.current) {
+      const targetIntensity = isUnanimous ? 9.5 : (isVotingClosed ? 7.8 : (isVotingOpen ? 7.0 : 6.5));
       gsap.to(spotLightRef.current, {
-        intensity: isUnanimous ? 9.0 : 6.5,
+        intensity: targetIntensity,
         duration: 1.2,
         ease: 'power2.out',
       });
@@ -115,12 +123,12 @@ function CentralPitchStage({
       if (isUnanimous) {
         // Pulso luminoso prestigioso no palco da startup
         gsap.to(unanimityMatRef.current, {
-          opacity: 0.5,
+          opacity: 0.55,
           duration: 0.8,
           ease: 'power2.out',
           onComplete: () => {
             pulseTween = gsap.to(unanimityMatRef.current, {
-              opacity: 0.75,
+              opacity: 0.82,
               repeat: -1,
               yoyo: true,
               duration: 1.4,
@@ -130,9 +138,9 @@ function CentralPitchStage({
         });
 
         gsap.to(unanimityAuraRef.current.scale, {
-          x: 1.04,
-          y: 1.04,
-          z: 1.04,
+          x: 1.05,
+          y: 1.05,
+          z: 1.05,
           repeat: -1,
           yoyo: true,
           duration: 1.4,
@@ -158,7 +166,49 @@ function CentralPitchStage({
     return () => {
       if (pulseTween) pulseTween.kill();
     };
-  }, [isUnanimous]);
+  }, [isUnanimous, isVotingOpen, isVotingClosed]);
+
+  // Efeito Visual de Urgência nos últimos 15 segundos (Milestone 5B)
+  useEffect(() => {
+    let urgencyTween = null;
+
+    if (isUrgent && reticleMatRef.current && stageRingMatRef.current) {
+      // Pulso rápido sincronizado em tom de alerta
+      const alertColor = new THREE.Color('#ff3b30');
+      urgencyTween = gsap.to([reticleMatRef.current.color, stageRingMatRef.current.color], {
+        r: alertColor.r,
+        g: alertColor.g,
+        b: alertColor.b,
+        repeat: -1,
+        yoyo: true,
+        duration: 0.5,
+        ease: 'sine.inOut',
+      });
+    } else {
+      // Restaura cor original de branding
+      const targetPrimary = new THREE.Color(primaryColor);
+      if (reticleMatRef.current) {
+        gsap.to(reticleMatRef.current.color, {
+          r: targetPrimary.r,
+          g: targetPrimary.g,
+          b: targetPrimary.b,
+          duration: 0.8,
+        });
+      }
+      if (stageRingMatRef.current) {
+        gsap.to(stageRingMatRef.current.color, {
+          r: targetPrimary.r,
+          g: targetPrimary.g,
+          b: targetPrimary.b,
+          duration: 0.8,
+        });
+      }
+    }
+
+    return () => {
+      if (urgencyTween) urgencyTween.kill();
+    };
+  }, [isUrgent, primaryColor]);
 
   return (
     <group position={[0, 0, -3.2]}>
@@ -170,7 +220,7 @@ function CentralPitchStage({
           <meshStandardMaterial
             color="#1c2136"
             roughness={0.2}
-            metalness={0.8}
+            metalness={0.82}
             envMapIntensity={1.3}
           />
         </mesh>
@@ -215,8 +265,8 @@ function CentralPitchStage({
           <cylinderGeometry args={[2.75, 2.85, 0.16, 64]} />
           <meshStandardMaterial
             color="#252b45"
-            roughness={0.25}
-            metalness={0.85}
+            roughness={0.22}
+            metalness={0.88}
             envMapIntensity={1.4}
           />
         </mesh>
@@ -226,8 +276,8 @@ function CentralPitchStage({
           <circleGeometry args={[2.7, 64]} />
           <meshStandardMaterial
             color="#2d3452"
-            roughness={0.4}
-            metalness={0.5}
+            roughness={0.38}
+            metalness={0.52}
           />
         </mesh>
 
@@ -252,14 +302,14 @@ function CentralPitchStage({
         </mesh>
       </group>
 
-      {/* Refletor spot cênico focalizado no pódio com suporte a Unanimidade */}
+      {/* Refletor spot cênico focalizado no pódio com suporte a Unanimidade e Foco */}
       <spotLight
         ref={spotLightRef}
         position={[0, 11, 2]}
         target-position={[0, 0.34, -3.2]}
-        intensity={6.5}
-        angle={Math.PI / 5.8}
-        penumbra={0.65}
+        intensity={isUnanimous ? 9.5 : (isVotingClosed ? 7.8 : 6.5)}
+        angle={isVotingClosed ? Math.PI / 6.8 : Math.PI / 5.8}
+        penumbra={isVotingClosed ? 0.45 : 0.65}
         color="#f8fafc"
         distance={25}
         castShadow
@@ -400,17 +450,17 @@ function AmphitheaterTiers({ secondaryColor = '#3a86ff' }) {
 /**
  * ScenicArches — Arcos cênicos de grande escala e portal de keynote corporativo.
  * 
- * Milestone 2D.4:
+ * Milestone 2D.4 & 5B:
  * - 3 arcos concêntricos com neons embutidos reativos imediatamente ao branding;
- * - Arco 0 (frontal): primaryColor;
- * - Arco 1 (central): secondaryColor;
- * - Arco 2 (traseiro): primaryColor;
- * - Luzes volumétricas cênicas interpolam cores e reforçam intensidade na Unanimidade.
+ * - Resposta visual no Milestone 5B:
+ *   * Redução de preenchimento lateral em VotingClosed (isolamento dramático);
+ *   * Intensificação na Unanimidade.
  */
 function ScenicArches({
   primaryColor = '#ef233c',
   secondaryColor = '#3a86ff',
   isUnanimous = false,
+  isVotingClosed = false,
 }) {
   const arch0MatRef = useRef();
   const arch1MatRef = useRef();
@@ -491,21 +541,23 @@ function ScenicArches({
     }
   }, [primaryColor, secondaryColor]);
 
-  // Efeito de Unanimidade nos Arcos
+  // Efeito de Unanimidade e Encerramento nos Arcos
   useEffect(() => {
     let pulseTween = null;
 
     if (lightTopRef.current) {
+      const targetIntensity = isUnanimous ? 7.5 : (isVotingClosed ? 2.5 : 3.8);
       gsap.to(lightTopRef.current, {
-        intensity: isUnanimous ? 7.5 : 3.8,
+        intensity: targetIntensity,
         duration: 1.2,
         ease: 'power2.out',
       });
     }
 
     if (lightLeftRef.current && lightRightRef.current) {
+      const targetIntensity = isUnanimous ? 5.5 : (isVotingClosed ? 1.4 : 2.5);
       gsap.to([lightLeftRef.current, lightRightRef.current], {
-        intensity: isUnanimous ? 5.5 : 2.5,
+        intensity: targetIntensity,
         duration: 1.2,
         ease: 'power2.out',
         onComplete: () => {
@@ -525,7 +577,7 @@ function ScenicArches({
     return () => {
       if (pulseTween) pulseTween.kill();
     };
-  }, [isUnanimous]);
+  }, [isUnanimous, isVotingClosed]);
 
   const matRefs = [arch0MatRef, arch1MatRef, arch2MatRef];
   const initialColors = [primaryColor, secondaryColor, primaryColor];
@@ -610,13 +662,16 @@ function ScenicArches({
 /**
  * StudioScene — Orquestrador cênico 3D da Arena Voice.
  * 
- * Milestone 2D.4: Dynamic Theming & Reactive Stage Experience.
+ * Milestone 2D.4 & 5B: Live Show Experience & Immersive Stage (ADR-027).
  * - Conecta o palco ao branding do evento ativo (primaryColor e secondaryColor);
- * - Orquestra a resposta em tempo real aos eventos SignalR;
- * - Ativa celebração institucional de Unanimidade (5 de 5 cadeiras apoiando);
- * - Iluminação aprimorada para clareza, prestígio e legibilidade cênica.
+ * - Orquestra a resposta em tempo real aos eventos SignalR e estágios do Pitch;
+ * - Resposta audiovisual coordenada:
+ *   * isVotingOpen ativa pulso contínuo nos botões das cadeiras da banca;
+ *   * isUrgent ativa pulso sincronizado com o cronômetro no palco central;
+ *   * isVotingClosed afunila iluminação dramática no orador;
+ *   * isUnanimous ativa celebração visual de grande escala.
  */
-export function StudioScene({ chairs = [], branding = {} }) {
+export function StudioScene({ chairs = [], branding = {}, pitchState = null }) {
   const ambientLightRef = useRef();
 
   const primaryColor = branding?.primaryColor || '#ef233c';
@@ -625,16 +680,27 @@ export function StudioScene({ chairs = [], branding = {} }) {
   const turnedCount = chairs.filter((c) => c.isTurned).length;
   const isUnanimous = chairs.length === 5 && turnedCount === 5;
 
-  // Interpolação suave da iluminação global na Unanimidade
+  // Análise dos estados cênicos para acionamento visual coordenado (Milestone 5B)
+  const stageName = pitchState?.stage || pitchState?.stageName || 'Waiting';
+  const isVotingOpen = stageName === 'VotingOpen' || Boolean(pitchState?.isVotingAllowed);
+  const isTimedStage = ['PitchRunning', 'QA', 'VotingOpen'].includes(stageName);
+  const remSec = typeof pitchState?.remainingSeconds === 'number'
+    ? Math.round(pitchState.remainingSeconds)
+    : null;
+  const isUrgent = isTimedStage && !pitchState?.isPaused && remSec !== null && remSec > 0 && remSec <= 15;
+  const isVotingClosed = ['VotingClosed', 'Finished'].includes(stageName);
+
+  // Interpolação suave da iluminação global
   useEffect(() => {
     if (ambientLightRef.current) {
+      const targetAmbient = isUnanimous ? 1.05 : (isVotingClosed ? 0.65 : 0.75);
       gsap.to(ambientLightRef.current, {
-        intensity: isUnanimous ? 1.0 : 0.75,
+        intensity: targetAmbient,
         duration: 1.2,
         ease: 'power2.out',
       });
     }
-  }, [isUnanimous]);
+  }, [isUnanimous, isVotingClosed]);
 
   /**
    * Distribuição em arco semicircular para as 5 cadeiras da banca de jurados.
@@ -677,27 +743,32 @@ export function StudioScene({ chairs = [], branding = {} }) {
       <pointLight position={[-9, 2.5, 5]} intensity={2.2} color="#94a3b8" distance={16} />
       <pointLight position={[9, 2.5, 5]} intensity={2.2} color="#94a3b8" distance={16} />
 
-      {/* ── Arquitetura Cênica da Arena (Reativa ao Branding) ─────────────── */}
+      {/* ── Arquitetura Cênica da Arena (Reativa ao Branding e Pitch) ──────── */}
       <ArenaFloor />
       <CentralPitchStage
         primaryColor={primaryColor}
         secondaryColor={secondaryColor}
         isUnanimous={isUnanimous}
+        isVotingOpen={isVotingOpen}
+        isUrgent={isUrgent}
+        isVotingClosed={isVotingClosed}
       />
       <AmphitheaterTiers secondaryColor={secondaryColor} />
       <ScenicArches
         primaryColor={primaryColor}
         secondaryColor={secondaryColor}
         isUnanimous={isUnanimous}
+        isVotingClosed={isVotingClosed}
       />
 
-      {/* ── As 5 Cadeiras da Banca de Avaliação (Conectadas ao Branding) ───── */}
+      {/* ── As 5 Cadeiras da Banca de Avaliação (Conectadas ao Branding e Voto) ───── */}
       {chairDefs.map((c) => (
         <Chair
           key={c.id}
           id={c.id}
           name={c.name}
           isTurned={c.isTurned}
+          isVotingOpen={isVotingOpen}
           position={c.pos}
           baseRotY={c.baseRotY}
           branding={branding}

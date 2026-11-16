@@ -14,13 +14,11 @@ import { StudioScene } from './StudioScene';
  * Milestone 2D.4: Dynamic Theming & Reactive Stage Experience.
  * Integra branding dinâmico reativo e iluminação cênica aprimorada.
  * 
- * Milestone 5A: Audio Engine Infrastructure & Visual Rendering Foundation (ADR-026).
- * Pipeline de postprocessing: EffectComposer + Bloom seletivo + ToneMapping ACES Filmic.
- * - toneMapping do renderer: THREE.NoToneMapping (delegado ao EffectComposer)
- * - Bloom luminanceThreshold=0.85: apenas elementos emissivos brilham (neon, halos)
- * - multisampling=0: evita artefatos com postprocessing ativo
+ * Milestone 5A & 5B: Live Show Experience & Immersive Stage (ADR-026 & ADR-027).
+ * - Pipeline de postprocessing: EffectComposer + Bloom seletivo + ToneMapping ACES Filmic;
+ * - Propagação autoritativa de pitchState para reatividade cênica sincronizada ao show.
  */
-export function StudioCanvas({ chairs = [], branding = {} }) {
+export function StudioCanvas({ chairs = [], branding = {}, pitchState = null }) {
   // Configuração dinâmica de enquadramento institucional
   const cameraConfig = useMemo(() => {
     let viewMode = 'frontal';
@@ -115,7 +113,7 @@ export function StudioCanvas({ chairs = [], branding = {} }) {
 
         {/* ── Cena Principal dentro de Suspense ───────────────────────────── */}
         <Suspense fallback={null}>
-          <StudioScene chairs={chairs} branding={branding} />
+          <StudioScene chairs={chairs} branding={branding} pitchState={pitchState} />
 
           {/* Sombra de contato no piso da arena */}
           <ContactShadows
