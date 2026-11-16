@@ -1,17 +1,20 @@
 import React from 'react';
 import { StudioCanvas } from '../components/StudioCanvas';
 import { StageHUD } from '../components/stage/StageHUD';
+import { AudioUnlockOverlay } from '../components/stage/AudioUnlockOverlay';
 import { useOperatorContext } from '../contexts/OperatorContext';
 
 /**
  * StagePage — Superfície de Apresentação ao Público (Telão 3D).
  * 
  * Milestone 2D.1: Infraestrutura de Dados, Contexto e HUD Cênico.
+ * Milestone 5A: Audio Engine Infrastructure & Visual Rendering Foundation (ADR-026).
  * 
  * Experiência pública limpa e cinematográfica (ADR-009):
  * - Consome dados autoritativos do OperatorContext: chairs, currentProject e currentEvent;
  * - Transmite metadados do evento ativo e do pitch para a camada pública StageHUD;
  * - Mantém a cena 3D procedural do Voice Studio estável e desacoplada;
+ * - AudioUnlockOverlay garante conformidade com políticas de autoplay do navegador;
  * - Superfície 100% contemplativa, sem botões ou controles de rede.
  */
 export function StagePage({
@@ -57,6 +60,9 @@ export function StagePage({
         pitchState={pitchState}
         jury={jury}
       />
+
+      {/* Audio Unlock Overlay — Conformidade com políticas de autoplay (Milestone 5A, ADR-026) */}
+      <AudioUnlockOverlay />
     </main>
   );
 }

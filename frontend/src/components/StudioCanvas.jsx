@@ -1,6 +1,8 @@
 import React, { Suspense, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
+import { EffectComposer, Bloom, ToneMapping } from '@react-three/postprocessing';
+import { ToneMappingMode } from 'postprocessing';
 import * as THREE from 'three';
 import { StudioScene } from './StudioScene';
 
@@ -11,6 +13,12 @@ import { StudioScene } from './StudioScene';
  * 
  * Milestone 2D.4: Dynamic Theming & Reactive Stage Experience.
  * Integra branding dinâmico reativo e iluminação cênica aprimorada.
+ * 
+ * Milestone 5A: Audio Engine Infrastructure & Visual Rendering Foundation (ADR-026).
+ * Pipeline de postprocessing: EffectComposer + Bloom seletivo + ToneMapping ACES Filmic.
+ * - toneMapping do renderer: THREE.NoToneMapping (delegado ao EffectComposer)
+ * - Bloom luminanceThreshold=0.85: apenas elementos emissivos brilham (neon, halos)
+ * - multisampling=0: evita artefatos com postprocessing ativo
  */
 export function StudioCanvas({ chairs = [], branding = {} }) {
   // Configuração dinâmica de enquadramento institucional
@@ -71,7 +79,8 @@ export function StudioCanvas({ chairs = [], branding = {} }) {
           antialias: true,
           powerPreference: 'high-performance',
           outputColorSpace: THREE.SRGBColorSpace,
-          toneMapping: THREE.ACESFilmicToneMapping,
+          // toneMapping delegado ao EffectComposer (ToneMapping ACES Filmic effect)
+          toneMapping: THREE.NoToneMapping,
           toneMappingExposure: 1.3,
           preserveDrawingBuffer: true,
         }}
@@ -118,6 +127,20 @@ export function StudioCanvas({ chairs = [], branding = {} }) {
             color="#000000"
           />
         </Suspense>
+
+        {/* ── Pipeline de Postprocessing (Milestone 5A, ADR-026) ──────────── */}
+        {/* multisampling=0 evita artefatos combinados com postprocessing     */}
+        <EffectComposer multisampling={0}>
+          {/* Bloom seletivo: só elementos com emissão > 0.85 brilham         */}
+          <Bloom
+            luminanceThreshold={0.85}
+            luminanceSmoothing={0.9}
+            intensity={1.5}
+            mipmapBlur
+          />
+          {/* ToneMapping ACES Filmic — substitui gl.toneMapping do renderer  */}
+          <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+        </EffectComposer>
       </Canvas>
     </div>
   );
