@@ -197,7 +197,7 @@ async function runRegression() {
         });
       } catch (err) {
         exitCode = err.status || 1;
-        output = (err.stdout || '') + '\n' + (err.stderr || '');
+        output = (err.stdout || '') + '\n' + (err.stderr || ''); 
       }
 
       const elapsed = ((Date.now() - startT) / 1000).toFixed(1);
