@@ -706,18 +706,18 @@ NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
 ### FASE 5: Live Show Experience & Immersive Stage
 *Transformar a Arena Voice de uma plataforma operacional robusta em uma experiência de espetáculo ao vivo, integrando áudio cinemático Web Audio API, computação gráfica 3D com React Three Fiber e direção de palco.*
 
-- **STATUS:** 🚀 EM IMPLEMENTAÇÃO (Roadmap V2 — Milestone 5A Iniciado)
+- **STATUS:** 🚀 EM IMPLEMENTAÇÃO (Roadmap V2 — Milestones 5A e 5B Concluídos)
 - **OBJETIVO:** Integrar simultaneamente um motor de áudio imersivo de baixa latência e um pipeline visual cinematográfico no telão (/stage), sincronizando som, iluminação, materiais PBR, câmeras dirigidas e pós-processamento aos eventos de domínio em tempo real via SignalR.
 - **STACK OFICIAL HOMOLOGADO (ADR-026):** React 19 + Three.js + React Three Fiber + Drei + GSAP + SignalR + React Three Postprocessing.
 - **PRÉ-REQUISITOS:** Fase 3 (Governança, Ciclo de Pitch, Timers e Result Engine) e Fase 4 (Persistência ACID, Crash Recovery, Audit Trail e Disaster Recovery).
 - **SUBFASES E ESCOPO DETALHADO:**
 
-  - **Milestone 5A — Audio Engine Infrastructure & Visual Rendering Foundation:**
+  - **✅ Milestone 5A — Audio Engine Infrastructure & Visual Rendering Foundation (Concluído):**
     - *Dimensão Sonora:* Singleton AudioEngine baseado na Web Audio API, gerenciamento de nós (AudioBufferSourceNode -> GainNode), useAudioScene hook, AudioUnlockOverlay para conformidade com a política de Autoplay dos navegadores e carregamento de assets sonoros.
     - *Dimensão Visual 3D:* Integração de @react-three/postprocessing com EffectComposer, Bloom (Selective Luminance Threshold para brilho de neons), ToneMapping e pipeline de renderização cinemático mantendo 60 FPS cravados.
     - *Critério de Aceite:* Áudio desbloqueado com 1 clique; pós-processamento operando sem artefatos ou quedas de frames; zero regressões nas suítes existentes.
 
-  - **Milestone 5B — Audio & Visual Event Synchronization:**
+  - **✅ Milestone 5B — Audio & Visual Event Synchronization (Concluído):**
     - *Dimensão Sonora:* Efeito sonoro mecânico de rotação (*catraca/whoosh*) no ChairTurned, alerta sonoro cadenciado nos últimos 15s (PitchTimerUpdated) e gongo dramático de encerramento no VotingClosed.
     - *Dimensão Visual 3D:* Iluminação e materiais reativos; emissive pulse nos anéis da cadeira; transição gradual das primitivas de cadeira para o modelo GLTF fotorrealista com pivot e botão emissivo.
     - *Critério de Aceite:* Latência sincronizada entre áudio e animação 3D < 50ms; disparo preciso de som e luz na virada da cadeira.
