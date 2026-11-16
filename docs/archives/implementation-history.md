@@ -895,7 +895,7 @@
 | **4B** | State Persistence & Session Re-hydration | SqliteArenaProjectStore, Crash Boot Recovery |
 | **4C** | Operational Audit Trail & Event Sourcing Leve | Tabela AuditEvents, ActivityLog persistido |
 | **4D** | Automated Snapshots, Backup & Disaster Recovery | VACUUM INTO hot-backup, RecoveryManager |
-| **4E** | Chaos Engineering & Reliability Test Suite | 	est-chaos-reliability.cjs, 50+ asserções de caos |
+| **4E** | Chaos Engineering & Reliability Test Suite | *(Escopo reabsorvido pela Phase 7 — Milestone 7D)* |
 
 - **Branch planejada:** eat/phase4-data-resilience (a criar após aprovação desta documentação).
 - **Tag planejada:** 0.4.0-phase4 ao encerrar a Fase 4.
@@ -924,7 +924,7 @@
   - **4B:** PostgresArenaProjectStore implementando a interface IArenaProjectStore com reidratação e sanitização idênticas.
   - **4C:** AuditEvents append-only no PostgreSQL.
   - **4D:** BackupOrchestrator gerenciando backups a quente via pg_dump e snapshots automáticos por rodada (ound_N_<timestamp>.pgdump).
-  - **4E:** Suíte de caos testando indisponibilidade de porta, reinicialização rápida e resiliência de cluster.
+  - **4E:** Suíte de caos e resiliência holística (reabsorvida na Phase 7 — Milestone 7D).
 - **Garantia Arquitetural:** Zero alterações nos 34 contratos REST e 9 contratos SignalR; a camada de aplicação continua consumindo unicamente IArenaProjectStore.
 ---
 
@@ -1002,3 +1002,10 @@
   - Runbook Operacional de Disaster Recovery (`docs/runbooks/disaster-recovery-runbook.md`) com RTO < 30s e RPO = 0;
   - Decisões formais registradas em ADR-023, ADR-024 e ADR-025.
 - **Detalhes Completos:** Consulte [`docs/archives/milestones/Phase4D-Implementation-History.md`](milestones/Phase4D-Implementation-History.md).
+
+---
+
+## Milestone 4E — Chaos Engineering & Reliability Test Suite
+- **Status:** 🔄 Reabsorvido na Phase 7 (Milestone 7D)
+- **Data da Decisão:** 16 de Novembro de 2026 (Post Phase 4 Decision Workshop)
+- **Justificativa Arquitetural:** Com o encerramento do Milestone 4D, a plataforma atingiu 688 testes verdes em 14 suítes, persistência ACID relacional, Crash Recovery automático em modo `Paused`, Audit Trail append-only com reidratação de timeline, snapshots automáticos físicos por rodada e Disaster Recovery validado com 100% de paridade. O escopo restante de testes de caos e estresse não justificava mais um marco independente em isolamento de banco de dados, sendo oficialmente unificado à **Fase 7 (Milestone 7D — Chaos Engineering & Resiliência Holística de Campo)** para validação integrada com hardware ESP32, rede local Wi-Fi, áudio e contingências reais de palco.

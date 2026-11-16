@@ -95,3 +95,21 @@ Com o término do Milestone 4D, todos os requisitos de confiabilidade e resiliê
 
 **A Fase 4 da Arena Voice está oficialmente encerrada.**
 A plataforma está 100% blindada para eventos reais corporativos e apta para o início da **Fase 5 (Live Show Experience & Web Audio Engine)**.
+
+---
+
+## 5. Post-Phase-4 Strategic Roadmap Decision (Reabsorção do Milestone 4E)
+
+Durante o *Post Phase 4 Decision Workshop* (16 de Novembro de 2026), a arquitetura avaliou estrategicamente o próximo gargalo real da plataforma:
+
+1. **Por que o Milestone 4E foi cancelado como entrega isolada:**
+   O planejamento inicial previa uma suíte isolada de Chaos Engineering executando 100 reinicializações forçadas em loop (`taskkill /F`). Entretanto, os testes práticos de Crash Recovery da Fase 4B (`tests/test-crash-rehydration.cjs`) e a validação de restauração física da Fase 4D (`tests/test-disaster-recovery.cjs`) já demonstraram exaustivamente a atomicidade e a resistência do PostgreSQL Portable a quedas de energia. Continuar testando a durabilidade de disco em isolamento representava retornos decrescentes de engenharia.
+
+2. **Por que a Phase 7 absorveu o escopo (Milestone 7D):**
+   Em uma dinâmica de palco ao vivo no formato "The Voice", o verdadeiro caos não é uma falha de disco em repouso, mas sim incidentes simultâneos no ecossistema: falha de bateria ou perda de Wi-Fi nas cadeiras ESP32, desconexão de cabos na mesa de som, concorrência SignalR sob estresse e contingência humana do operador. Portanto, o escopo de Chaos Engineering foi transferido para a **Fase 7 (Milestone 7D — Chaos Engineering & Resiliência Holística de Campo)**, onde será executado de forma realista durante o Ensaio Técnico Geral de Produção.
+
+3. **Por que a confiabilidade de dados foi considerada suficiente:**
+   Com 688 asserções automatizadas em 14 suítes (100% verde), RTO < 30 segundos, RPO = 0, Audit Trail completo, persistência ACID relacional, snapshots automáticos por rodada e restore comprovado com 100% de paridade, todos os critérios inegociáveis de resiliência de dados foram superados.
+
+4. **Próxima Prioridade Estratégica:**
+   Com a estabilidade de dados garantida, o maior gargalo atual do Arena Voice é a **experiência cênica e atmosfera sonora**. A arena física e 3D é atualmente silenciosa. A próxima fase prioritária oficial é a **Fase 5 (Live Show Experience & Audio Atmosphere)**, integrando a Web Audio API ao telão cênico (`/stage`) com efeitos sonoros em tempo real sincronizados aos acionamentos da banca.

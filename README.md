@@ -178,25 +178,30 @@ O frontend é uma SPA reativa desenvolvida em **React 19**, **Vite** e **Tailwin
 | **Fase 3C** | Pitch Timers, Pause/Resume & Voting Lockout (HTTP 409 Conflict) | ✅ **Concluída e Homologada** |
 | **Fase 3D** | Round History & Result Engine (Approved, Rejected, Inconclusive) | ✅ **Concluída e Homologada** |
 | **Fase 3E** | Judge Catalog & Event Jury Assignment (Banca 1..5, Palco Nominal) | ✅ **Concluída e Homologada** |
-| **Fase 4** | Platform Reliability & Data Resilience (PostgreSQL Portable, Crash Recovery, Audit, Backup) | 📅 **Planejada (Próxima Fase)** |
-| **Fase 5** | Live Show Experience & Audio Atmosphere (Áudio Cênico, Web Audio API, Sound FX) | 📅 **Roadmap V2** |
+| **Fase 4** | Platform Reliability & Data Resilience (PostgreSQL Portable, Crash Recovery, Audit, Backup, DR) | ✅ **Concluída e Homologada (v0.4.3-phase4d)** |
+| **Fase 5** | Live Show Experience & Audio Atmosphere (Áudio Cênico, Web Audio API, Sound FX) | 📅 **Planejada (Próxima Fase)** |
 | **Fase 6** | Awards Ceremony, Ranking & Executive Reports (Pódio 3D, Ata Oficial PDF/CSV) | 📅 **Roadmap V2** |
-| **Fase 7** | Operational Hardening, Contingency & Fleet Telemetry (Bypass no Cockpit, ESP32) | 📅 **Roadmap V2** |
+| **Fase 7** | Operational Hardening, Contingency & Fleet Telemetry (Bypass no Cockpit, ESP32, Chaos) | 📅 **Roadmap V2** |
 | **Fase 8** | Evaluator Portal & Qualitative Rubrics (Módulo Satélite / Complementar) | 📅 **Roadmap V2** |
 
-### Bateria Consolidada de Testes Automatizados (466 Asserções / 100% Verde):
+### Bateria Consolidada de Testes Automatizados (688 Asserções em 14 Suítes / 100% Verde):
 ```text
-  tests/test-api.cjs               -> 48 / 48 PASS  (Hardware Bridge & Base API)
-  tests/test-projects-api.cjs      -> 53 / 53 PASS  (Projects API & ActiveContext)
-  tests/test-events-api.cjs        -> 38 / 38 PASS  (Event Lifecycle & Governance 3A)
-  tests/test-signalr-e2e.cjs       -> 55 / 55 PASS  (SignalR Broadcasts & Sincronização)
-  tests/test-pitch-lifecycle.cjs   -> 76 / 76 PASS  (Pitch Lifecycle Engine 3B)
-  tests/homologation-2d5.cjs       -> 35 / 35 PASS  (Homologação E2E Palco 3D & Unanimidade)
-  tests/test-timers-lockout.cjs    -> 50 / 50 PASS  (Timers, Pause/Resume & Lockout 3C)
-  tests/test-round-history.cjs     -> 61 / 61 PASS  (Round History & Result Engine 3D)
-  tests/test-judges-jury.cjs       -> 50 / 50 PASS  (Judge Catalog & Event Jury 3E)
+  tests/test-backend-api.cjs         -> 48 / 48 PASS  (Hardware Bridge & Base API)
+  tests/test-signalr.cjs             -> 46 / 46 PASS  (SignalR Broadcasts & Sincronização)
+  tests/test-projects-api.cjs        -> 62 / 62 PASS  (Projects API & ActiveContext)
+  tests/test-events-api.cjs          -> 38 / 38 PASS  (Event Lifecycle & Governance 3A)
+  tests/test-pitch-lifecycle.cjs     -> 76 / 76 PASS  (Pitch Lifecycle Engine 3B)
+  tests/test-pitch-timers.cjs        -> 50 / 50 PASS  (Timers, Pause/Resume & Lockout 3C)
+  tests/test-round-history.cjs       -> 61 / 61 PASS  (Round History & Result Engine 3D)
+  tests/test-judge-jury.cjs          -> 50 / 50 PASS  (Judge Catalog & Event Jury 3E)
+  tests/test-stage-homologation.cjs  -> 35 / 35 PASS  (Homologação E2E Palco 3D & Unanimidade)
+  tests/test-postgres-persistence.cjs-> 31 / 31 PASS  (PostgreSQL 18.6 ACID Persistence 4A)
+  tests/test-audit-query-layer.cjs   -> 79 / 79 PASS  (Audit Trail & ActivityLog Sync 4C)
+  tests/test-backup-manual.cjs       -> 24 / 24 PASS  (Manual Backup Engine & pg_dump 4D.1)
+  tests/test-disaster-recovery.cjs   -> 28 / 28 PASS  (Physical Restore & Parity Validation 4D.3)
+  tests/test-crash-rehydration.cjs   -> 33 / 33 PASS  (Crash Recovery & Paused Rehydration 4B)
   ──────────────────────────────────────────────────────────────────────────────
-  TOTAL CONSOLIDADO                -> 466 / 466 PASS (Zero falhas, zero regressões)
+  TOTAL CONSOLIDADO                  -> 688 / 688 PASS (Zero falhas, zero regressões)
 ```
 
 ---

@@ -189,7 +189,7 @@ A suíte completa de 11 arquivos de teste automatizados foi executada de ponta a
 1. **Multi-Node / Cluster Distribuído:** A plataforma opera como nó autossuficiente local de evento; consenso distribuído (Raft/Paxos) não é aplicável a esta fase.
 2. **Audit Trail Completo / Event Sourcing:** O 4B persiste snapshots do estado atual, e não o log imutável de eventos de transição (escopo previsto para **Milestone 4C**).
 3. **Backup Automatizado & Disaster Recovery Externo:** Rotinas de dump lógico periódicas pertencem ao **Milestone 4D**.
-4. **Chaos Engineering:** Injeção sistemática de falhas distribuídas pertence ao **Milestone 4E**.
+4. **Chaos Engineering:** Injeção sistemática de falhas distribuídas (originalmente planejado para Milestone 4E, reabsorvido formalmente pela **Fase 7 — Milestone 7D**).
 
 ---
 

@@ -137,7 +137,7 @@ O driver oficial .NET é o **Npgsql** (`Npgsql` NuGet), com queries via Dapper o
 | **4B** | Re-hidratação idêntica — mesma lógica, tabela `ActiveSessionState` em PG |
 | **4C** | Tabela `AuditEvents` em PG — sem diferença na lógica; ganho em particionamento futuro |
 | **4D** | `BackupOrchestrator` via `pg_dump`; `ConnectionLifecycleManager`; runbook operacional |
-| **4E** | Adicionar cenários de chaos: porta indisponível, cluster não iniciado, restart de PG |
+| **4E** | *(Reabsorvido na Fase 7 — Milestone 7D)* Cenários de chaos integrados com hardware e rede local |
 
 ## Impacto Futuro
 - **Fase 6 (Ranking e Relatórios):** Window functions e CTEs do PostgreSQL entregam rankings complexos e atas executivas em milissegundos sem limitações de SQL.
