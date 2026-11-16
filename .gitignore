@@ -37,3 +37,7 @@ yarn-error.log*
 # === Operating System ===
 Thumbs.db
 .DS_Store
+
+# === Backups & Dumps ===
+backups/*.pgdump
+!backups/.gitkeep

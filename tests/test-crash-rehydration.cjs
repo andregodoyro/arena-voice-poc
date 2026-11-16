@@ -15,10 +15,11 @@
 const http = require('http');
 const { spawn, execSync } = require('child_process');
 const path = require('path');
+const { getDotnetExe } = require('./tool-locator.cjs');
 
 const BASE_URL = process.env.ARENA_API_URL || 'http://127.0.0.1:5000';
 const BACKEND_DIR = path.resolve(__dirname, '../backend');
-const DOTNET_EXE = 'C:\\Users\\ANDREROC\\Documents\\devtools\\portable\\dotnet\\dotnet.exe';
+const DOTNET_EXE = getDotnetExe();
 
 let testsPassed = 0;
 let testsFailed = 0;

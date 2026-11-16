@@ -20,10 +20,11 @@
 const { spawn, execSync } = require('child_process');
 const http = require('http');
 const path = require('path');
+const { getDotnetExe, getNodeExe } = require('./tool-locator.cjs');
 
 const BACKEND_DIR = path.resolve(__dirname, '../backend');
-const DOTNET_EXE = 'C:\\Users\\ANDREROC\\Documents\\devtools\\portable\\dotnet\\dotnet.exe';
-const NODE_EXE = 'C:\\Users\\ANDREROC\\Documents\\devtools\\portable\\node\\node.exe';
+const DOTNET_EXE = getDotnetExe();
+const NODE_EXE = getNodeExe();
 const BASE_URL = 'http://127.0.0.1:5000';
 
 const suites = [
