@@ -1,4 +1,4 @@
-﻿# Diário Técnico de Implementação (Implementation History)
+# Diário Técnico de Implementação (Implementation History)
 ## Plataforma Arena Voice / Arena de Inovação
 
 > **Status:** Documento Vivo de Memória Arquitetural  
@@ -969,3 +969,36 @@
   - 	ests/test-postgres-persistence.cjs
   - 	ests/test-projects-api.cjs
 - **Resultados de Homologação:** 497/497 testes aprovados em 10 suítes (100% de sucesso, 0 falhas, 0 regressões).
+
+---
+
+## Milestone 4B — State Persistence & Session Re-hydration
+- **Status:** ✅ Concluído e Homologado (Novembro de 2026)
+- **Tag Oficial:** `v0.4.1-phase4b`
+- **Cobertura de Testes:** 530 asserções em 11 suítes automatizadas (100% verde).
+- **Detalhes Completos:** Consulte [`docs/archives/milestones/Phase4B-Implementation-History.md`](milestones/Phase4B-Implementation-History.md).
+
+---
+
+## Milestone 4C — Operational Audit Trail & Event Sourcing Leve
+- **Status:** ✅ Concluído e Homologado (16 de Novembro de 2026)
+- **Tag Oficial:** `v0.4.2-phase4c`
+- **Cobertura de Testes:** 609 asserções em 12 suítes automatizadas (100% verde).
+- **Detalhes Completos:** Consulte [`docs/archives/milestones/Phase4C-Implementation-History.md`](milestones/Phase4C-Implementation-History.md).
+
+---
+
+## Milestone 4D — Automated Snapshots, Backup & Disaster Recovery
+- **Status:** ✅ Concluído e Homologado (16 de Novembro de 2026)
+- **Tag Oficial:** `v0.4.3-phase4d`
+- **Cobertura de Testes:** 688 asserções em 14 suítes automatizadas (100% verde).
+- **Entregas Técnicas:**
+  - Backup assíncrono isolado em segundo plano (`BackupOrchestrator`, `BackupWorker`, `Channel<BackupRequest>`);
+  - Backup sob demanda via `POST /api/admin/backup` e listagem pelo filesystem via `GET /api/admin/backups`;
+  - Snapshots automáticos físicos acoplados ao evento de domínio `RoundArchived` (`round_N_<timestamp>.pgdump`);
+  - Trilha de auditoria integrada (`ManualBackupRequested`, `BackupSucceeded`, `BackupFailed`, `AutoSnapshotTriggered`, `AutoSnapshotCreated`, `AutoSnapshotFailed`);
+  - Motor canônico de restauração out-of-process via `pg_restore` (`scripts/restore-backup.cjs` e `scripts/restore-backup.cmd`);
+  - Suíte de Disaster Recovery automatizada (`tests/test-disaster-recovery.cjs`) com 28 asserções comprovando 100% de paridade pré e pós-restore em banco temporário;
+  - Runbook Operacional de Disaster Recovery (`docs/runbooks/disaster-recovery-runbook.md`) com RTO < 30s e RPO = 0;
+  - Decisões formais registradas em ADR-023, ADR-024 e ADR-025.
+- **Detalhes Completos:** Consulte [`docs/archives/milestones/Phase4D-Implementation-History.md`](milestones/Phase4D-Implementation-History.md).

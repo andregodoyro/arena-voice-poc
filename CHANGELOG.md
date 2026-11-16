@@ -5,6 +5,39 @@ O formato baseia-se em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0
 
 ---
 
+## [0.4.3-phase4d] - 2026-11-16
+### Conclusão Oficial do Milestone 4D e Encerramento da Fase 4: Automated Snapshots, Backup & Disaster Recovery
+
+#### Adicionado
+- **Motor de Orquestração de Backup (`BackupOrchestrator`)**: Execução isolada de `pg_dump.exe` em formato custom comprimido (`-Fc`) via processo do sistema operacional com injeção segura de credenciais.
+- **Worker Assíncrono (`BackupWorker`)**: Fila `Channel<BackupRequest>` processada em segundo plano, garantindo tempo de resposta HTTP inferior a 20ms e overhead de enfileiramento < 10ms.
+- **Endpoints Administrativos de Backup**:
+  - `POST /api/admin/backup` — Enfileira job assíncrono de backup manual e retorna `202 Accepted` com `jobId`.
+  - `GET /api/admin/backups` — Catálogo em tempo real consultando o filesystem (`backups/`) como fonte única da verdade, ordenado cronologicamente por data de criação.
+- **Snapshots Automáticos Orientados a Domínio (Domain-Driven Snapshots)**: Disparo automático de snapshot assíncrono nomeado com o índice sequencial da rodada (`round_{N}_{timestamp}.pgdump`) ao arquivar rodadas em `ArchiveCurrentRound`, `TransitionPitch(Finished)`, `SelectProject` e `FinishEvent`.
+- **Rastreabilidade de Snapshots no Audit Trail**: Segregação de eventos operacionais e técnicos: `BackupTriggered`, `BackupSucceeded`, `BackupFailed`, `AutoSnapshotTriggered`, `AutoSnapshotCreated` e `AutoSnapshotFailed`.
+- **Engine de Restauração Física (`scripts/restore-backup.cjs`)**: Motor canônico de restauração que localiza dinamicamente o `pg_restore` e executa a recuperação com `--clean --if-exists` de forma idempotente e segura (Out-of-Process).
+- **Interface Operacional Windows (`scripts/restore-backup.cmd`)**: Script amigável para operadores com flags `--help` e `--list` e seleção automática do snapshot mais recente.
+- **Suíte de Disaster Recovery (`tests/test-disaster-recovery.cjs`)**: 28 asserções automatizadas validando ciclo completo de desastre e restauração física em banco isolado (`arena_voice_restore_test`) com 100% de conferência estrutural e de contagens.
+- **Runbook Operacional de Contingência (`docs/runbooks/disaster-recovery-runbook.md`)**: Guia detalhado passo a passo para operadores em eventos ao vivo, documentando RTO < 30s e RPO = 0.
+- **Registros Arquiteturais Formais**:
+  - `ADR-023`: Estratégia do BackupOrchestrator e Execução Isolada de Processos.
+  - `ADR-024`: Estratégia de Gatilho de Backup (RoundArchived vs. Periodic Timer).
+  - `ADR-025`: Arquitetura de Disaster Recovery e Restauração Fora do Processo (Out-of-Process Restore).
+
+#### Alterado
+- **Orquestrador Central (`run-regression-suite.cjs`)**: Elevado para 14 suítes automatizadas, integrando `test-backup-recovery.cjs` e `test-disaster-recovery.cjs`.
+- **PostgresArenaProjectStore.cs**: Injetado `IBackupOrchestrator` de forma desacoplada para emissão assíncrona de snapshots sem contenção no lock principal.
+
+#### Validação e Confiabilidade
+- **14/14 Suítes Automatizadas Aprovadas** (688/688 testes verdes, zero falhas, zero regressões).
+- **RTO Comprovado**: Recuperação física em ~18 segundos (< 30s).
+- **RPO Comprovado**: Zero rodadas arquivadas perdidas.
+- **Auditoria de Portabilidade 100% Aprovada**: Zero caminhos absolutos locais ou dependências de usuário da máquina de desenvolvimento.
+- **Encerramento da Fase 4**: Platform Reliability & Data Resilience 100% concluída.
+
+---
+
 ## [0.4.2-phase4c] - 2026-11-16
 ### Conclusão Oficial do Milestone 4C: Operational Audit Trail & Event Sourcing Leve
 

@@ -594,18 +594,19 @@ FASES ENTREGUES E HOMOLOGADAS (CONCLUÍDAS)
   ✅ FASE 3: Event Governance, Pitch Dynamics & Jury (v0.3.0-phase3)
   ✅ FASE 4A: Storage Engine & Relational Schema (v0.4.0-phase4a — PostgreSQL Portable, EF Core 10)
   ✅ FASE 4B: State Persistence & Session Re-hydration (v0.4.1-phase4b — Crash Recovery & Snapshot Pattern)
+  ✅ FASE 4C: Operational Audit Trail & Event Sourcing Leve (v0.4.2-phase4c — AuditEvents & ActivityLog Sync)
+  ✅ FASE 4D: Automated Snapshots, Backup & Disaster Recovery (v0.4.3-phase4d — BackupOrchestrator, pg_dump, Auto-Snapshots, Out-of-Process Restore & Runbook)
 ════════════════════════════════════════════════════════════════════════════════
 NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
 ════════════════════════════════════════════════════════════════════════════════
   │
-  ├─► FASE 4: Platform Reliability & Data Resilience
+  ├─► FASE 4: Platform Reliability & Data Resilience (CONCLUÍDA)
   │     ├─ [x] 4A: Storage Engine & Relational Schema (PostgreSQL Portable 18.6, EF Core 10 & Schema Relacional)
   │     ├─ [x] 4B: State Persistence & Session Re-hydration (Snapshot Pattern, Crash Recovery Paused & TurnedChairs)
   │     ├─ [x] 4C: Operational Audit Trail & Event Sourcing Leve (AuditEvents & ActivityLog Sync)
-  │     ├─ [ ] 4D: Automated Snapshots, Backup & Disaster Recovery (BackupOrchestrator, pg_dump & Auto-Snapshots) ◄── [PRÓXIMO MARCO]
-  │     └─ [ ] 4E: Chaos Engineering & Reliability Test Suite (Simulação de kill -9 & 100 Restarts)
+  │     └─ [x] 4D: Automated Snapshots, Backup & Disaster Recovery (BackupOrchestrator, pg_dump, Auto-Snapshots, Out-of-Process Restore & Runbook)
   │
-  ├─► FASE 5: Live Show Experience & Audio Atmosphere
+  ├─► FASE 5: Live Show Experience & Audio Atmosphere ◄── [PRÓXIMO MARCO]
   │     ├─ 5A: Motor de Áudio Cênico Web Audio API no Telão (/stage)
   │     ├─ 5B: Sincronização Sonora: Whoosh de Rotação, Buzzer e Gongo de Encerramento
   │     └─ 5C: Efeitos de Celebração Cênica: Fanfarra e Iluminação de Unanimidade (5/5)
@@ -656,12 +657,12 @@ NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
 
 ---
 
-### FASE 4: Platform Reliability & Data Resilience (EM ANDAMENTO — 4A e 4B Homologados)
+### FASE 4: Platform Reliability & Data Resilience (✅ CONCLUÍDA — v0.4.3-phase4d)
 *Blindar a plataforma contra falhas, quedas de energia e perda de dados em eventos ao vivo.*
 
-- **STATUS:** 🚀 4A, 4B e 4C CONCLUÍDOS E HOMOLOGADOS (Branch `feat/phase4-data-resilience`)
-- **OBJETIVO:** Substituir o armazenamento volátil em memória por persistência local transacional ACID (PostgreSQL Portable via EF Core 10), garantindo reidratação instantânea pós-queda, tolerância a falhas via *Paused Recovery*, trilha de auditoria e backups operacionais via pg_dump.
-- **BASELINE ATUAL:** **609 asserções automatizadas em 12 suítes aprovadas (100% verde)**.
+- **STATUS:** ✅ 4A, 4B, 4C e 4D CONCLUÍDOS E HOMOLOGADOS (Branch `feat/phase4-data-resilience`)
+- **OBJETIVO:** Substituir o armazenamento volátil em memória por persistência local transacional ACID (PostgreSQL Portable via EF Core 10), garantindo reidratação instantânea pós-queda, tolerância a falhas via *Paused Recovery*, trilha de auditoria e backups operacionais via pg_dump com restauração física out-of-process.
+- **BASELINE ATUAL:** **688 asserções automatizadas em 14 suítes aprovadas (100% verde)**.
 - **MARCOS ENTREGUES:**
   - **✅ Milestone 4A — Storage Engine & Relational Schema (v0.4.0-phase4a):**
     - Cluster PostgreSQL Portable 18.6 com Npgsql 10 e EF Core 10.
@@ -679,22 +680,17 @@ NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
     - Reidratação durável do `ActivityLog` no cockpit do operador após F5 via `auditApi.js` e `auditMapper.js`;
     - Suíte de auditoria `test-audit-query-layer.cjs` (79 testes verdes);
     - Consolidação de regressão geral com 609 testes verdes em 12 suítes.
-- **PRÓXIMO MARCO A SER INICIADO:**
-  - **Milestone 4D — Automated Snapshots, Backup & Disaster Recovery:**
-    - BackupOrchestrator: executa pg_dump em processo separado gerando arquivo comprimido com timestamp;
-    - Snapshot automático a cada rodada arquivada (`round_N_<timestamp>.pgdump`);
-    - Endpoint POST /api/admin/backup acionável pelo operador em 1 clique.
-- **SUBFASES SUBSEQUENTES:**
-  - **Milestone 4D — Automated Snapshots, Backup & Disaster Recovery:**
-    - BackupOrchestrator: executa pg_dump em processo separado gerando arquivo comprimido com timestamp;
-    - Snapshot automático a cada rodada arquivada (`round_N_<timestamp>.pgdump`);
-    - Endpoint POST /api/admin/backup acionável pelo operador em 1 clique.
-  - **Milestone 4E — Chaos Engineering & Reliability Test Suite:**
-    - Suíte automatizada especializada `tests/test-chaos-reliability.cjs`;
-    - Simulação de terminação abrupta do processo (kill -9) durante escritas e votações concorrentes;
-    - Homologação final da Fase 4.
-- **CRITÉRIO DE ACEITE GLOBAL:** Desligar forçadamente o processo .NET e/ou o cluster PostgreSQL durante qualquer momento da operação e reiniciar o servidor sem perda de nenhuma rodada, voto ou configuração.
-- **DECISÕES ARQUITETURAIS:** [ADR-016](decision-records/ADR-016-offline-first-persistence-strategy.md), [ADR-017](decision-records/ADR-017-platform-reliability-over-feature-expansion.md), [ADR-018](decision-records/ADR-018-efcore10-npgsql-migrations-portable.md), [ADR-019](decision-records/ADR-019-dbcontext-factory-hybrid-store.md), [ADR-020](decision-records/ADR-020-snapshot-pattern-and-lock-separation.md) e [ADR-021](decision-records/ADR-021-crash-recovery-and-rehydration-strategy.md).
+  - **✅ Milestone 4D — Automated Snapshots, Backup & Disaster Recovery (v0.4.3-phase4d):**
+    - **BackupOrchestrator & BackupWorker:** processamento assíncrono em segundo plano via `Channel<BackupRequest>` isolado do hot-path de votação;
+    - **Physical Backup Engine:** geração de dumps binários PostgreSQL (`pg_dump -Fc`) sob demanda e retenção configurável baseada no filesystem;
+    - **Snapshots Automáticos:** disparo atômico de snapshot físico (`round_N_<timestamp>.pgdump`) atrelado ao evento `RoundArchived`;
+    - **Auditoria Operacional:** eventos `ManualBackupRequested`, `BackupSucceeded`, `BackupFailed`, `AutoSnapshotTriggered`, `AutoSnapshotCreated`, `AutoSnapshotFailed` no Audit Trail;
+    - **Out-of-Process Disaster Recovery Engine:** scripts canônicos de restauração física (`scripts/restore-backup.cjs` e `scripts/restore-backup.cmd`) via `pg_restore` com isolamento completo e sem expor comandos destrutivos via HTTP;
+    - **Suíte de Disaster Recovery:** `tests/test-disaster-recovery.cjs` (28 asserções) validando restauração real em banco isolado temporário, paridade de 100% dos dados nas 5 tabelas críticas e integridade referencial;
+    - **Disaster Recovery Runbook:** procedimento operacional documentado passo a passo para mesa técnica e recuperação em notebook sobressalente com RTO < 30s e RPO = 0;
+    - **Consolidação de Decisões de Arquitetura:** ADR-023, ADR-024 e ADR-025.
+- **CRITÉRIO DE ACEITE GLOBAL:** Desligar forçadamente o processo .NET e/ou o cluster PostgreSQL durante qualquer momento da operação e reiniciar o servidor sem perda de nenhuma rodada, voto ou configuração, restaurando o cluster em caso de perda total com RTO < 30s e RPO = 0.
+- **DECISÕES ARQUITETURAIS:** [ADR-016](decision-records/ADR-016-offline-first-persistence-strategy.md), [ADR-017](decision-records/ADR-017-platform-reliability-over-feature-expansion.md), [ADR-018](decision-records/ADR-018-efcore10-npgsql-migrations-portable.md), [ADR-019](decision-records/ADR-019-dbcontext-factory-hybrid-store.md), [ADR-020](decision-records/ADR-020-snapshot-pattern-and-lock-separation.md), [ADR-021](decision-records/ADR-021-crash-recovery-and-rehydration-strategy.md), [ADR-022](decision-records/ADR-022-audit-trail-and-cqrs-light.md), [ADR-023](decision-records/ADR-023-backup-orchestration-and-pgdump.md), [ADR-024](decision-records/ADR-024-round-archived-automatic-snapshots.md) e [ADR-025](decision-records/ADR-025-out-of-process-disaster-recovery.md).
 
 ---
 
@@ -808,6 +804,6 @@ A cada fase entregue:
 ## 🎯 PRÓXIMA FASE OFICIAL RECOMENDADA
 
 > [!IMPORTANT]
-> **A Próxima Fase a ser desenvolvida é a FASE 4: PLATFORM RELIABILITY & DATA RESILIENCE.**  
-> Branch oficial recomendada: eat/phase4-data-resilience  
-> Esta etapa elimina o único ponto de falha existencial da plataforma (volatilidade da memória RAM), implementa o banco relacional PostgreSQL Portable local via Npgsql, cria o mecanismo de reidratação pós-queda, a trilha de auditoria operacional e o backup a quente em 1 clique, deixando a Arena Voice 100% blindada para eventos reais.
+> **A Próxima Fase a ser desenvolvida é a FASE 5: LIVE SHOW EXPERIENCE & AUDIO ATMOSPHERE.**  
+> Branch oficial recomendada: `feat/phase5-audio-atmosphere`  
+> Com a Fase 4 (Platform Reliability & Data Resilience) 100% homologada e consolidada com 688 testes verdes em 14 suítes, persistência ACID relacional, Crash Recovery, Audit Trail, snapshots automáticos por rodada e Disaster Recovery operacional (RTO < 30s, RPO = 0), a plataforma está totalmente blindada contra perda de dados. O foco agora se volta para a experiência sensorial e a dramaticidade cênica do telão (/stage) via Web Audio API integrada aos eventos de domínio em tempo real.

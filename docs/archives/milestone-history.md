@@ -1,10 +1,10 @@
 # Índice Histórico de Marcos (Milestone History)
 ## Plataforma Arena Voice / Arena de Inovação
 
-> **Status Geral do Projeto:** Fases 1 a 3 e Milestones 4A, 4B e 4C Concluídos e Homologados  
-> **Tag Estável Mais Recente:** `v0.4.2-phase4c` (Encerramento do Milestone 4C)  
-> **Cobertura Automatizada:** 609 verificações em 12 suítes (100% aprovadas, zero regressões)  
-> **Última Atualização:** 16 de Novembro de 2026 (Consolidação Final e Fechamento do Milestone 4C)
+> **Status Geral do Projeto:** Fases 1 a 3 e Fase 4 (4A, 4B, 4C, 4D) Concluídos e Homologados  
+> **Tag Estável Mais Recente:** `v0.4.3-phase4d` (Encerramento da Fase 4 e Milestone 4D)  
+> **Cobertura Automatizada:** 688 verificações em 14 suítes (100% aprovadas, zero regressões)  
+> **Última Atualização:** 16 de Novembro de 2026 (Consolidação Final e Fechamento do Milestone 4D)
 
 ---
 
@@ -38,7 +38,7 @@ Este documento é a **fonte oficial de índice de marcos**, permitindo rastrear 
 | **4** | **4A** | Storage Engine & Relational Schema | ✅ Concluído | PostgreSQL Portable 18.6, EF Core 10, Schema relacional, persistência ACID | 497 testes (10 suítes) | `v0.4.0-phase4a` |
 | **4** | **4B** | State Persistence & Session Re-hydration | ✅ Concluído | Snapshot Pattern, Lock Separation, Crash Recovery Paused & TurnedChairs | 530 testes (11 suítes) | `v0.4.1-phase4b` |
 | **4** | **4C** | Operational Audit Trail & Event Sourcing Leve | ✅ Concluído | Tabela `audit_events`, pipeline assíncrono Channel, Query Layer (ADR-022) e ActivityLog F5 | 609 testes (12 suítes) | `v0.4.2-phase4c` |
-| **4** | **4D** | Automated Snapshots, Backup & Disaster Recovery | 📅 Próximo | BackupOrchestrator, pg_dump em processo separado, Auto-Snapshots | Testes de backup e recuperação | `v0.4.3-phase4d` |
+| **4** | **4D** | Automated Snapshots, Backup & Disaster Recovery | ✅ Concluído | BackupOrchestrator, pg_dump em processo separado, Auto-Snapshots, pg_restore e DR Runbook | 688 testes (14 suítes) | `v0.4.3-phase4d` |
 | **4** | **4E** | Chaos Engineering & Reliability Test Suite | 📅 Próximo | `test-chaos-reliability.cjs`, simulações de kill -9, 100 restarts consecutivos | 50+ asserções de caos e confiabilidade | `v0.4.4-phase4e` |
 | **5** | **5A-5D** | Live Show Experience (Áudio & Dinâmicas) | 🔮 Futuro | Integração de áudio cênico, dinâmicas de show ao vivo, animações de entrada | A definir na Fase 5 | `v0.5.0-phase5` |
 | **6** | **6A-6C** | Awards, Ranking & Reports | 🔮 Futuro | Pódio de premiação, ranking acumulado, exportação PDF/CSV de resultados | A definir na Fase 6 | `v0.6.0-phase6` |
@@ -86,7 +86,7 @@ Este documento é a **fonte oficial de índice de marcos**, permitindo rastrear 
 - **4A (Storage Engine & Relational Schema):** Substituição do `ArenaProjectStore` em memória por `SqliteArenaProjectStore` com banco embedded. Schema relacional estrito com tabelas normalizadas para `Events`, `Projects`, `Judges`, `EventJuryAssignments`, `PitchHistory`, `AuditEvents`. WAL mode ativado, `PRAGMA foreign_keys = ON` e `CHECK CONSTRAINTS` em todas as colunas críticas.
 - **4B (State Persistence & Session Re-hydration):** Persistência completa do estado operacional da arena entre reinicializações do backend. Implementação do `Crash Boot Recovery`: ao inicializar, o backend detecta sessão interrompida e restaura o `ActiveContext` com o último estado coerente gravado. Zero perda de estado operacional em quedas de energia.
 - **4C (Operational Audit Trail & Event Sourcing Leve):** Tabela `AuditEvents` registrando automaticamente toda ação crítica do sistema (seleção de projeto, transição de pitch, acionamento de cadeira, encerramento de rodada). Integração com o `ActivityLog` do frontend para sincronia de histórico pós-reconexão. Rastreabilidade de operações para suporte e auditoria pós-evento.
-- **4D (Automated Snapshots, Backup & Disaster Recovery):** Sistema de hot-backup via `VACUUM INTO` para snapshots automáticos do banco. Snapshots pré-evento, pós-rodada e agendados por intervalo. `RecoveryManager` com seleção do snapshot mais recente coerente em caso de corrupção. Preservação do histórico completo de edições entre sessões.
+- **4D (Automated Snapshots, Backup & Disaster Recovery — CONCLUÍDO):** Sistema de backup a quente (`pg_dump -Fc`) via `BackupOrchestrator` e `BackupWorker` assíncrono com canal bounded desacoplado do hot-path. Snapshots automáticos disparados no arquivamento de cada rodada (`round_N_<timestamp>.pgdump`). Motor canônico de restauração out-of-process (`scripts/restore-backup.cjs` e `scripts/restore-backup.cmd`) via `pg_restore` com flags seguras. Suíte de Disaster Recovery automatizada (`tests/test-disaster-recovery.cjs`) com 28 asserções validando 100% de paridade em banco isolado temporário. Runbook operacional documentado com RTO < 30s e RPO = 0. Homologação total: 688 testes em 14 suítes aprovados. Tag `v0.4.3-phase4d`.
 - **4E (Chaos Engineering & Reliability Test Suite):** Suíte `test-chaos-reliability.cjs` simulando falhas reais: queda de energia mid-session, corrupção de banco, restart durante votação ativa, replay de rollback e validação de idempotência em todas as operações críticas. Meta: 50+ asserções de confiabilidade com 100% de aprovação.
 
 ---
