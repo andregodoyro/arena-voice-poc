@@ -601,8 +601,8 @@ NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
   ├─► FASE 4: Platform Reliability & Data Resilience
   │     ├─ [x] 4A: Storage Engine & Relational Schema (PostgreSQL Portable 18.6, EF Core 10 & Schema Relacional)
   │     ├─ [x] 4B: State Persistence & Session Re-hydration (Snapshot Pattern, Crash Recovery Paused & TurnedChairs)
-  │     ├─ [ ] 4C: Operational Audit Trail & Event Sourcing Leve (AuditEvents & ActivityLog Sync) ◄── [PRÓXIMO MARCO]
-  │     ├─ [ ] 4D: Automated Snapshots, Backup & Disaster Recovery (BackupOrchestrator, pg_dump & Auto-Snapshots)
+  │     ├─ [x] 4C: Operational Audit Trail & Event Sourcing Leve (AuditEvents & ActivityLog Sync)
+  │     ├─ [ ] 4D: Automated Snapshots, Backup & Disaster Recovery (BackupOrchestrator, pg_dump & Auto-Snapshots) ◄── [PRÓXIMO MARCO]
   │     └─ [ ] 4E: Chaos Engineering & Reliability Test Suite (Simulação de kill -9 & 100 Restarts)
   │
   ├─► FASE 5: Live Show Experience & Audio Atmosphere
@@ -659,9 +659,9 @@ NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
 ### FASE 4: Platform Reliability & Data Resilience (EM ANDAMENTO — 4A e 4B Homologados)
 *Blindar a plataforma contra falhas, quedas de energia e perda de dados em eventos ao vivo.*
 
-- **STATUS:** 🚀 4A e 4B CONCLUÍDOS E HOMOLOGADOS (Branch `feat/phase4-data-resilience`)
+- **STATUS:** 🚀 4A, 4B e 4C CONCLUÍDOS E HOMOLOGADOS (Branch `feat/phase4-data-resilience`)
 - **OBJETIVO:** Substituir o armazenamento volátil em memória por persistência local transacional ACID (PostgreSQL Portable via EF Core 10), garantindo reidratação instantânea pós-queda, tolerância a falhas via *Paused Recovery*, trilha de auditoria e backups operacionais via pg_dump.
-- **BASELINE ATUAL:** **530 asserções automatizadas em 11 suítes aprovadas (100% verde)**.
+- **BASELINE ATUAL:** **609 asserções automatizadas em 12 suítes aprovadas (100% verde)**.
 - **MARCOS ENTREGUES:**
   - **✅ Milestone 4A — Storage Engine & Relational Schema (v0.4.0-phase4a):**
     - Cluster PostgreSQL Portable 18.6 com Npgsql 10 e EF Core 10.
@@ -672,11 +672,18 @@ NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
     - **Snapshot Pattern & Lock Separation:** isolamento estrito entre `_contextLock` (Hot Cache em RAM) e `_dbPersistenceLock` (PostgreSQL I/O).
     - **Crash Recovery Engine:** detecção de quedas e aplicação da estratégia *Paused Recovery* (timer congelado no último checkpoint, sem descarte automático para Waiting).
     - Suíte de reidratação e crash `test-crash-rehydration.cjs` (33 testes verdes).
-    - Consolidação de regressão geral com 530 testes verdes em 11 suítes.
+  - **✅ Milestone 4C — Operational Audit Trail & Event Sourcing Leve (v0.4.2-phase4c):**
+    - Tabela append-only `audit_events` registrando 100% das mutações operacionais de domínio;
+    - Pipeline assíncrono não-bloqueante (`Channel<AuditEventRecord>` bounded 10k + `AuditEventWriter`);
+    - Camada de consulta CQRS leve (`AuditQueryService`) e endpoints `/api/audit*` com segregação de visibilidade (**ADR-022**);
+    - Reidratação durável do `ActivityLog` no cockpit do operador após F5 via `auditApi.js` e `auditMapper.js`;
+    - Suíte de auditoria `test-audit-query-layer.cjs` (79 testes verdes);
+    - Consolidação de regressão geral com 609 testes verdes em 12 suítes.
 - **PRÓXIMO MARCO A SER INICIADO:**
-  - **Milestone 4C — Operational Audit Trail & Event Sourcing Leve:**
-    - Tabela append-only `AuditEvents` registrando todas as mutações operacionais;
-    - Endpoint `GET /api/audit-log` e reidratação do ActivityLog no cockpit após F5.
+  - **Milestone 4D — Automated Snapshots, Backup & Disaster Recovery:**
+    - BackupOrchestrator: executa pg_dump em processo separado gerando arquivo comprimido com timestamp;
+    - Snapshot automático a cada rodada arquivada (`round_N_<timestamp>.pgdump`);
+    - Endpoint POST /api/admin/backup acionável pelo operador em 1 clique.
 - **SUBFASES SUBSEQUENTES:**
   - **Milestone 4D — Automated Snapshots, Backup & Disaster Recovery:**
     - BackupOrchestrator: executa pg_dump em processo separado gerando arquivo comprimido com timestamp;

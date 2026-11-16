@@ -1,10 +1,10 @@
-﻿# Índice Histórico de Marcos (Milestone History)
+# Índice Histórico de Marcos (Milestone History)
 ## Plataforma Arena Voice / Arena de Inovação
 
-> **Status Geral do Projeto:** Fases 1 a 3 e Milestone 4A Concluídos e Homologados  
-> **Tag Estável Mais Recente:** `v0.3.0-phase3` (Encerramento da Fase 3)  
-> **Cobertura Automatizada:** 497 verificações em 10 suítes (100% aprovadas, zero regressões)  
-> **Última Atualização:** Novembro de 2026 (Consolidação Final e Fechamento da Fase 3)
+> **Status Geral do Projeto:** Fases 1 a 3 e Milestones 4A, 4B e 4C Concluídos e Homologados  
+> **Tag Estável Mais Recente:** `v0.4.2-phase4c` (Encerramento do Milestone 4C)  
+> **Cobertura Automatizada:** 609 verificações em 12 suítes (100% aprovadas, zero regressões)  
+> **Última Atualização:** 16 de Novembro de 2026 (Consolidação Final e Fechamento do Milestone 4C)
 
 ---
 
@@ -35,11 +35,11 @@ Este documento é a **fonte oficial de índice de marcos**, permitindo rastrear 
 | **3** | **3C** | Pitch Timers & Authoritative Lockout | ✅ Concluído | Cronômetro ancorado em timestamp, pause/resume sem drift, +tempo, lockout 409 Conflict fora de VotingOpen | 355 testes (305 base + 50 timers) | main |
 | **3** | **3D** | Round History & Result Engine | ✅ Concluído | Snapshot imutável de rodada, Result (Approved/Rejected/Inconclusive), ApprovalMode (Unanimous/Majority/Minority/None) | 416 testes (355 base + 61 history) | main |
 | **3** | **3E** | Judge Catalog & Event Jury Assignment | ✅ Concluído | Catálogo global de jurados, alocação nas cadeiras 1..5, StageJuryDock, integração com RoundHistoryEntry | 466 testes (416 base + 50 jury) | `v0.3.0-phase3` |
-| **4** | **4A** | Storage Engine & Relational Schema | 📅 Próximo | SQLite WAL Mode, schema relacional estrito, Foreign Keys & Check Constraints | Testes de migração e integridade | `v0.4.0-phase4` |
-| **4** | **4B** | State Persistence & Session Re-hydration | 📅 Próximo | `SqliteArenaProjectStore`, re-hidratação de sessão, Crash Boot Recovery | Testes de persistência e re-hidratação | `v0.4.0-phase4` |
-| **4** | **4C** | Operational Audit Trail & Event Sourcing Leve | 📅 Próximo | Tabela `AuditEvents`, ActivityLog persistido, rastreabilidade de operações críticas | Testes de auditoria e rastreabilidade | `v0.4.0-phase4` |
-| **4** | **4D** | Automated Snapshots, Backup & Disaster Recovery | 📅 Próximo | `VACUUM INTO` hot-backup, snapshots automáticos, Recovery Manager | Testes de backup e recuperação de desastre | `v0.4.0-phase4` |
-| **4** | **4E** | Chaos Engineering & Reliability Test Suite | 📅 Próximo | `test-chaos-reliability.cjs`, simulações de falha, validação de idempotência | 50+ asserções de caos e confiabilidade | `v0.4.0-phase4` |
+| **4** | **4A** | Storage Engine & Relational Schema | ✅ Concluído | PostgreSQL Portable 18.6, EF Core 10, Schema relacional, persistência ACID | 497 testes (10 suítes) | `v0.4.0-phase4a` |
+| **4** | **4B** | State Persistence & Session Re-hydration | ✅ Concluído | Snapshot Pattern, Lock Separation, Crash Recovery Paused & TurnedChairs | 530 testes (11 suítes) | `v0.4.1-phase4b` |
+| **4** | **4C** | Operational Audit Trail & Event Sourcing Leve | ✅ Concluído | Tabela `audit_events`, pipeline assíncrono Channel, Query Layer (ADR-022) e ActivityLog F5 | 609 testes (12 suítes) | `v0.4.2-phase4c` |
+| **4** | **4D** | Automated Snapshots, Backup & Disaster Recovery | 📅 Próximo | BackupOrchestrator, pg_dump em processo separado, Auto-Snapshots | Testes de backup e recuperação | `v0.4.3-phase4d` |
+| **4** | **4E** | Chaos Engineering & Reliability Test Suite | 📅 Próximo | `test-chaos-reliability.cjs`, simulações de kill -9, 100 restarts consecutivos | 50+ asserções de caos e confiabilidade | `v0.4.4-phase4e` |
 | **5** | **5A-5D** | Live Show Experience (Áudio & Dinâmicas) | 🔮 Futuro | Integração de áudio cênico, dinâmicas de show ao vivo, animações de entrada | A definir na Fase 5 | `v0.5.0-phase5` |
 | **6** | **6A-6C** | Awards, Ranking & Reports | 🔮 Futuro | Pódio de premiação, ranking acumulado, exportação PDF/CSV de resultados | A definir na Fase 6 | `v0.6.0-phase6` |
 | **7** | **7A-7C** | Operational Hardening & Fleet Management | 🔮 Futuro | Multi-dispositivo, monitoramento de frota, hardening operacional | A definir na Fase 7 | `v0.7.0-phase7` |

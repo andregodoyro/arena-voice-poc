@@ -5,6 +5,31 @@ O formato baseia-se em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0
 
 ---
 
+## [0.4.2-phase4c] - 2026-11-16
+### Conclusão Oficial do Milestone 4C: Operational Audit Trail & Event Sourcing Leve
+
+#### Adicionado
+- **Schema e Entidade `AuditEvent`**: Mapeamento da tabela relacional append-only `audit_events` com colunas estruturadas (`event_type`, `aggregate_type`, `aggregate_id`, `actor_type`, `actor_name`, `occurred_at`) e campos dinâmicos `JSONB` (`payload`, `before_state`, `after_state`, `metadata`).
+- **Migration `AddAuditEventsTable`**: Migration EF Core versionada gerando a tabela de auditoria com índices compostos de alta performance para consultas cronológicas.
+- **Pipeline de Escrita Assíncrono (`System.Threading.Channels`)**: Fila bounded em memória (10.000 itens) com `IAuditEventPublisher` desacoplando totalmente a gravação física no banco do fluxo crítico de requisições HTTP e SignalR.
+- **Background Hosted Service `AuditEventWriter`**: Worker assíncrono para processamento e persistência de lotes de eventos na base PostgreSQL.
+- **Instrumentação Global de Domínio**: 100% das mutações operacionais instrumentadas no `PostgresArenaProjectStore` (eventos de criação/edição/deleção, ciclo de pitch, timers, votações em cadeiras e snapshots).
+- **Camada de Consulta REST (CQRS Leve)**: Implementação de `AuditQueryService` e endpoints `/api/audit`, `/api/audit/{id}`, `/api/audit/project/{id}`, `/api/audit/event/{id}` e `/api/audit/session`.
+- **ADR-022 (Segregação de Visibilidade da Timeline)**: Ocultação padrão de eventos técnicos (`RecoveryCheckpointCreated`, `ActiveSessionUpdated`), reduzindo ruído visual e volume de tráfego em ~40%, com suporte a `?includeTechnical=true` sob demanda.
+- **Integração Frontend e Re-hidratação (`auditApi.js` & `auditMapper.js`)**: Cliente de API e conversor de domínio integrados ao `OperatorContext.jsx` para carregar a timeline no boot do cockpit.
+- **ActivityLog Aprimorado**: Componente `ActivityLog.jsx` com ícones específicos para cada ciclo operacional (play, pause, unanimidade, votos, governança) e persistência durável após recargas (`F5`).
+- **Suíte de Testes de Consulta (`test-audit-query-layer.cjs`)**: 79 asserções cobrindo paginação, filtros e conformidade ADR-022.
+
+#### Alterado
+- **Orquestrador Central (`run-regression-suite.cjs`)**: Elevado para 12 suítes automatizadas, integrando a validação formal da camada de auditoria.
+- **OperatorContext.jsx**: Fusão transparente entre eventos históricos vindos do banco de dados e eventos que acabaram de ocorrer via SignalR.
+
+#### Validação e Confiabilidade
+- **12/12 Suítes Automatizadas Aprovadas** (609/609 testes verdes, 0 falhas, 0 regressões).
+- **Persistência Completa de Timeline**: Comprovação de que a linha do tempo do operador sobrevive intacta ao `F5`.
+
+---
+
 ## [0.4.1-phase4b] - 2026-11-11
 ### Conclusão Oficial do Milestone 4B: State Persistence & Session Re-hydration
 
