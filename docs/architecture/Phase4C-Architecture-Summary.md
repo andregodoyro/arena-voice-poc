@@ -65,14 +65,14 @@ flowchart TD
 * `AuditEventWriter` background service persiste de forma robusta e resiliente em background.
 
 ### 3.3. Segregação de Visibilidade e CQRS de Consulta (ADR-022)
-* Camada de leitura implementada em [`AuditQueryService`](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/backend/Services/AuditQueryService.cs).
+* Camada de leitura implementada em [`AuditQueryService`](../../backend/Services/AuditQueryService.cs).
 * Ocultação padrão de eventos técnicos de infraestrutura (`RecoveryCheckpointCreated`, ~38% do volume de escritas, e `ActiveSessionUpdated`).
 * Suporte completo a filtros de domínio, paginação padrão e parâmetro `includeTechnical=true` para auditoria e SRE.
 
 ### 3.4. Re-hidratação no Frontend e Mapper de Domínio
-* Módulo [`auditApi.js`](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/frontend/src/api/auditApi.js) centraliza as chamadas REST com parametrização ADR-022.
-* Módulo [`auditMapper.js`](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/frontend/src/utils/auditMapper.js) converte `AuditEventDto` para modelos ricos do [`ActivityLog.jsx`](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/frontend/src/components/operator/ActivityLog.jsx).
-* O [`OperatorContext.jsx`](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/frontend/src/contexts/OperatorContext.jsx) unifica o snapshot inicial do banco com eventos recebidos via SignalR em tempo real, preservando a linha do tempo completa após recargas de navegador (`F5`).
+* Módulo [`auditApi.js`](../../frontend/src/api/auditApi.js) centraliza as chamadas REST com parametrização ADR-022.
+* Módulo [`auditMapper.js`](../../frontend/src/utils/auditMapper.js) converte `AuditEventDto` para modelos ricos do [`ActivityLog.jsx`](../../frontend/src/components/operator/ActivityLog.jsx).
+* O [`OperatorContext.jsx`](../../frontend/src/contexts/OperatorContext.jsx) unifica o snapshot inicial do banco com eventos recebidos via SignalR em tempo real, preservando a linha do tempo completa após recargas de navegador (`F5`).
 
 ---
 
