@@ -1,8 +1,8 @@
 /**
  * run-regression-suite.cjs
- * Orquestrador central da regressão completa do Milestone 4B.6.
+ * Orquestrador central da regressão completa do Milestone 4C.6.
  * 
- * Executa as 11 suítes do projeto contra o PostgreSQL:
+ * Executa as 12 suítes do projeto contra o PostgreSQL:
  * 1. test-api.cjs
  * 2. test-events-api.cjs
  * 3. test-projects-api.cjs
@@ -13,7 +13,8 @@
  * 8. test-signalr-e2e.cjs
  * 9. homologation-2d5.cjs
  * 10. test-postgres-persistence.cjs
- * 11. test-crash-rehydration.cjs
+ * 11. test-audit-query-layer.cjs (Milestone 4C.4 / ADR-022)
+ * 12. test-crash-rehydration.cjs (Milestone 4B.5)
  */
 
 const { spawn, execSync } = require('child_process');
@@ -35,7 +36,8 @@ const suites = [
   'test-round-history.cjs',
   'test-signalr-e2e.cjs',
   'homologation-2d5.cjs',
-  'test-postgres-persistence.cjs'
+  'test-postgres-persistence.cjs',
+  'test-audit-query-layer.cjs'
 ];
 
 let backendProcess = null;
@@ -130,7 +132,18 @@ function parseOutput(output) {
     };
   }
 
-  // Padrão 4: "PASS: X" e "FAIL: Y"
+  // Padrão 4: "RESULTADO FINAL: X pass, Y fail" ou "PASS: X" e "FAIL: Y"
+  const finalResultMatch = output.match(/RESULTADO FINAL:\s*(\d+)\s+pass,\s*(\d+)\s+fail/i);
+  if (finalResultMatch) {
+    const passed = parseInt(finalResultMatch[1]);
+    const failed = parseInt(finalResultMatch[2]);
+    return {
+      total: passed + failed,
+      passed,
+      failed
+    };
+  }
+
   const passMatch = output.match(/\bPASS:\s*(\d+)/i);
   const failM = output.match(/\bFAIL:\s*(\d+)/i);
   if (passMatch) {
@@ -156,7 +169,7 @@ function parseOutput(output) {
 
 async function runRegression() {
   console.log('======================================================');
-  console.log('   ARENA VOICE — REGRESSÃO GERAL (MILESTONE 4B.6)    ');
+  console.log('   ARENA VOICE — REGRESSÃO GERAL (MILESTONE 4C.6)    ');
   console.log('======================================================\n');
 
   const results = [];
@@ -238,7 +251,7 @@ async function runRegression() {
 
     // 3. Tabela Consolidada
     console.log('\n\n========================================================================================');
-    console.log('                          CONSOLIDAÇÃO FINAL DA REGRESSÃO 4B.6                          ');
+    console.log('                          CONSOLIDAÇÃO FINAL DA REGRESSÃO 4C.6                          ');
     console.log('========================================================================================');
     console.log('| #  | Suíte de Teste                 | Total | Aprovados | Falhas | Tempo   | Status   |');
     console.log('|---|--------------------------------|-------|-----------|--------|---------|----------|');
