@@ -39,7 +39,8 @@ const suites = [
   'homologation-2d5.cjs',
   'test-postgres-persistence.cjs',
   'test-audit-query-layer.cjs',
-  'test-backup-recovery.cjs'
+  'test-backup-recovery.cjs',
+  'test-disaster-recovery.cjs'
 ];
 
 let backendProcess = null;
@@ -171,7 +172,7 @@ function parseOutput(output) {
 
 async function runRegression() {
   console.log('======================================================');
-  console.log('   ARENA VOICE — REGRESSÃO GERAL (MILESTONE 4C.6)    ');
+  console.log('   ARENA VOICE — REGRESSÃO GERAL (MILESTONE 4D.3)    ');
   console.log('======================================================\n');
 
   const results = [];
@@ -253,7 +254,7 @@ async function runRegression() {
 
     // 3. Tabela Consolidada
     console.log('\n\n========================================================================================');
-    console.log('                          CONSOLIDAÇÃO FINAL DA REGRESSÃO 4C.6                          ');
+    console.log('                          CONSOLIDAÇÃO FINAL DA REGRESSÃO 4D.3                          ');
     console.log('========================================================================================');
     console.log('| #  | Suíte de Teste                 | Total | Aprovados | Falhas | Tempo   | Status   |');
     console.log('|---|--------------------------------|-------|-----------|--------|---------|----------|');
