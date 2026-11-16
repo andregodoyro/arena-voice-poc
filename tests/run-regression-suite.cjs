@@ -38,7 +38,8 @@ const suites = [
   'test-signalr-e2e.cjs',
   'homologation-2d5.cjs',
   'test-postgres-persistence.cjs',
-  'test-audit-query-layer.cjs'
+  'test-audit-query-layer.cjs',
+  'test-backup-recovery.cjs'
 ];
 
 let backendProcess = null;

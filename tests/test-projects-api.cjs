@@ -74,6 +74,17 @@ async function run() {
     await request('/api/projects/proj-agrosmart-04', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 0 }) });
     await request('/api/projects/proj-cybershield-05', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 0 }) });
 
+    // Remove eventuais projetos criados por outras suítes para garantir isolamento
+    const preCheck = await request('/api/projects');
+    if (Array.isArray(preCheck.body)) {
+        const seedIds = ['proj-neurosync-01', 'proj-ecolog-02', 'proj-finflow-03', 'proj-agrosmart-04', 'proj-cybershield-05'];
+        for (const p of preCheck.body) {
+            if (!seedIds.includes(p.id)) {
+                await request(`/api/projects/${p.id}`, { method: 'DELETE' });
+            }
+        }
+    }
+
     console.log('[1] Event Management (GET /api/events/current)');
     const eventRes = await request('/api/events/current');
     assert(eventRes.status === 200, 'GET /api/events/current retorna HTTP 200', `Recebido ${eventRes.status}`);
