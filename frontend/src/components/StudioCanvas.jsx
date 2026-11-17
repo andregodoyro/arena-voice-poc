@@ -30,28 +30,28 @@ export function StudioCanvas({ chairs = [], branding = {}, pitchState = null }) 
     switch (viewMode) {
       case 'left':
         return {
-          position: [-7.8, 5.2, 14.2],
-          target: [0, 1.4, -1.5],
+          position: [-8.8, 5.4, 14.5],
+          target: [0, 1.8, -1.8],
           fov: 46,
         };
       case 'right':
         return {
-          position: [7.8, 5.2, 14.2],
-          target: [0, 1.4, -1.5],
+          position: [8.8, 5.4, 14.5],
+          target: [0, 1.8, -1.8],
           fov: 46,
         };
       case 'wide':
         return {
-          position: [0, 9.2, 21.5],
-          target: [0, 1.8, -2.5],
-          fov: 48,
+          position: [-1.2, 9.2, 22.0],
+          target: [0, 2.2, -2.5],
+          fov: 49,
         };
       case 'frontal':
       default:
         return {
-          position: [0, 5.2, 15.8],
-          target: [0, 1.4, -1.0],
-          fov: 46,
+          position: [0, 5.2, 16.2],
+          target: [0, 1.8, -1.6],
+          fov: 47,
         };
     }
   }, []);
@@ -61,7 +61,7 @@ export function StudioCanvas({ chairs = [], branding = {}, pitchState = null }) 
       style={{
         position: 'absolute',
         inset: 0,
-        background: 'radial-gradient(ellipse at center top, #141a33 0%, #05060d 65%)',
+        background: 'radial-gradient(ellipse at center top, #241b14 0%, #0c0907 65%, #050403 100%)',
       }}
     >
       <Canvas
@@ -71,7 +71,7 @@ export function StudioCanvas({ chairs = [], branding = {}, pitchState = null }) 
           position: cameraConfig.position,
           fov: cameraConfig.fov,
           near: 0.1,
-          far: 120,
+          far: 140,
         }}
         gl={{
           antialias: true,
@@ -79,7 +79,7 @@ export function StudioCanvas({ chairs = [], branding = {}, pitchState = null }) 
           outputColorSpace: THREE.SRGBColorSpace,
           // toneMapping delegado ao EffectComposer (ToneMapping ACES Filmic effect)
           toneMapping: THREE.NoToneMapping,
-          toneMappingExposure: 1.3,
+          toneMappingExposure: 1.25,
           preserveDrawingBuffer: true,
         }}
         onCreated={({ gl }) => {
@@ -87,41 +87,41 @@ export function StudioCanvas({ chairs = [], branding = {}, pitchState = null }) 
           gl.shadowMap.type = THREE.PCFSoftShadowMap;
         }}
       >
-        {/* Cor de fundo cênica profunda */}
-        <color attach="background" args={['#060812']} />
+        {/* Cor de fundo cênica profunda em tons quentes de grafite/ébano */}
+        <color attach="background" args={['#0a0807']} />
 
-        {/* Neblina atmosférica expandida com gradiente suave */}
-        <fog attach="fog" args={['#060812', 26, 65]} />
+        {/* Neblina atmosférica quente com gradiente suave */}
+        <fog attach="fog" args={['#0a0807', 28, 80]} />
 
         {/* ── Controles de Câmera Institucional ───────────────────────────── */}
         <OrbitControls
           makeDefault
           enablePan={false}
-          minPolarAngle={Math.PI / 4.5}
-          maxPolarAngle={Math.PI / 2.1}
-          minDistance={7}
-          maxDistance={35}
-          rotateSpeed={0.55}
+          minPolarAngle={Math.PI / 4.8}
+          maxPolarAngle={Math.PI / 2.08}
+          minDistance={8}
+          maxDistance={38}
+          rotateSpeed={0.5}
           zoomSpeed={0.7}
           enableDamping
           dampingFactor={0.07}
           target={cameraConfig.target}
         />
 
-        {/* ── Ambiente & Iluminação Cênica Integrada (2D.4 Legibilidade) ─── */}
-        <hemisphereLight skyColor="#2c3758" groundColor="#0a0d18" intensity={0.85} />
+        {/* ── Iluminação Ambiente Indireta Quente (3000K Arquitetural) ───── */}
+        <hemisphereLight skyColor="#4d3725" groundColor="#140f0b" intensity={0.82} />
 
         {/* ── Cena Principal dentro de Suspense ───────────────────────────── */}
         <Suspense fallback={null}>
           <StudioScene chairs={chairs} branding={branding} pitchState={pitchState} />
 
-          {/* Sombra de contato no piso da arena */}
+          {/* Sombra de contato suave no piso nobre da arena */}
           <ContactShadows
             position={[0, -0.01, 0]}
-            opacity={0.65}
-            scale={32}
-            blur={2.2}
-            far={8}
+            opacity={0.7}
+            scale={36}
+            blur={2.4}
+            far={10}
             color="#000000"
           />
         </Suspense>
@@ -129,11 +129,11 @@ export function StudioCanvas({ chairs = [], branding = {}, pitchState = null }) 
         {/* ── Pipeline de Postprocessing (Milestone 5A, ADR-026) ──────────── */}
         {/* multisampling=0 evita artefatos combinados com postprocessing     */}
         <EffectComposer multisampling={0}>
-          {/* Bloom seletivo: só elementos com emissão > 0.85 brilham         */}
+          {/* Bloom seletivo para realce dos halos arquiteturais e consoles     */}
           <Bloom
-            luminanceThreshold={0.85}
-            luminanceSmoothing={0.9}
-            intensity={1.5}
+            luminanceThreshold={0.88}
+            luminanceSmoothing={0.85}
+            intensity={1.2}
             mipmapBlur
           />
           {/* ToneMapping ACES Filmic — substitui gl.toneMapping do renderer  */}
