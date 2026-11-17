@@ -1,4 +1,4 @@
-﻿# ROADMAP ARENA VOICE / ARENA DE INOVAÇÃO
+# ROADMAP ARENA VOICE / ARENA DE INOVAÇÃO
 ## Versão 2.0 — Roadmap V2: Show-Ready & Production-Ready First
 
 > **Classificação:** Documento Mestre de Produto e Arquitetura  
@@ -751,6 +751,7 @@ NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
 - **STATUS:** 📅 PLANEJADA (Roadmap V2)
 - **OBJETIVO:** Computar a classificação geral dos pitches apresentados, projetar a cerimônia de premiação no palco e exportar a ata oficial em PDF e CSV para a comissão organizadora.
 - **PRÉ-REQUISITOS:** Fase 4 (Persistência) e Fase 3D (Result Engine).
+- **DIRETRIZ DE HARDWARE:** **Firmware Congelado.** Nenhuma alteração no código embarcado dos ESP32 é introduzida na Fase 6. O firmware baseline `v0.5.0` permanece intacto e estável enquanto a evolução ocorre exclusivamente no backend e frontend.
 - **SUBFASES E ESCOPO:**
   - **Milestone 6A — Motor de Ranking Oficial:** Algoritmo de classificação baseado nos snapshots do `RoundHistoryEntry` com desempate por: `ApprovalMode` (Unanimidade > Maioria) ➔ Total de Votos ➔ Ordem cronológica.
   - **Milestone 6B — Telão Cênico de Premiação e Pódio:** Visualização de encerramento no `/stage` com revelação do Top 3 / Top 5 das startups apoiadas pela banca com iluminação dourada e efeitos cênicos.
@@ -766,8 +767,8 @@ NOVA LINHA EVOLUTIVA OFICIAL (ROADMAP V2)
 - **OBJETIVO:** Fornecer à mesa técnica ferramentas de diagnóstico de frota ESP32 em tempo real, comandos de bypass manual imediato em caso de pane física, runbooks de pré-show e validação de caos holístico no ecossistema completo.
 - **PRÉ-REQUISITOS:** Fases 4, 5 e 6 homologadas.
 - **SUBFASES E ESCOPO:**
-  - **Milestone 7A — Cockpit de Contingência (Bypass Manual):** Ação no cockpit "Forçar Voto Manual da Cadeira N" para uso exclusivo em caso de quebra mecânica de botão ou bateria fraca durante o pitch ao vivo.
-  - **Milestone 7B — Telemetria da Frota de ESP32:** Monitor de liveness em background medindo ping e status de conexão Wi-Fi das 5 cadeiras físicas antes do início de cada apresentação.
+  - **Milestone 7A — Cockpit de Contingência (Bypass Manual):** Ação no cockpit "Forçar Voto Manual da Cadeira N" no `/operator` para uso exclusivo da mesa técnica em caso de quebra mecânica de botão ou bateria fraca durante o pitch ao vivo. Responsável: Frontend Operator Cockpit.
+  - **Milestone 7B — Telemetria da Frota de ESP32:** Ativação da flag `#define ENABLE_TELEMETRY 1` no firmware baseline v0.5.0, envio periódico de heartbeat em background com RSSI, uptime e tensão, e tela de radar de liveness das 5 cadeiras no cockpit. Responsável: ESP32 + Backend + Operator Cockpit.
   - **Milestone 7C — Runbook de Produção e Checklist Pré-Show:** Manual operacional minuto a minuto para alinhamento entre mesa técnica, mestre de cerimônias e direção de palco.
   - **Milestone 7D — Chaos Engineering & Resiliência Holística de Campo (Reabsorvido do 4E):**
     - *Conceito:* **Chaos Engineering será executado dentro da Phase 7 em conjunto com testes de hardware ESP32, rede local, SignalR, telão, áudio e contingências operacionais reais.**
@@ -838,6 +839,9 @@ A cada fase entregue:
 3. **[ADR-011 a ADR-015: Governança, Ciclo do Pitch, Lockout, Histórico e Banca](decision-records/):** Fundações homologadas da Fase 3.
 4. **[ADR-016: Estratégia de Persistência Offline-First com PostgreSQL Portable](decision-records/ADR-016-offline-first-persistence-strategy.md):** Decisão formal de armazenamento local transacional in-process.
 5. **[ADR-017: Priorização de Confiabilidade sobre Telas Prematuras](decision-records/ADR-017-platform-reliability-over-feature-expansion.md):** Decisão formal do Roadmap V2 priorizando robustez e palco sobre scorecards móveis.
+6. **[ADR-026: R3F Stack & Immersive Stage](decision-records/ADR-026-react-three-fiber-and-immersive-stage.md):** Renderização 3D cinemática com React Three Fiber.
+7. **[ADR-027: Áudio Procedural em Runtime & Sincronização Audiovisual](decision-records/ADR-027-procedural-audio-and-audiovisual-synchronization.md):** Síntese Web Audio procedural nativa (< 50ms) sem assets externos.
+8. **[ADR-028: Firmware Architecture & Hardware Integration Strategy](decision-records/ADR-028-firmware-architecture-hardware-integration.md):** Baseline oficial v0.5.0, resolução mDNS com fallback de contingência e isolamento offline-first.
 
 ---
 

@@ -255,9 +255,9 @@ Consulte o **[Índice Mestre da Documentação (`docs/README.md`)](docs/README.m
 
 | Área Temática | Documentos Principais |
 | :--- | :--- |
-| **Arquitetura & Decisões** | [Arquitetura Geral (`docs/architecture.md`)](docs/architecture.md) • [Catálogo de ADRs — ADR-001 a ADR-019 (`docs/decision-records/`)](docs/decision-records/) |
+| **Arquitetura & Decisões** | [Arquitetura Geral (`docs/architecture.md`)](docs/architecture.md) • [Catálogo de ADRs — ADR-001 a ADR-028 (`docs/decision-records/`)](docs/decision-records/) |
 | **Produto & Visão** | [Roadmap e Planejamento Progressivo (`docs/roadmap.md`)](docs/roadmap.md) |
-| **Infraestrutura & Campo** | [Guia de Hardware ESP32 (`docs/hardware.md`)](docs/hardware.md) • [Guia de Rede e Hotspot (`docs/network.md`)](docs/network.md) |
+| **Infraestrutura & Campo** | [Guia de Hardware ESP32 & Baseline v0.5.0 (`docs/hardware.md`)](docs/hardware.md) • [Guia de Rede e mDNS (`docs/network.md`)](docs/network.md) |
 | **Histórico Operacional** | [Tabela Mestra de Marcos (`docs/archives/milestone-history.md`)](docs/archives/milestone-history.md) • [Diário Técnico (`docs/archives/implementation-history.md`)](docs/archives/implementation-history.md) |
 | **Retrospectivas** | [Fase 1](docs/archives/retrospectives/phase1-retrospective.md) • [Fase 2](docs/archives/retrospectives/phase2-retrospective.md) • [Fase 3](docs/archives/retrospectives/phase3-retrospective.md) |
 | **Auditorias & Histórico** | [Auditoria Marco 1 (`docs/archives/audits/software-foundation-audit.md`)](docs/archives/audits/software-foundation-audit.md) • [Rascunho Inicial](docs/archives/historical/roadmap-initial.md) |

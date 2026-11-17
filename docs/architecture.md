@@ -375,3 +375,53 @@ Na inicialização do backend em `RehydrateSessionState()`:
 3. **Preservação Temporal no Checkpoint:** O tempo restante é congelado exatamente no ponto registrado no último snapshot válido (`LastCheckpointAt`), garantindo que o cronômetro não continue correndo durante a indisponibilidade física do servidor.
 4. **Decisão Soberana do Operador:** O operador na mesa técnica decide entre **Retomar (`POST /api/pitch/timer/resume`)** ou **Reiniciar (`POST /api/pitch/reset`)**, conferindo total previsibilidade e governança à produção do evento.
 5. **Metadados de Diagnóstico:** Flags `RecoveredFromCrash`, `InterruptedStage`, `RecoveredAt` e `LastCheckpointAt` são expostas nos DTOs para auditoria.
+
+---
+
+## 7. Subsistema de Hardware & Firmware ESP32 (Baseline Oficial v0.5.0)
+
+Conforme estabelecido na decisão arquitetural [ADR-028: Firmware Architecture & Hardware Integration Strategy](decision-records/ADR-028-firmware-architecture-hardware-integration.md), o subsistema embarcado é formalmente homologado como um **sensor transdutor e ponte de eventos de baixa latência**, mantendo a autoridade integral do backend e a operação offline-first:
+
+```text
+                                  REDE LOCAL / WI-FI 2.4 GHz
+            [Botão Físico ESP32]                   [Simulador de Testes]
+            (GPIO 18 / Debounce)                   (scripts/simulate-esp32)
+                     │                                       │
+                     └───────────────────┬───────────────────┘
+                                         │ HTTP POST /api/chair-press (Fail-Fast < 1s)
+                                         ▼
+                     ┌──────────────────────────────────────────────┐
+                     │             BACKEND ARENA VOICE              │
+                     │     ASP.NET Core (.NET 10 Minimal API)       │
+                     │             Binds em 0.0.0.0:5000            │
+                     ├──────────────────────────────────────────────┤
+                     │ • Lockout Autoritativo (VotingOpen? / 409)   │
+                     │ • Audit Trail (audit_events com ms e IP)     │
+                     │ • Persistência ACID (turned_chairs int[])    │
+                     │ • Hub SignalR Realtime (/hubs/arena-poc)     │
+                     └──────────────┬───────────────────────────────┘
+                                    │
+           ┌────────────────────────┴────────────────────────┐
+           ▼ Broadcast Realtime (SignalR)                      ▼ Snapshot REST (/api/state)
+┌──────────────────────────────────────┐     ┌──────────────────────────────────────┐
+│      /stage — TELÃO PÚBLICO 3D       │     │    /operator — COCKPIT DA MESA       │
+│    (Experiência Cênica / Telão)      │     │     (Gestão e Operação da Sessão)    │
+├──────────────────────────────────────┤     ├──────────────────────────────────────┤
+│ • Web Audio Synth (< 50ms)           │     │ • Placar e Status das 5 Cadeiras     │
+│ • Rotação Procedural 3D com GSAP     │     │ • Stepper e Controles de Pitch       │
+│ • Glow Neon e Dock de Jurados        │     │ • Bypass Manual (Fase 7A)            │
+└──────────────────────────────────────┘     └──────────────────────────────────────┘
+```
+
+### 7.1. Separação Estrita de Responsabilidades
+- **O Firmware:** Apenas lê a transição do microswitch (GPIO 18 com pull-up interno e debounce de 50 ms), resolve o endereço do servidor via mDNS `arena-voice.local` (com fallback determinístico de IP) e despacha a requisição HTTP POST.
+- **O Backend:** Única fonte da verdade. Valida o estágio da máquina de estados do pitch e o estado do timer. Se a votação não estiver aberta ou o cronômetro estiver pausado, devolve `HTTP 409 Conflict`.
+- **A IHM Local (LED):** Reflete a semântica de negócio: `HTTP 200 OK` aciona o duplo pisca de confirmação visual ao jurado; `HTTP 409 Conflict` apaga o LED ao término do POST sem emitir a confirmação.
+
+### 7.2. Política de Filas e Resiliência (Fail-Fast Within Window)
+O Arena Voice proíbe formalmente buffers ou filas persistentes de votos no microcontrolador. O acionamento de cadeira é um evento cênico temporal instantâneo. Se houver falha transitória de rede, o firmware executa até 3 tentativas rápidas em uma janela máxima de **$1.000\text{ ms}$**. Se a falha persistir, o evento é descartado e o operador na mesa técnica utiliza o **Bypass Manual no Cockpit (Fase 7A)**.
+
+### 7.3. Roadmap do Firmware Alinhado à Plataforma
+- **Fase 5 (Live Show):** Baseline v0.5.0 estável com mDNS e IHM semântica.
+- **Fase 6 (Ranking & Ata):** Firmware congelado (sem alterações).
+- **Fase 7 (Hardening & Telemetria):** Ativação da flag `#define ENABLE_TELEMETRY 1` para o monitor de liveness de frota (Fase 7B), ensaio com runbook (Fase 7C) e testes de Chaos Engineering de hardware e rádio (Fase 7D).

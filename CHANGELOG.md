@@ -5,6 +5,27 @@ O formato baseia-se em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0
 
 ---
 
+## [0.5.0-baseline-hw] - 2026-11-17
+### Formalização da Baseline Arquitetural de Hardware, Firmware e Infraestrutura de Palco (ADR-028)
+
+#### Adicionado
+- **Decisão Arquitetural Formal (`ADR-028: Firmware Architecture & Hardware Integration Strategy`)**:
+  - Consolidação do papel do firmware como transdutor/ponte de eventos ultrarrápido sem regras de domínio de negócio;
+  - Reafirmação estrita do modelo **Backend Authoritative** (`ESP32 -> HTTP POST -> Backend -> PostgreSQL -> SignalR -> Stage -> Operator`) e da diretriz **Offline-First** (ADR-016);
+  - Rejeição formal de protocolos concorrentes desnecessários (MQTT, WebSockets/SignalR embarcado, dependências de nuvem pública como Firebase/Supabase para a banca);
+  - Estratégia oficial de descoberta de serviço em 3 níveis: Prioridade 1: mDNS `arena-voice.local` (UDP 5353); Prioridade 2: Hostname local; Prioridade 3: `BACKEND_FALLBACK_IP` como contingência determinística;
+  - Especificação dos 8 componentes obrigatórios do Firmware v0.5.0 (`DeviceIdentity`, `WiFiManager`, `mDNSResolver`, `FallbackResolver`, `ButtonController`, `DebounceEngine`, `HttpTransport`, `ResponseHandler`, `LedController`);
+  - Estrutura de `DeviceIdentity` com `chairId`, `deviceTag`, `firmwareVersion`, `hardwareRevision` e `macAddress`;
+  - Política de telemetria com stubs estruturados desde já, porém inativos (`#define ENABLE_TELEMETRY 0`), reservando a ativação para a Fase 7B;
+  - Política anti-buffer/fila persistente de votos de bancada (*Fail-Fast Within Window* $\le 1.000\text{ ms}$) para preservar a integridade cênica temporal;
+  - Diretriz de congelamento total do firmware durante a Fase 6 e alinhamento de escopo da Fase 7 (7A Cockpit Bypass, 7B Fleet Telemetry, 7C Runbook e 7D Chaos Engineering).
+- **Documentação de Hardware e Conectividade Revisitada**:
+  - `docs/hardware.md` reformulado com a baseline v0.5.0, pinagem arcade GPIO 18, IHM de 4 estados no LED e protocolo de lockout semântico.
+  - `docs/network.md` atualizado com a topologia de rede local fechada, resolução mDNS e amarrações recomendadas por MAC.
+  - `docs/architecture.md` expandido com a Seção 7 formalizando o Subsistema de Hardware & Firmware ESP32.
+
+---
+
 ## [0.4.3-phase4d] - 2026-11-16
 ### Conclusão Oficial do Milestone 4D e Encerramento da Fase 4: Automated Snapshots, Backup & Disaster Recovery
 
