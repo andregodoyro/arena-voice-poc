@@ -6,17 +6,28 @@ O formato baseia-se em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0
 ---
 
 ## [0.5.0-baseline-hw] - 2026-11-17
-### Formalização da Baseline Arquitetural de Hardware, Firmware e Infraestrutura de Palco (ADR-028)
+### Conclusão Oficial do Milestone FW-01: Implementação do Firmware Baseline v0.5.0
 
 #### Adicionado
+- **Arquitetura Modular de Firmware Embarcado (`firmware/`)**:
+  - `sketch.ino`: Ponto de entrada canônico não-bloqueante integrando todos os controladores;
+  - `config.h`: Parâmetros técnicos, pino arcade `GPIO 18`, LED `GPIO 2`, debounce 50ms, lockout local 1500ms e timeouts;
+  - `config_secrets.h.example`: Template seguro de segredos locais e IDs por cadeira;
+  - `DeviceIdentity.h`: Struct com `chairId`, `deviceTag`, `firmwareVersion`, `hardwareRevision` e leitura dinâmica do MAC físico;
+  - `LedController.h`: IHM visual temporizada via `millis()` (Searching, Solid ON, Double-Blink, Standby e Erro);
+  - `NetworkManager.h`: Cliente Wi-Fi com auto-reconexão, resolução mDNS `arena-voice.local` (UDP 5353) e fallback determinístico;
+  - `ButtonController.h`: Debounce não-bloqueante de 50ms e trava anti-repulsão de 1500ms;
+  - `HttpTransport.h`: Transporte REST atômico com política *Fail-Fast Within Window* ($\le 1.000\text{ ms}$) e decodificação semântica de `HTTP 200 OK` vs `HTTP 409 Conflict`;
+  - `Telemetry.h`: Estrutura dormente e stubs para a Fase 7B (`#define ENABLE_TELEMETRY 0`).
+- **Documentação de Engenharia de Hardware (`docs/hardware/`)**:
+  - `docs/hardware/fw-01-baseline.md`: Especificação técnica completa da baseline v0.5.0;
+  - `docs/hardware/fw-01-setup.md`: Guia de configuração do Arduino IDE, board package ESP32 e gravação USB;
+  - `docs/hardware/fw-01-test-plan.md`: Plano formal com 8 casos de teste (mDNS, Fallback, 200, 409, Reconexão, Debounce, Lockout, Carga).
 - **Decisão Arquitetural Formal (`ADR-028: Firmware Architecture & Hardware Integration Strategy`)**:
   - Consolidação do papel do firmware como transdutor/ponte de eventos ultrarrápido sem regras de domínio de negócio;
   - Reafirmação estrita do modelo **Backend Authoritative** (`ESP32 -> HTTP POST -> Backend -> PostgreSQL -> SignalR -> Stage -> Operator`) e da diretriz **Offline-First** (ADR-016);
   - Rejeição formal de protocolos concorrentes desnecessários (MQTT, WebSockets/SignalR embarcado, dependências de nuvem pública como Firebase/Supabase para a banca);
   - Estratégia oficial de descoberta de serviço em 3 níveis: Prioridade 1: mDNS `arena-voice.local` (UDP 5353); Prioridade 2: Hostname local; Prioridade 3: `BACKEND_FALLBACK_IP` como contingência determinística;
-  - Especificação dos 8 componentes obrigatórios do Firmware v0.5.0 (`DeviceIdentity`, `WiFiManager`, `mDNSResolver`, `FallbackResolver`, `ButtonController`, `DebounceEngine`, `HttpTransport`, `ResponseHandler`, `LedController`);
-  - Estrutura de `DeviceIdentity` com `chairId`, `deviceTag`, `firmwareVersion`, `hardwareRevision` e `macAddress`;
-  - Política de telemetria com stubs estruturados desde já, porém inativos (`#define ENABLE_TELEMETRY 0`), reservando a ativação para a Fase 7B;
   - Política anti-buffer/fila persistente de votos de bancada (*Fail-Fast Within Window* $\le 1.000\text{ ms}$) para preservar a integridade cênica temporal;
   - Diretriz de congelamento total do firmware durante a Fase 6 e alinhamento de escopo da Fase 7 (7A Cockpit Bypass, 7B Fleet Telemetry, 7C Runbook e 7D Chaos Engineering).
 - **Documentação de Hardware e Conectividade Revisitada**:
