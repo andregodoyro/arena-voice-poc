@@ -33,6 +33,7 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         {
             m.Property(x => x.LogoUrl).HasColumnName("logo_url").HasMaxLength(500).IsRequired();
             m.Property(x => x.CoverImageUrl).HasColumnName("cover_image_url").HasMaxLength(500).IsRequired();
+            m.Ignore(x => x.Items);
         });
 
         // Índices

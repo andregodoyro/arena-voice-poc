@@ -857,7 +857,8 @@ app.MapPost("/api/projects", (CreateProjectDto dto, IArenaProjectStore store) =>
         Media = new ProjectMedia
         {
             LogoUrl = dto.LogoUrl?.Trim() ?? string.Empty,
-            CoverImageUrl = dto.CoverImageUrl?.Trim() ?? string.Empty
+            CoverImageUrl = dto.CoverImageUrl?.Trim() ?? string.Empty,
+            Items = dto.MediaItems ?? new()
         }
     };
 
@@ -946,12 +947,19 @@ app.MapPut("/api/projects/{id}", async (string id, UpdateProjectDto dto, IArenaP
         project.OrderIndex = dto.OrderIndex.Value;
     }
 
-    if (dto.LogoUrl != null || dto.CoverImageUrl != null)
+    if (dto.LogoUrl != null || dto.CoverImageUrl != null || dto.MediaItems != null)
     {
+        // Regra: string vazia ("") preserva o valor existente no banco (não sobrescreve).
+        // Apenas uma URL preenchida com conteúdo efetivo atualiza o campo.
+        // Isso evita que "não editar o campo" (envio de "") apague uma URL previamente salva.
+        var newLogoUrl = string.IsNullOrWhiteSpace(dto.LogoUrl) ? project.Media.LogoUrl : dto.LogoUrl.Trim();
+        var newCoverImageUrl = string.IsNullOrWhiteSpace(dto.CoverImageUrl) ? project.Media.CoverImageUrl : dto.CoverImageUrl.Trim();
+
         project.Media = new ProjectMedia
         {
-            LogoUrl = dto.LogoUrl?.Trim() ?? project.Media.LogoUrl,
-            CoverImageUrl = dto.CoverImageUrl?.Trim() ?? project.Media.CoverImageUrl
+            LogoUrl = newLogoUrl,
+            CoverImageUrl = newCoverImageUrl,
+            Items = dto.MediaItems ?? project.Media.Items ?? new()
         };
     }
 
