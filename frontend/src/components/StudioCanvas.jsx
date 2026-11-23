@@ -18,7 +18,13 @@ import { StudioScene } from './StudioScene';
  * - Pipeline de postprocessing: EffectComposer + Bloom seletivo + ToneMapping ACES Filmic;
  * - Propagação autoritativa de pitchState para reatividade cênica sincronizada ao show.
  */
-export function StudioCanvas({ chairs = [], branding = {}, pitchState = null }) {
+export function StudioCanvas({
+  chairs = [],
+  branding = {},
+  pitchState = null,
+  currentProject = null,
+  currentEvent = null,
+}) {
   // Configuração dinâmica de enquadramento institucional
   const cameraConfig = useMemo(() => {
     let viewMode = 'frontal';
@@ -30,28 +36,28 @@ export function StudioCanvas({ chairs = [], branding = {}, pitchState = null }) 
     switch (viewMode) {
       case 'left':
         return {
-          position: [-8.8, 5.4, 14.5],
-          target: [0, 1.8, -1.8],
-          fov: 46,
+          position: [-9.5, 5.0, 15.0],
+          target: [0, 3.0, -3.2],
+          fov: 48,
         };
       case 'right':
         return {
-          position: [8.8, 5.4, 14.5],
-          target: [0, 1.8, -1.8],
-          fov: 46,
+          position: [9.5, 5.0, 15.0],
+          target: [0, 3.0, -3.2],
+          fov: 48,
         };
       case 'wide':
         return {
-          position: [-1.2, 9.2, 22.0],
-          target: [0, 2.2, -2.5],
-          fov: 49,
+          position: [0, 7.5, 22.0],
+          target: [0, 3.0, -3.2],
+          fov: 52,
         };
       case 'frontal':
       default:
         return {
-          position: [0, 5.2, 16.2],
-          target: [0, 1.8, -1.6],
-          fov: 47,
+          position: [0, 4.6, 17.5],
+          target: [0, 3.2, -3.2],
+          fov: 48,
         };
     }
   }, []);
@@ -113,7 +119,13 @@ export function StudioCanvas({ chairs = [], branding = {}, pitchState = null }) 
 
         {/* ── Cena Principal dentro de Suspense ───────────────────────────── */}
         <Suspense fallback={null}>
-          <StudioScene chairs={chairs} branding={branding} pitchState={pitchState} />
+          <StudioScene
+            chairs={chairs}
+            branding={branding}
+            pitchState={pitchState}
+            currentProject={currentProject}
+            currentEvent={currentEvent}
+          />
 
           {/* Sombra de contato suave no piso nobre da arena */}
           <ContactShadows

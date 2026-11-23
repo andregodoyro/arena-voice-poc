@@ -59,11 +59,13 @@ export function StagePage({
 
   return (
     <main style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
-      {/* 3D Canvas Layer — Projeção Cênica Reativa com Branding e PitchState (Milestones 2D.4 & 5B) */}
+      {/* 3D Canvas Layer — Projeção Cênica Reativa com Branding, Projeto Ativo e PitchState */}
       <StudioCanvas
         chairs={chairs}
         branding={currentEvent?.branding}
         pitchState={pitchState}
+        currentProject={currentProject}
+        currentEvent={currentEvent}
       />
 
       {/* 2D HUD Cênico — Projeta Evento, Projeto Atual, Estágio do Pitch, Placar e Banca de Jurados */}

@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import { Chair } from './Chair';
+import { HeroShowcaseWall } from './stage/HeroShowcaseWall';
 import gsap from 'gsap';
 import * as THREE from 'three';
 
@@ -435,21 +436,37 @@ function AcousticCanopy({ secondaryColor = '#ffd8a8' }) {
  * - Banho de luz rasante vertical (linear grazing) que valoriza a textura da madeira.
  */
 function AcousticTimberWalls() {
-  const slatCount = 68;
-  const startAngle = Math.PI * 0.58;
-  const endAngle = Math.PI * 1.42;
   const radius = 23.0;
 
+  // Ripas acústicas nas alas laterais (Left Wing e Right Wing) emoldurando o telão panorâmico
   const slats = useMemo(() => {
     const list = [];
-    for (let i = 0; i < slatCount; i++) {
-      const t = i / (slatCount - 1);
-      const angle = startAngle + t * (endAngle - startAngle);
+    const slatsPerWing = 22;
+
+    // Ala Esquerda: da lateral externa até o início do telão
+    const leftStart = Math.PI * 0.58;
+    const leftEnd = Math.PI * 0.74;
+    for (let i = 0; i < slatsPerWing; i++) {
+      const t = i / (slatsPerWing - 1);
+      const angle = leftStart + t * (leftEnd - leftStart);
       const x = Math.sin(angle) * radius;
       const z = Math.cos(angle) * radius - 3.2;
       const rotY = angle + Math.PI;
-      list.push({ id: i, pos: [x, 7.0, z], rotY });
+      list.push({ id: `left-${i}`, pos: [x, 7.0, z], rotY });
     }
+
+    // Ala Direita: do fim do telão até a lateral externa
+    const rightStart = Math.PI * 1.26;
+    const rightEnd = Math.PI * 1.42;
+    for (let i = 0; i < slatsPerWing; i++) {
+      const t = i / (slatsPerWing - 1);
+      const angle = rightStart + t * (rightEnd - rightStart);
+      const x = Math.sin(angle) * radius;
+      const z = Math.cos(angle) * radius - 3.2;
+      const rotY = angle + Math.PI;
+      list.push({ id: `right-${i}`, pos: [x, 7.0, z], rotY });
+    }
+
     return list;
   }, []);
 
@@ -468,7 +485,7 @@ function AcousticTimberWalls() {
         />
       </mesh>
 
-      {/* Ripas verticais de madeira nobre espaçadas com precisão arquitetural */}
+      {/* Ripas verticais de madeira nobre nas alas laterais de emolduramento */}
       {slats.map((slat) => (
         <mesh
           key={`slat-${slat.id}`}
@@ -485,59 +502,28 @@ function AcousticTimberWalls() {
         </mesh>
       ))}
 
-      {/* Iluminação rasante (grazing lights) nas ripas de madeira da parede */}
-      <pointLight position={[-16, 6.0, -12]} intensity={2.2} color="#ffd4a8" distance={20} />
-      <pointLight position={[0, 6.0, -18]} intensity={2.4} color="#ffd4a8" distance={20} />
-      <pointLight position={[16, 6.0, -12]} intensity={2.2} color="#ffd4a8" distance={20} />
-    </group>
-  );
-}
+      {/* Escadas e portais arquiteturais laterais iluminados (Conceito Visual Callout 03) */}
+      <group position={[-18.5, 3.5, -16.5]} rotation={[0, 0.65, 0]}>
+        {[0, 1, 2, 3].map((stepIdx) => (
+          <mesh key={`step-l-${stepIdx}`} position={[stepIdx * 0.45, stepIdx * 0.5, 0]}>
+            <boxGeometry args={[1.6, 0.45, 3.2]} />
+            <meshStandardMaterial color="#261c14" roughness={0.4} metalness={0.2} />
+          </mesh>
+        ))}
+      </group>
+      <group position={[18.5, 3.5, -16.5]} rotation={[0, -0.65, 0]}>
+        {[0, 1, 2, 3].map((stepIdx) => (
+          <mesh key={`step-r-${stepIdx}`} position={[-stepIdx * 0.45, stepIdx * 0.5, 0]}>
+            <boxGeometry args={[1.6, 0.45, 3.2]} />
+            <meshStandardMaterial color="#261c14" roughness={0.4} metalness={0.2} />
+          </mesh>
+        ))}
+      </group>
 
-/**
- * HeroWallNiche — Preparação Arquitetural para o Telão Monumental (Phase 5C.2).
- * 
- * Phase 5C.1:
- * - Reserva e delimita formalmente o nicho do telão monumental na parede esquerda;
- * - Proporção de cinema 16:9 widescreen (13.5m x 7.6m);
- * - Moldura embutida em madeira nobre escura e chanfro em bronze escovado;
- * - Retroiluminação perimetral difusa embutida na alvenaria;
- * - Painel em standby texturizado aguardando a chegada da mídia ativa na 5C.2.
- */
-function HeroWallNiche() {
-  return (
-    <group position={[-13.2, 6.8, -6.8]} rotation={[0, 0.54, 0]}>
-      {/* Moldura de alvenaria e madeira da caixa de projeção (Shadow Box) */}
-      <mesh position={[0, 0, -0.32]}>
-        <boxGeometry args={[14.2, 8.2, 0.6]} />
-        <meshStandardMaterial color="#1a1410" roughness={0.4} metalness={0.3} />
-      </mesh>
-
-      {/* Bezel chanfrado arquitetural em bronze escovado */}
-      <mesh position={[0, 0, -0.01]}>
-        <boxGeometry args={[13.7, 7.8, 0.12]} />
-        <meshStandardMaterial color="#2d2219" roughness={0.3} metalness={0.7} />
-      </mesh>
-
-      {/* Fita de luz perimetral embutida no nicho do telão (Cove Backlight) */}
-      <mesh position={[0, 0, 0.02]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[4.2, 4.3, 32]} />
-      </mesh>
-
-      {/* Superfície do telão em standby (Pronta para a Phase 5C.2) */}
-      <mesh position={[0, 0, 0.06]}>
-        <planeGeometry args={[13.4, 7.5]} />
-        <meshStandardMaterial
-          color="#0c0e14"
-          roughness={0.2}
-          metalness={0.65}
-        />
-      </mesh>
-
-      {/* Friso luminoso sutil de demarcação do Hero Wall */}
-      <mesh position={[0, -3.76, 0.07]}>
-        <planeGeometry args={[13.4, 0.04]} />
-        <meshBasicMaterial color="#ffe0b2" transparent opacity={0.45} />
-      </mesh>
+      {/* Iluminação rasante (grazing lights) nas ripas de madeira e escadas laterais */}
+      <pointLight position={[-18, 6.0, -14]} intensity={2.4} color="#ffd4a8" distance={22} />
+      <pointLight position={[18, 6.0, -14]} intensity={2.4} color="#ffd4a8" distance={22} />
+      <pointLight position={[0, 7.5, -23]} intensity={1.8} color="#ffe2c4" distance={20} />
     </group>
   );
 }
@@ -654,7 +640,13 @@ function AmphitheaterSeating({ secondaryColor = '#ffd8a8' }) {
  * - As 5 cadeiras da banca preservadas em semicírculo com materiais PBR nobres;
  * - Preservação estrita dos gatilhos de áudio cênico e SignalR (ADR-027 / ADR-028).
  */
-export function StudioScene({ chairs = [], branding = {}, pitchState = null }) {
+export function StudioScene({
+  chairs = [],
+  branding = {},
+  pitchState = null,
+  currentProject = null,
+  currentEvent = null,
+}) {
   const ambientLightRef = useRef();
 
   const primaryColor = branding?.primaryColor || '#ef233c';
@@ -738,7 +730,12 @@ export function StudioScene({ chairs = [], branding = {}, pitchState = null }) {
       />
       <AcousticCanopy secondaryColor={secondaryColor} />
       <AcousticTimberWalls />
-      <HeroWallNiche />
+      <HeroShowcaseWall
+        currentProject={currentProject}
+        currentEvent={currentEvent}
+        pitchState={pitchState}
+        branding={branding}
+      />
       <AmphitheaterSeating secondaryColor={secondaryColor} />
 
       {/* ── As 5 Cadeiras da Banca de Avaliação ─────────────────────────────── */}
