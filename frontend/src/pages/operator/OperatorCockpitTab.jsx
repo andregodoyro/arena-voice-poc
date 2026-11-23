@@ -4,6 +4,7 @@ import { ScoreBoard } from '../../components/operator/ScoreBoard';
 import { ChairGrid } from '../../components/operator/ChairGrid';
 import { ActivityLog } from '../../components/operator/ActivityLog';
 import { PitchLifecycleControl } from '../../components/operator/PitchLifecycleControl';
+import { OperatorMediaControl } from '../../components/operator/OperatorMediaControl';
 import { useOperatorContext } from '../../contexts/OperatorContext';
 
 /**
@@ -41,6 +42,9 @@ export function OperatorCockpitTab({ chairs: propsChairs, events: propsEvents, o
       <section className="lg:col-span-2 space-y-6">
         {/* Controle do Pitch Lifecycle (Milestone 3B) */}
         <PitchLifecycleControl />
+
+        {/* Controles de Mídia do Telão (Milestone 5C.4) */}
+        <OperatorMediaControl />
 
         {/* Placar Consolidado */}
         <ScoreBoard chairs={chairs} />
