@@ -3,8 +3,9 @@
  * 
  * Regra de negócio do Arena Voice:
  * 1. Valores vazios ou nulos são válidos (campos opcionais).
- * 2. Caminhos relativos internos (/samples/*, /branding/*, etc.) são válidos.
- * 3. URLs absolutas externas com protocolo HTTP ou HTTPS são válidas.
+ * 2. Caminhos relativos internos (/samples/*, /branding/*, /uploads/*, etc.) são válidos.
+ * 3. Data URLs (data:image/...) são válidas (suporte a uploads locais offline).
+ * 4. URLs absolutas externas com protocolo HTTP ou HTTPS são válidas.
  */
 
 /**
@@ -17,6 +18,11 @@ export function isValidMediaUrl(val) {
     return true;
   }
   const trimmed = val.trim();
+
+  // Data URLs para previews e uploads em base64
+  if (trimmed.startsWith('data:image/')) {
+    return true;
+  }
 
   // Caminhos relativos internos iniciados com barra ou ponto
   if (trimmed.startsWith('/') || trimmed.startsWith('./') || trimmed.startsWith('../')) {

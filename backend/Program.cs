@@ -118,6 +118,20 @@ DatabaseStartupValidator.ValidateAndMigrate(app.Services, logger);
 
 app.UseCors();
 
+// Servir arquivos estáticos para uploads
+var uploadsDir = Path.Combine(app.Environment.ContentRootPath, "uploads");
+if (!Directory.Exists(uploadsDir)) Directory.CreateDirectory(uploadsDir);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsDir),
+    RequestPath = "/uploads",
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
+        ctx.Context.Response.Headers.Append("Cache-Control", "public, max-age=86400");
+    }
+});
+
 // =========================================================================
 // 1. ENDPOINTS PRINCIPAIS DE CADEIRA: LOCKOUT AUTORITATIVO & HARDWARE BRIDGE
 // Compatível com { "chairId": 1 } e também { "seatNumber": 1 }
@@ -850,6 +864,47 @@ app.MapPost("/api/projects", (CreateProjectDto dto, IArenaProjectStore store) =>
     var created = store.AddProject(project);
     return Results.Created($"/api/projects/{created.Id}", created);
 });
+
+// POST /api/upload — Upload de ativos visuais do projeto (Milestone 5C.2B)
+app.MapPost("/api/upload", async (IFormFile? file, IWebHostEnvironment env) =>
+{
+    if (file == null || file.Length == 0)
+    {
+        return Results.BadRequest(new { error = "Nenhum arquivo enviado." });
+    }
+
+    var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp", ".svg" };
+    var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+    if (!allowedExtensions.Contains(ext))
+    {
+        return Results.BadRequest(new { error = $"Formato '{ext}' não suportado. Formatos aceitos: JPG, JPEG, PNG, WEBP, SVG." });
+    }
+
+    if (file.Length > 20 * 1024 * 1024)
+    {
+        return Results.BadRequest(new { error = "O arquivo excede o limite máximo permitido de 20MB." });
+    }
+
+    var safeFileName = $"{Guid.NewGuid():N}{ext}";
+    var targetDir = Path.Combine(env.ContentRootPath, "uploads");
+    if (!Directory.Exists(targetDir)) Directory.CreateDirectory(targetDir);
+    var targetPath = Path.Combine(targetDir, safeFileName);
+
+    using (var stream = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.Read))
+    {
+        await file.CopyToAsync(stream);
+        await stream.FlushAsync();
+    }
+
+    return Results.Ok(new
+    {
+        url = $"/uploads/{safeFileName}",
+        fileName = file.FileName,
+        safeFileName,
+        size = file.Length,
+        contentType = file.ContentType
+    });
+}).DisableAntiforgery();
 
 // PUT /api/projects/{id} — Atualiza dados de um projeto existente
 app.MapPut("/api/projects/{id}", async (string id, UpdateProjectDto dto, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>

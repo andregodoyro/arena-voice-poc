@@ -41,3 +41,8 @@ Thumbs.db
 # === Backups & Dumps ===
 backups/*.pgdump
 !backups/.gitkeep
+
+# === Uploads ===
+backend/uploads/*
+!backend/uploads/.gitkeep
+frontend/public/uploads/
