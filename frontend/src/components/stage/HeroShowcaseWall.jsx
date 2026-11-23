@@ -8,11 +8,12 @@ import { createFallbackTexture } from '../../utils/canvasTextureFallback';
 
 /**
  * ScreenVideo — Subcomponente que renderiza a textura de vídeo via useVideoTexture do Drei.
+ * Suporta áudio sincronizado com o vídeo, controle de volume, scrubbing/timeline e transporte ao vivo.
  * Integração bidirecional com o Cockpit do Operador via BroadcastChannel ('arena_media_controls').
  */
 function ScreenVideo({ url }) {
   const texture = useVideoTexture(url, {
-    muted: true,
+    muted: false,
     loop: true,
     start: true,
     crossOrigin: 'Anonymous',
@@ -23,46 +24,111 @@ function ScreenVideo({ url }) {
     const video = texture?.image;
     if (!video) return;
 
+    // Resgatar volume persistido da sessão ou adotar 70% como padrão de show ao vivo
+    const savedVolStr = localStorage.getItem('arena_media_volume');
+    const initialVolume = savedVolStr !== null ? parseFloat(savedVolStr) : 0.7;
+    video.volume = Math.max(0, Math.min(1, initialVolume));
+    video.muted = initialVolume === 0;
+
     let channel;
     try {
       channel = new BroadcastChannel('arena_media_controls');
+
+      const notify = (extra = {}) => {
+        channel.postMessage({
+          type: 'MEDIA_STATUS',
+          isPlaying: !video.paused,
+          currentTime: video.currentTime || 0,
+          duration: video.duration || 0,
+          volume: video.muted ? 0 : video.volume,
+          isMuted: Boolean(video.muted),
+          isEnded: Boolean(video.ended),
+          mediaType: 'video',
+          ...extra,
+        });
+      };
+
+      // Tentar autoplay com som; se o navegador bloquear pela política de autoplay,
+      // continuar tocando mutado e sinalizar o Cockpit para desbloqueio com um clique.
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('[ScreenVideo] Autoplay com áudio bloqueado pelo navegador. Iniciando mutado:', err);
+          video.muted = true;
+          video.play().catch(() => {});
+          notify({ isAudioBlocked: true });
+        });
+      }
 
       const handleMessage = (e) => {
         const data = e.data;
         if (!data || !data.action) return;
 
-        if (data.action === 'PLAY') {
-          video.play().catch(() => {});
-        } else if (data.action === 'PAUSE') {
-          video.pause();
-        } else if (data.action === 'RESTART') {
-          video.currentTime = 0;
-          video.play().catch(() => {});
+        switch (data.action) {
+          case 'PLAY':
+            video.play().catch(() => {});
+            break;
+          case 'PAUSE':
+            video.pause();
+            break;
+          case 'RESTART':
+            video.currentTime = 0;
+            video.play().catch(() => {});
+            break;
+          case 'SEEK':
+            if (typeof data.time === 'number' && !isNaN(data.time)) {
+              const safeTime = Math.max(0, Math.min(video.duration || 0, data.time));
+              video.currentTime = safeTime;
+              notify();
+            }
+            break;
+          case 'VOLUME':
+            if (typeof data.volume === 'number' && !isNaN(data.volume)) {
+              const vol = Math.max(0, Math.min(1, data.volume));
+              video.volume = vol;
+              video.muted = vol === 0;
+              localStorage.setItem('arena_media_volume', String(vol));
+              notify();
+            }
+            break;
+          case 'UNMUTE':
+            video.muted = false;
+            if (video.volume === 0) {
+              video.volume = 0.7;
+            }
+            localStorage.setItem('arena_media_volume', String(video.volume));
+            notify({ isAudioBlocked: false });
+            break;
+          case 'REQUEST_STATUS':
+            notify();
+            break;
+          default:
+            break;
         }
       };
 
       channel.addEventListener('message', handleMessage);
 
-      const notify = () => {
-        channel.postMessage({
-          type: 'MEDIA_STATUS',
-          isPlaying: !video.paused,
-          currentTime: video.currentTime,
-          duration: video.duration || 0,
-          mediaType: 'video',
-        });
-      };
-
       video.addEventListener('play', notify);
       video.addEventListener('pause', notify);
       video.addEventListener('timeupdate', notify);
+      video.addEventListener('volumechange', notify);
+      video.addEventListener('ended', notify);
+      video.addEventListener('loadedmetadata', notify);
 
       notify();
 
       return () => {
+        video.pause();
+        video.currentTime = 0;
+        video.muted = true;
+        video.volume = 0;
         video.removeEventListener('play', notify);
         video.removeEventListener('pause', notify);
         video.removeEventListener('timeupdate', notify);
+        video.removeEventListener('volumechange', notify);
+        video.removeEventListener('ended', notify);
+        video.removeEventListener('loadedmetadata', notify);
         channel.removeEventListener('message', handleMessage);
         channel.close();
       };
