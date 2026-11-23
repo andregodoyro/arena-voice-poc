@@ -10,7 +10,12 @@ public record ProjectMediaItem
 
 public record ProjectMedia
 {
-    public string LogoUrl { get; init; } = string.Empty;
+    public string LogoUrl       { get; init; } = string.Empty;
     public string CoverImageUrl { get; init; } = string.Empty;
+    /// <summary>
+    /// URL do vídeo promocional do projeto (mp4 / webm).
+    /// Exibido no Hero LED Wall durante o estado PitchRunning (Phase 5C.4).
+    /// </summary>
+    public string VideoUrl      { get; init; } = string.Empty;
     public List<ProjectMediaItem> Items { get; init; } = new();
 }

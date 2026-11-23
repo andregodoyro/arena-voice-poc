@@ -27,6 +27,8 @@ builder.WebHost.ConfigureKestrel(options =>
 {
     var bindAddress = hostEnv == "127.0.0.1" || hostEnv == "localhost" ? IPAddress.Loopback : IPAddress.Any;
     options.Listen(bindAddress, port);
+    // Aumentar limite de request body para suportar upload de vídeos de até 100 MB (Phase 5C.4)
+    options.Limits.MaxRequestBodySize = 105 * 1024 * 1024; // 105 MB com margem de overhead
 });
 
 // Configuração CORS permissiva para desenvolvimento local
@@ -866,7 +868,7 @@ app.MapPost("/api/projects", (CreateProjectDto dto, IArenaProjectStore store) =>
     return Results.Created($"/api/projects/{created.Id}", created);
 });
 
-// POST /api/upload — Upload de ativos visuais do projeto (Milestone 5C.2B)
+// POST /api/upload — Upload de ativos visuais e de vídeo do projeto (Phase 5C.2B / 5C.4)
 app.MapPost("/api/upload", async (IFormFile? file, IWebHostEnvironment env) =>
 {
     if (file == null || file.Length == 0)
@@ -874,16 +876,24 @@ app.MapPost("/api/upload", async (IFormFile? file, IWebHostEnvironment env) =>
         return Results.BadRequest(new { error = "Nenhum arquivo enviado." });
     }
 
-    var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp", ".svg" };
+    // Imagens: até 20 MB | Vídeos: até 100 MB
+    var allowedImages = new[] { ".jpg", ".jpeg", ".png", ".webp", ".svg" };
+    var allowedVideos = new[] { ".mp4", ".webm" };
+    var allowedExtensions = allowedImages.Concat(allowedVideos).ToArray();
+
     var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
     if (!allowedExtensions.Contains(ext))
     {
-        return Results.BadRequest(new { error = $"Formato '{ext}' não suportado. Formatos aceitos: JPG, JPEG, PNG, WEBP, SVG." });
+        return Results.BadRequest(new { error = $"Formato '{ext}' não suportado. Formatos aceitos: JPG, JPEG, PNG, WEBP, SVG, MP4, WEBM." });
     }
 
-    if (file.Length > 20 * 1024 * 1024)
+    bool isVideo = allowedVideos.Contains(ext);
+    long maxBytes = isVideo ? 100L * 1024 * 1024 : 20L * 1024 * 1024;
+    string limitLabel = isVideo ? "100MB" : "20MB";
+
+    if (file.Length > maxBytes)
     {
-        return Results.BadRequest(new { error = "O arquivo excede o limite máximo permitido de 20MB." });
+        return Results.BadRequest(new { error = $"O arquivo excede o limite de {limitLabel} para {(isVideo ? "vídeos" : "imagens")}." });
     }
 
     var safeFileName = $"{Guid.NewGuid():N}{ext}";
@@ -947,19 +957,21 @@ app.MapPut("/api/projects/{id}", async (string id, UpdateProjectDto dto, IArenaP
         project.OrderIndex = dto.OrderIndex.Value;
     }
 
-    if (dto.LogoUrl != null || dto.CoverImageUrl != null || dto.MediaItems != null)
+    if (dto.LogoUrl != null || dto.CoverImageUrl != null || dto.VideoUrl != null || dto.MediaItems != null)
     {
         // Regra: string vazia ("") preserva o valor existente no banco (não sobrescreve).
         // Apenas uma URL preenchida com conteúdo efetivo atualiza o campo.
         // Isso evita que "não editar o campo" (envio de "") apague uma URL previamente salva.
-        var newLogoUrl = string.IsNullOrWhiteSpace(dto.LogoUrl) ? project.Media.LogoUrl : dto.LogoUrl.Trim();
+        var newLogoUrl       = string.IsNullOrWhiteSpace(dto.LogoUrl)       ? project.Media.LogoUrl       : dto.LogoUrl.Trim();
         var newCoverImageUrl = string.IsNullOrWhiteSpace(dto.CoverImageUrl) ? project.Media.CoverImageUrl : dto.CoverImageUrl.Trim();
+        var newVideoUrl      = string.IsNullOrWhiteSpace(dto.VideoUrl)      ? project.Media.VideoUrl      : dto.VideoUrl.Trim();
 
         project.Media = new ProjectMedia
         {
-            LogoUrl = newLogoUrl,
+            LogoUrl       = newLogoUrl,
             CoverImageUrl = newCoverImageUrl,
-            Items = dto.MediaItems ?? project.Media.Items ?? new()
+            VideoUrl      = newVideoUrl,
+            Items         = dto.MediaItems ?? project.Media.Items ?? new()
         };
     }
 
