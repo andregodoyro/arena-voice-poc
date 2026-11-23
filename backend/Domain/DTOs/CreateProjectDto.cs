@@ -11,5 +11,6 @@ public record CreateProjectDto
     public int? OrderIndex { get; init; }
     public string? LogoUrl { get; init; }
     public string? CoverImageUrl { get; init; }
+    public string? VideoUrl { get; init; }
     public List<ProjectMediaItem>? MediaItems { get; init; }
 }

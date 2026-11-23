@@ -593,6 +593,16 @@ namespace ArenaVoicePocBackend.Persistence.Migrations
                             b1.Property<string>("EventId")
                                 .HasColumnType("character varying(64)");
 
+                            b1.Property<string>("VideoUrl")
+                                .HasMaxLength(500)
+                                .HasColumnType("character varying(500)")
+                                .HasColumnName("video_url");
+
+                            b1.Property<string>("Items")
+                                .IsRequired()
+                                .HasColumnType("jsonb")
+                                .HasColumnName("media_items");
+
                             b1.Property<string>("LogoUrl")
                                 .IsRequired()
                                 .HasMaxLength(500)
@@ -696,6 +706,16 @@ namespace ArenaVoicePocBackend.Persistence.Migrations
                                 .HasMaxLength(500)
                                 .HasColumnType("character varying(500)")
                                 .HasColumnName("cover_image_url");
+
+                            b1.Property<string>("VideoUrl")
+                                .HasMaxLength(500)
+                                .HasColumnType("character varying(500)")
+                                .HasColumnName("video_url");
+
+                            b1.Property<string>("Items")
+                                .IsRequired()
+                                .HasColumnType("jsonb")
+                                .HasColumnName("media_items");
 
                             b1.Property<string>("LogoUrl")
                                 .IsRequired()

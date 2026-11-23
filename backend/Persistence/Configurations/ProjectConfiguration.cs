@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ArenaVoicePocBackend.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -28,12 +29,31 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.Property(p => p.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(p => p.UpdatedAt).HasColumnName("updated_at").IsRequired();
 
-        // Owned Type: ProjectMedia
+        // Owned Type: ProjectMedia (Milestone 5C — Persistência Completa de Mídia)
         builder.OwnsOne(p => p.Media, m =>
         {
-            m.Property(x => x.LogoUrl).HasColumnName("logo_url").HasMaxLength(500).IsRequired();
-            m.Property(x => x.CoverImageUrl).HasColumnName("cover_image_url").HasMaxLength(500).IsRequired();
-            m.Ignore(x => x.Items);
+            m.Property(x => x.LogoUrl)
+             .HasColumnName("logo_url")
+             .HasMaxLength(500)
+             .IsRequired();
+
+            m.Property(x => x.CoverImageUrl)
+             .HasColumnName("cover_image_url")
+             .HasMaxLength(500)
+             .IsRequired();
+
+            m.Property(x => x.VideoUrl)
+             .HasColumnName("video_url")
+             .HasMaxLength(500)
+             .IsRequired(false);
+
+            m.Property(x => x.Items)
+             .HasColumnName("media_items")
+             .HasColumnType("jsonb")
+             .HasConversion(
+                 v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                 v => JsonSerializer.Deserialize<List<ProjectMediaItem>>(v, (JsonSerializerOptions?)null) ?? new List<ProjectMediaItem>()
+             );
         });
 
         // Índices

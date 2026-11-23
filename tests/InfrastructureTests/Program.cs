@@ -1,4 +1,4 @@
-using System.Threading.Channels;
+﻿using System.Threading.Channels;
 using ArenaVoicePocBackend.Domain;
 using ArenaVoicePocBackend.Domain.Entities;
 using ArenaVoicePocBackend.Domain.Enums;
@@ -30,6 +30,7 @@ public class Program
         TestAuditEventPublisherBackPressureHandling();
         await TestAuditEventWriterBatchingAndDrainingAsync();
         await TestEfCoreAuditEventsPersistenceAsync();
+        await TestProjectMediaPersistenceAsync();
 
         Console.WriteLine("================================================================================");
         Console.WriteLine($"TOTAL DE ASSERÇÕES: {_passed + _failed} | APROVADAS: {_passed} | FALHAS: {_failed}");
@@ -244,6 +245,128 @@ public class Program
         await writer.StopAsync(CancellationToken.None);
 
         Assert(channel.Reader.Count == 0, "AuditEventWriter consumiu e drenou todos os eventos do canal");
+    }
+
+    private static async Task TestProjectMediaPersistenceAsync()
+    {
+        Console.WriteLine("\n[10] Testando Persistência Completa de ProjectMedia (Milestone 5C)...");
+        var connectionString = "Host=localhost;Port=5432;Database=arena_voice;Username=postgres;Password=postgres;";
+
+        var options = new DbContextOptionsBuilder<ArenaDbContext>()
+            .UseNpgsql(connectionString)
+            .Options;
+
+        try
+        {
+            await using var db = new ArenaDbContext(options);
+            if (!await db.Database.CanConnectAsync())
+            {
+                Console.WriteLine("  ⚠️ PostgreSQL não acessível no teste 10. Ignorando persistência direta.");
+                return;
+            }
+
+            // 1. Criar projeto com LogoUrl, CoverImageUrl, VideoUrl e MediaItems (JSONB)
+            var testProjectId = $"proj-test-media-{Guid.NewGuid():N}"[..20];
+            var targetEvent = await db.Events.FirstOrDefaultAsync() ?? new Event
+            {
+                Id = "evt-test-temp",
+                Title = "Evento Temporario Teste",
+                Description = "Desc",
+                Status = EventStatus.Active,
+                ScheduledDate = DateTimeOffset.UtcNow
+            };
+
+            if (targetEvent.Id == "evt-test-temp")
+            {
+                db.Events.Add(targetEvent);
+                await db.SaveChangesAsync();
+            }
+
+            var project = new Project
+            {
+                Id = testProjectId,
+                EventId = targetEvent.Id,
+                Title = "Startup Media Test",
+                PitchLeader = "Testador",
+                Track = "DevOps",
+                Description = "Validação de persistência de mídia",
+                OrderIndex = 999,
+                Status = ProjectStatus.Pending,
+                Media = new ProjectMedia
+                {
+                    LogoUrl = "/samples/logo-test-1.png",
+                    CoverImageUrl = "/samples/cover-test-1.png",
+                    VideoUrl = "/samples/video-test-1.mp4",
+                    Items = new List<ProjectMediaItem>
+                    {
+                        new ProjectMediaItem { Id = "slide-1", Type = "image", Url = "/samples/s1.png", Order = 1 },
+                        new ProjectMediaItem { Id = "slide-2", Type = "image", Url = "/samples/s2.png", Order = 2 }
+                    }
+                }
+            };
+
+            db.Projects.Add(project);
+            await db.SaveChangesAsync();
+            Assert(true, "Projeto com mídia inicial inserido com sucesso");
+
+            // 2. Consulta em contexto isolado (Simula restart / novo request)
+            await using (var verifyDb = new ArenaDbContext(options))
+            {
+                var fetched = await verifyDb.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == testProjectId);
+                Assert(fetched != null, "Projeto recuperado em novo DbContext isolado");
+                Assert(fetched?.Media?.LogoUrl == "/samples/logo-test-1.png", "LogoUrl persistido com integridade");
+                Assert(fetched?.Media?.CoverImageUrl == "/samples/cover-test-1.png", "CoverImageUrl persistido com integridade");
+                Assert(fetched?.Media?.VideoUrl == "/samples/video-test-1.mp4", "VideoUrl persistido com integridade no PostgreSQL");
+                Assert(fetched?.Media?.Items?.Count == 2, "MediaItems JSONB recuperou 2 itens com integridade");
+                Assert(fetched?.Media?.Items?[0].Url == "/samples/s1.png", "Primeiro slide da galeria preservado");
+            }
+
+            // 3. Atualização de Mídia (Simula formulário de edição do operador)
+            await using (var updateDb = new ArenaDbContext(options))
+            {
+                var existing = await updateDb.Projects.FirstOrDefaultAsync(p => p.Id == testProjectId);
+                Assert(existing != null, "Projeto localizado para update");
+
+                if (existing != null)
+                {
+                    existing.Media.CoverImageUrl = "/uploads/new-cover-updated.png";
+                    existing.Media.VideoUrl = "/uploads/new-video-updated.mp4";
+                    existing.Media.Items.Add(new ProjectMediaItem { Id = "slide-3", Type = "image", Url = "/samples/s3.png", Order = 3 });
+
+                    var mediaEntry = updateDb.Entry(existing).Reference(p => p.Media).TargetEntry;
+                    if (mediaEntry != null)
+                    {
+                        mediaEntry.State = EntityState.Modified;
+                    }
+
+                    await updateDb.SaveChangesAsync();
+                    Assert(true, "Update de ProjectMedia executado com sucesso");
+                }
+            }
+
+            // 4. Verificação pós-update em novo contexto isolado
+            await using (var verifyDb2 = new ArenaDbContext(options))
+            {
+                var reloaded = await verifyDb2.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == testProjectId);
+                Assert(reloaded?.Media?.CoverImageUrl == "/uploads/new-cover-updated.png", "CoverImageUrl atualizado sobreviveu a novo DbContext");
+                Assert(reloaded?.Media?.VideoUrl == "/uploads/new-video-updated.mp4", "VideoUrl atualizado sobreviveu a novo DbContext");
+                Assert(reloaded?.Media?.Items?.Count == 3, "MediaItems JSONB atualizado contém 3 itens");
+                Assert(reloaded?.Media?.Items?[2].Id == "slide-3", "Novo slide adicionado persistido com integridade");
+
+                // Cleanup
+                var toDelete = await verifyDb2.Projects.FirstOrDefaultAsync(p => p.Id == testProjectId);
+                if (toDelete != null)
+                {
+                    verifyDb2.Projects.Remove(toDelete);
+                    await verifyDb2.SaveChangesAsync();
+                    Assert(true, "Projeto de teste de mídia removido com sucesso");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Assert(false, $"Exceção ao testar persistência de mídia no PostgreSQL: {ex.Message}");
+        }
     }
 
     private static async Task TestEfCoreAuditEventsPersistenceAsync()

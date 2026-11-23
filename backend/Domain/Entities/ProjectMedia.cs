@@ -8,14 +8,14 @@ public record ProjectMediaItem
     public int Order { get; init; } = 0;
 }
 
-public record ProjectMedia
+public class ProjectMedia
 {
-    public string LogoUrl       { get; init; } = string.Empty;
-    public string CoverImageUrl { get; init; } = string.Empty;
+    public string LogoUrl       { get; set; } = string.Empty;
+    public string CoverImageUrl { get; set; } = string.Empty;
     /// <summary>
     /// URL do vídeo promocional do projeto (mp4 / webm).
     /// Exibido no Hero LED Wall durante o estado PitchRunning (Phase 5C.4).
     /// </summary>
-    public string VideoUrl      { get; init; } = string.Empty;
-    public List<ProjectMediaItem> Items { get; init; } = new();
+    public string VideoUrl      { get; set; } = string.Empty;
+    public List<ProjectMediaItem> Items { get; set; } = new();
 }

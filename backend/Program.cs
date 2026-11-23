@@ -1,4 +1,4 @@
-using ArenaVoicePocBackend.Configuration;
+﻿using ArenaVoicePocBackend.Configuration;
 using ArenaVoicePocBackend.Domain;
 using ArenaVoicePocBackend.Domain.DTOs;
 using ArenaVoicePocBackend.Domain.Entities;
@@ -860,6 +860,7 @@ app.MapPost("/api/projects", (CreateProjectDto dto, IArenaProjectStore store) =>
         {
             LogoUrl = dto.LogoUrl?.Trim() ?? string.Empty,
             CoverImageUrl = dto.CoverImageUrl?.Trim() ?? string.Empty,
+            VideoUrl = dto.VideoUrl?.Trim() ?? string.Empty,
             Items = dto.MediaItems ?? new()
         }
     };
@@ -920,11 +921,13 @@ app.MapPost("/api/upload", async (IFormFile? file, IWebHostEnvironment env) =>
 // PUT /api/projects/{id} — Atualiza dados de um projeto existente
 app.MapPut("/api/projects/{id}", async (string id, UpdateProjectDto dto, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
 {
+
     var project = store.GetProjectById(id);
     if (project == null)
     {
         return Results.NotFound(new { error = "Projeto não encontrado.", id });
     }
+
 
     if (!string.IsNullOrWhiteSpace(dto.Title))
     {
@@ -980,7 +983,10 @@ app.MapPut("/api/projects/{id}", async (string id, UpdateProjectDto dto, IArenaP
         project.Status = dto.Status.Value;
     }
 
+
     store.UpdateProject(project);
+
+    var reloadedAfterSave = store.GetProjectById(id);
 
     var activeContext = store.GetActiveContext();
     if (activeContext.CurrentProjectId == id)
@@ -993,7 +999,7 @@ app.MapPut("/api/projects/{id}", async (string id, UpdateProjectDto dto, IArenaP
         });
     }
 
-    return Results.Ok(project);
+    return Results.Ok(reloadedAfterSave ?? project);
 });
 
 // DELETE /api/projects/{id} — Remove um projeto
