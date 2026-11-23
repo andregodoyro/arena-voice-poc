@@ -529,106 +529,6 @@ function AcousticTimberWalls() {
 }
 
 /**
- * AmphitheaterSeating — Arquibancada Semicircular Arquitetural.
- * 
- * Phase 5C.1:
- * - Degraus concêntricos de auditório corporativo flanqueando o palco;
- * - Fitas de balizamento linear quente (2900K) embutidas nos espelhos dos degraus;
- * - Assentos contínuos estofados em tecido acústico escuro.
- */
-function AmphitheaterSeating({ secondaryColor = '#ffd8a8' }) {
-  const tiers = [
-    { inner: 12.0, outer: 14.2, y: 0.5, stepH: 0.5 },
-    { inner: 14.5, outer: 16.7, y: 1.15, stepH: 0.65 },
-    { inner: 17.0, outer: 19.2, y: 1.9, stepH: 0.75 },
-    { inner: 19.5, outer: 21.7, y: 2.75, stepH: 0.85 },
-  ];
-
-  // Ângulos que acomodam a plateia à direita e fundo da arena
-  const cylThetaStart = Math.PI * 0.72;
-  const cylThetaLength = Math.PI * 0.62;
-  const ringAlphaStart = Math.PI * 0.22;
-  const ringAlphaLength = Math.PI * 0.62;
-
-  return (
-    <group position={[0, 0, -3.2]}>
-      {tiers.map((tier, idx) => {
-        const benchRadius = (tier.inner + tier.outer) / 2;
-        return (
-          <group key={`seating-tier-${idx}`}>
-            {/* Piso do patamar da arquibancada em carvalho escuro */}
-            <mesh position={[0, tier.y, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[tier.inner, tier.outer, 48, 1, ringAlphaStart, ringAlphaLength]} />
-              <meshStandardMaterial
-                color="#221912"
-                roughness={0.45}
-                metalness={0.15}
-                side={THREE.DoubleSide}
-              />
-            </mesh>
-
-            {/* Espelho vertical (riser) frontal do degrau */}
-            <mesh position={[0, tier.y - tier.stepH / 2, 0]}>
-              <cylinderGeometry
-                args={[
-                  tier.inner,
-                  tier.inner,
-                  tier.stepH,
-                  48,
-                  1,
-                  true,
-                  cylThetaStart,
-                  cylThetaLength,
-                ]}
-              />
-              <meshStandardMaterial
-                color="#16100c"
-                roughness={0.55}
-                metalness={0.2}
-                side={THREE.DoubleSide}
-              />
-            </mesh>
-
-            {/* Friso luminoso embutido de segurança (temperatura quente 2900K) */}
-            <mesh position={[0, tier.y + 0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[tier.inner, tier.inner + 0.07, 48, 1, ringAlphaStart, ringAlphaLength]} />
-              <meshBasicMaterial
-                color="#ffe0b2"
-                transparent
-                opacity={0.55}
-                side={THREE.DoubleSide}
-              />
-            </mesh>
-
-            {/* Fileira de assentos contínuos estofados em tecido acústico */}
-            <mesh position={[0, tier.y + 0.16, 0]}>
-              <cylinderGeometry
-                args={[
-                  benchRadius,
-                  benchRadius,
-                  0.3,
-                  48,
-                  1,
-                  true,
-                  cylThetaStart,
-                  cylThetaLength,
-                ]}
-              />
-              <meshStandardMaterial
-                color="#2a221b"
-                roughness={0.65}
-                metalness={0.08}
-                side={THREE.DoubleSide}
-              />
-            </mesh>
-          </group>
-        );
-      })}
-    </group>
-  );
-}
-
-/**
  * StudioScene — Orquestrador Cênico 3D da Arena Voice.
  * 
  * Phase 5C.1: Architectural Arena Redesign.
@@ -736,7 +636,6 @@ export function StudioScene({
         pitchState={pitchState}
         branding={branding}
       />
-      <AmphitheaterSeating secondaryColor={secondaryColor} />
 
       {/* ── As 5 Cadeiras da Banca de Avaliação ─────────────────────────────── */}
       {chairDefs.map((c) => (
