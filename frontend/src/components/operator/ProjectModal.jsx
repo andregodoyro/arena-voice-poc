@@ -7,6 +7,7 @@ import {
   AlertCircle,
   Upload,
   Image as ImageIcon,
+  Film,
   Trash2,
   Plus,
   Sparkles,
@@ -17,6 +18,7 @@ import { isValidMediaUrl } from '../../utils/mediaValidation';
 import { projectsApi } from '../../api/projectsApi';
 
 const ACCEPTED_IMAGE_TYPES = '.jpg,.jpeg,.png,.webp,.svg';
+const ACCEPTED_VIDEO_TYPES = '.mp4,.webm';
 
 /**
  * ProjectModal — Modal para Criação e Edição de Projetos/Pitches com Upload de Mídia (Phase 5C.2B).
@@ -56,6 +58,7 @@ export function ProjectModal({
     orderIndex: project?.orderIndex ?? '',
     logoUrl: project?.media?.logoUrl || project?.logoUrl || '',
     coverImageUrl: project?.media?.coverImageUrl || project?.coverImageUrl || '',
+    videoUrl: project?.media?.videoUrl || project?.videoUrl || '',
   }));
 
   const [mediaItems, setMediaItems] = useState(initialMediaItems);
@@ -64,6 +67,7 @@ export function ProjectModal({
 
   const logoInputRef = useRef(null);
   const coverInputRef = useRef(null);
+  const videoInputRef = useRef(null);
   const galleryInputRef = useRef(null);
 
   // Sincroniza estado quando projeto muda
@@ -77,6 +81,7 @@ export function ProjectModal({
         orderIndex: project.orderIndex ?? '',
         logoUrl: project.media?.logoUrl || project.logoUrl || '',
         coverImageUrl: project.media?.coverImageUrl || project.coverImageUrl || '',
+        videoUrl: project.media?.videoUrl || project.videoUrl || '',
       });
       const items = Array.isArray(project.media?.items) ? project.media.items : (project.mediaItems || []);
       setMediaItems(items);
@@ -89,6 +94,7 @@ export function ProjectModal({
         orderIndex: '',
         logoUrl: '',
         coverImageUrl: '',
+        videoUrl: '',
       });
       setMediaItems([]);
     }
@@ -131,6 +137,9 @@ export function ProjectModal({
       } else if (target === 'cover') {
         const result = await projectsApi.uploadMedia(files[0]);
         setFormData((prev) => ({ ...prev, coverImageUrl: result.url }));
+      } else if (target === 'video') {
+        const result = await projectsApi.uploadMedia(files[0]);
+        setFormData((prev) => ({ ...prev, videoUrl: result.url }));
       } else if (target === 'gallery') {
         const uploadedList = [];
         for (let i = 0; i < files.length; i++) {
@@ -195,6 +204,12 @@ export function ProjectModal({
       return;
     }
 
+    const videoUrl = formData.videoUrl.trim();
+    if (videoUrl && !isValidMediaUrl(videoUrl)) {
+      setValidationError('O vídeo deve ser um caminho válido, URL ou upload.');
+      return;
+    }
+
     const payload = {
       title,
       pitchLeader,
@@ -211,6 +226,7 @@ export function ProjectModal({
       //   Por ora, string vazia = "não alterar" é a política mais segura para o upload flow.
       logoUrl: logoUrl || undefined,
       coverImageUrl: coverImageUrl || undefined,
+      videoUrl: videoUrl || undefined,
       mediaItems,
     };
 
@@ -366,7 +382,7 @@ export function ProjectModal({
                 <span>Ativos Visuais do Hero Showcase Wall (Palco LED)</span>
               </h4>
               <span className="text-[10px] text-gray-400 font-mono">
-                Formatos: JPG, JPEG, PNG, WEBP, SVG
+                Formatos: Imagens (.jpg, .png, .webp) | Vídeo (.mp4, .webm até 100MB)
               </span>
             </div>
 
@@ -505,7 +521,70 @@ export function ProjectModal({
               </div>
             </div>
 
-            {/* 3. GALERIA DE MÍDIA / MOCKUPS (ProjectMedia[]) */}
+            {/* 3. VÍDEO DE APRESENTAÇÃO (PITCH-LIVE NO LED WALL) */}
+            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-white block">
+                    Vídeo de Apresentação (Pitch-Live no LED Wall)
+                  </span>
+                  <span className="text-[11px] text-gray-400">
+                    Reproduzido nativamente no telão 3D durante o pitch (MP4 ou WebM, máx. 100MB).
+                  </span>
+                </div>
+                <input
+                  type="file"
+                  ref={videoInputRef}
+                  accept={ACCEPTED_VIDEO_TYPES}
+                  className="hidden"
+                  onChange={(e) => handleFileUpload(e, 'video')}
+                />
+                <button
+                  type="button"
+                  onClick={() => videoInputRef.current?.click()}
+                  disabled={uploadingTarget === 'video'}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600/80 hover:bg-blue-500 text-white flex items-center gap-1.5 transition-colors shadow-sm"
+                >
+                  {uploadingTarget === 'video' ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Film className="w-3.5 h-3.5" />
+                  )}
+                  <span>Fazer Upload Vídeo</span>
+                </button>
+              </div>
+
+              {/* Preview e URL do Vídeo */}
+              <div className="space-y-2">
+                {formData.videoUrl && (
+                  <div className="p-2.5 rounded-xl bg-blue-950/30 border border-blue-500/20 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs text-blue-200 truncate">
+                      <Film className="w-4 h-4 text-blue-400 shrink-0" />
+                      <span className="truncate font-mono text-[11px]">{formData.videoUrl}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, videoUrl: '' }))}
+                      className="p-1 rounded-lg hover:bg-red-950/80 text-gray-400 hover:text-red-400 transition-colors ml-2 shrink-0"
+                      title="Remover vídeo"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+                <input
+                  type="text"
+                  name="videoUrl"
+                  value={formData.videoUrl}
+                  onChange={handleChange}
+                  placeholder="/uploads/sample-pitch.mp4 ou URL externa de vídeo..."
+                  disabled={isSubmitting}
+                  className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white text-xs placeholder:text-gray-500"
+                />
+              </div>
+            </div>
+
+            {/* 4. GALERIA DE MÍDIA / MOCKUPS (ProjectMedia[]) */}
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/10 space-y-3">
               <div className="flex items-center justify-between">
                 <div>

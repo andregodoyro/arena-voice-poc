@@ -1,10 +1,11 @@
 import { request } from './apiClient';
 
 /**
- * projectsApi — Endpoints operacionais de Projetos (Milestones 2B, 2C.3 & 5C.2B).
- * 
+ * projectsApi — Endpoints operacionais de Projetos (Milestones 2B, 2C.3, 5C.2B, 5C.4).
+ *
  * Segue ADR-001 (Backend Authoritative), ADR-005 (Project Selection Lifecycle),
- * ADR-006 (Project Deletion Protection) e Milestone 5C.2B (Hero Wall Occupancy Pass & Upload Support).
+ * ADR-006 (Project Deletion Protection), Milestone 5C.2B (Hero Wall Occupancy Pass &
+ * Upload Support) e Phase 5C.4 (Video no LED Wall).
  */
 export const projectsApi = {
   /**
@@ -25,7 +26,7 @@ export const projectsApi = {
 
   /**
    * Cria um novo projeto vinculado ao evento ativo (POST /api/projects).
-   * @param {Object} projectData - Dados do projeto (title, pitchLeader, track, description, orderIndex, logoUrl, coverImageUrl, mediaItems).
+   * @param {Object} projectData - Dados do projeto (title, pitchLeader, track, description, orderIndex, logoUrl, coverImageUrl, videoUrl, mediaItems).
    */
   createProject: (projectData) => {
     return request('/api/projects', {
@@ -37,7 +38,7 @@ export const projectsApi = {
   /**
    * Atualiza dados de um projeto existente (PUT /api/projects/{id}).
    * @param {string} id - Identificador do projeto.
-   * @param {Object} projectData - Dados atualizados.
+   * @param {Object} projectData - Dados atualizados (Phase 5C.4: inclui videoUrl).
    */
   updateProject: (id, projectData) => {
     return request(`/api/projects/${encodeURIComponent(id)}`, {
@@ -69,9 +70,10 @@ export const projectsApi = {
   },
 
   /**
-   * Faz upload de ativos visuais para o servidor (POST /api/upload).
-   * Formatos suportados: JPG, JPEG, PNG, WEBP, SVG.
-   * Possui fallback resiliente para dataURL caso o backend esteja offline.
+   * Faz upload de ativos visuais ou de vídeo para o servidor (POST /api/upload).
+   * Formatos suportados: JPG, JPEG, PNG, WEBP, SVG (imagens) e MP4, WEBM (vídeos — Phase 5C.4).
+   * Limite: 20 MB para imagens, 100 MB para vídeos.
+   * Possui fallback resiliente para dataURL caso o backend esteja offline (apenas imagens).
    * @param {File} file - Arquivo a enviar.
    * @returns {Promise<{ url: string, fileName: string, size: number }>}
    */
