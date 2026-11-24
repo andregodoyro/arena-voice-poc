@@ -1535,6 +1535,23 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         return context.RoundHistoryEntries.AsNoTracking().FirstOrDefault(r => r.Id == roundId);
     }
 
+    public EventResultsResponseDto? GetEventResults(string eventId)
+    {
+        if (string.IsNullOrWhiteSpace(eventId)) return null;
+        using var context = _contextFactory.CreateDbContext();
+        var evt = context.Events.AsNoTracking().FirstOrDefault(e => e.Id == eventId.Trim());
+        if (evt == null) return null;
+
+        var rounds = context.RoundHistoryEntries.AsNoTracking()
+            .Where(r => r.EventId == evt.Id)
+            .ToList();
+        var projects = context.Projects.AsNoTracking()
+            .Where(p => p.EventId == evt.Id)
+            .ToList();
+
+        return EventRankingEngine.ComputeResults(evt, rounds, projects);
+    }
+
     public Round? GetLastRound()
     {
         using var context = _contextFactory.CreateDbContext();

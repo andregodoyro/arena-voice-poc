@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using ArenaVoicePocBackend.Domain.DTOs;
 using ArenaVoicePocBackend.Domain.Entities;
 using ArenaVoicePocBackend.Domain.Enums;
 
@@ -864,6 +865,20 @@ public class ArenaProjectStore : IArenaProjectStore
         lock (_contextLock)
         {
             return _roundHistory.FirstOrDefault(r => r.Id.Equals(roundId.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    public EventResultsResponseDto? GetEventResults(string eventId)
+    {
+        if (string.IsNullOrWhiteSpace(eventId)) return null;
+        lock (_contextLock)
+        {
+            var evt = _events.Values.FirstOrDefault(e => e.Id.Equals(eventId.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (evt == null) return null;
+
+            var rounds = _roundHistory.Where(r => r.EventId.Equals(evt.Id, StringComparison.OrdinalIgnoreCase)).ToList();
+            var projects = _projects.Values.Where(p => p.EventId.Equals(evt.Id, StringComparison.OrdinalIgnoreCase)).ToList();
+            return EventRankingEngine.ComputeResults(evt, rounds, projects);
         }
     }
 

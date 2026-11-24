@@ -1,3 +1,4 @@
+using ArenaVoicePocBackend.Domain.DTOs;
 using ArenaVoicePocBackend.Domain.Entities;
 using ArenaVoicePocBackend.Domain.Enums;
 
@@ -126,6 +127,9 @@ public interface IArenaProjectStore
     Round? GetRoundById(string roundId);
     Round? GetLastRound();
     Round? ArchiveCurrentRound(string reason = "Manual");
+
+    // Motor de Ranking Oficial Consolidado (Milestone 6A)
+    EventResultsResponseDto? GetEventResults(string eventId);
 
     // Catálogo Global de Jurados & Alocação de Banca (Milestone 3E)
     IReadOnlyList<Judge> GetAllJudges(bool includeInactive = false);
