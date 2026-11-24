@@ -1,4 +1,4 @@
-﻿using ArenaVoicePocBackend.Configuration;
+using ArenaVoicePocBackend.Configuration;
 using ArenaVoicePocBackend.Domain;
 using ArenaVoicePocBackend.Domain.DTOs;
 using ArenaVoicePocBackend.Domain.Entities;
@@ -129,6 +129,11 @@ builder.Services.PostConfigure<ArenaPersistenceOptions>(opts =>
 // AUTENTICAÇÃO JWT, RBAC & HARDWARE DEVICE AUTH (MILESTONE 5H)
 // =========================================================================
 builder.Services.AddArenaAuthenticationAndAuthorization(builder.Configuration);
+
+// =========================================================================
+// ADMIN USER SERVICE — PAINEL ADMINISTRATIVO DE USUÁRIOS (MILESTONE 5I)
+// =========================================================================
+builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 var storageEngineEnv = Environment.GetEnvironmentVariable("ARENA_STORAGE_ENGINE") ?? Environment.GetEnvironmentVariable("ARENA_STORAGE");
 var effectiveStorageEngine = !string.IsNullOrWhiteSpace(storageEngineEnv)
     ? storageEngineEnv
@@ -206,6 +211,106 @@ app.UseAuthorization();
 
 // Endpoints de Autenticação JWT (/api/auth/login, /refresh, /logout, /me)
 app.MapArenaAuthEndpoints();
+
+// =========================================================================
+// ENDPOINTS ADMINISTRATIVOS DE USUÁRIOS (MILESTONE 5I) — Restritos a Admin
+// =========================================================================
+
+// GET /api/admin/users — Lista todos os usuários
+app.MapGet("/api/admin/users", async (IAdminUserService adminSvc, HttpContext http) =>
+{
+    var users = await adminSvc.GetAllUsersAsync(http.RequestAborted);
+    return Results.Ok(users);
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyAdminOnly);
+
+// GET /api/admin/users/{id} — Detalhes de um usuário
+app.MapGet("/api/admin/users/{id}", async (string id, IAdminUserService adminSvc, HttpContext http) =>
+{
+    var user = await adminSvc.GetUserByIdAsync(id, http.RequestAborted);
+    return user is not null
+        ? Results.Ok(user)
+        : Results.NotFound(new { error = "Usuário não encontrado.", id });
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyAdminOnly);
+
+// POST /api/admin/users — Criar novo usuário
+app.MapPost("/api/admin/users", async (CreateUserDto dto, IAdminUserService adminSvc, HttpContext http) =>
+{
+    var actorId = http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+    var actorName = http.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? "Admin";
+    var result = await adminSvc.CreateUserAsync(dto, actorId, actorName, http.RequestAborted);
+
+    if (!result.Success)
+    {
+        if (result.Conflict) return Results.Conflict(new { error = result.ErrorMessage });
+        return Results.BadRequest(new { error = result.ErrorMessage });
+    }
+
+    return Results.Created($"/api/admin/users/{result.User!.Id}", result.User);
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyAdminOnly);
+
+// PUT /api/admin/users/{id} — Editar usuário
+app.MapPut("/api/admin/users/{id}", async (string id, UpdateUserDto dto, IAdminUserService adminSvc, HttpContext http) =>
+{
+    var actorId = http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+    var actorName = http.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? "Admin";
+    var result = await adminSvc.UpdateUserAsync(id, dto, actorId, actorName, http.RequestAborted);
+
+    if (!result.Success)
+    {
+        if (result.NotFound) return Results.NotFound(new { error = result.ErrorMessage, id });
+        if (result.Conflict) return Results.Conflict(new { error = result.ErrorMessage });
+        return Results.BadRequest(new { error = result.ErrorMessage });
+    }
+
+    return Results.Ok(result.User);
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyAdminOnly);
+
+// POST /api/admin/users/{id}/activate — Ativar conta
+app.MapPost("/api/admin/users/{id}/activate", async (string id, IAdminUserService adminSvc, HttpContext http) =>
+{
+    var actorId = http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+    var actorName = http.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? "Admin";
+    var result = await adminSvc.ActivateUserAsync(id, actorId, actorName, http.RequestAborted);
+
+    if (!result.Success)
+        return result.NotFound
+            ? Results.NotFound(new { error = result.ErrorMessage, id })
+            : Results.BadRequest(new { error = result.ErrorMessage });
+
+    return Results.Ok(new { success = true, user = result.User });
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyAdminOnly);
+
+// POST /api/admin/users/{id}/deactivate — Desativar conta
+app.MapPost("/api/admin/users/{id}/deactivate", async (string id, IAdminUserService adminSvc, HttpContext http) =>
+{
+    var actorId = http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+    var actorName = http.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? "Admin";
+    var result = await adminSvc.DeactivateUserAsync(id, actorId, actorName, http.RequestAborted);
+
+    if (!result.Success)
+    {
+        if (result.NotFound) return Results.NotFound(new { error = result.ErrorMessage, id });
+        if (result.Forbidden) return Results.Forbid();
+        return Results.BadRequest(new { error = result.ErrorMessage });
+    }
+
+    return Results.Ok(new { success = true, user = result.User });
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyAdminOnly);
+
+// POST /api/admin/users/{id}/reset-password — Redefinir senha
+app.MapPost("/api/admin/users/{id}/reset-password", async (string id, ResetPasswordDto dto, IAdminUserService adminSvc, HttpContext http) =>
+{
+    var actorId = http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+    var actorName = http.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? "Admin";
+    var result = await adminSvc.ResetPasswordAsync(id, dto.NewPassword, actorId, actorName, http.RequestAborted);
+
+    if (!result.Success)
+        return result.NotFound
+            ? Results.NotFound(new { error = result.ErrorMessage, id })
+            : Results.BadRequest(new { error = result.ErrorMessage });
+
+    return Results.Ok(new { success = true, message = "Senha redefinida. Sessões anteriores foram invalidadas." });
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyAdminOnly);
 
 // Health check para Render e monitoramento de proxies
 app.MapGet("/health", () => Results.Ok(new
