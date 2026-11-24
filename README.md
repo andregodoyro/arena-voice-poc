@@ -1,14 +1,14 @@
 # Arena Voice — Plataforma de Avaliação e Espetáculo de Inovação
 
-> **Status:** Fases 1 a 3 e Milestones 4A/4B Concluídos e Homologados \| 530/530 Testes Aprovados (100% Verde)  
-> **Versão Estável Atual:** `v0.4.1-phase4b`  
-> **Objetivo:** Plataforma completa para condução de bancas avaliadoras, pitch days e demo days corporativos com dinamismo cênico em tempo real, backend autoritativo, telão 3D procedural, cockpit operacional da mesa técnica e persistência relacional resiliente com recuperação automática pós-crash.
+> **Status:** Fases 1 a 4 e Phase 5 (5A a 5C.5 Fase 1) Concluídas e Homologadas | 100% Verde  
+> **Versão Estável Atual:** `v0.5.0-phase5`  
+> **Objetivo:** Plataforma completa para condução de bancas avaliadoras, pitch days e demo days corporativos com dinamismo cênico em tempo real, backend autoritativo, Hero Showcase Wall panorâmico 3D com reprodução de vídeo/áudio, cockpit operacional da mesa técnica com controles de transporte e persistência relacional resiliente com recuperação automática pós-crash (PostgreSQL 18.6).
 
 ---
 
 ## 🏗️ 1. Visão Geral do Produto e Arquitetura
 
-O **Arena Voice** é uma plataforma corporativa configurável projetada para transformar bancas tradicionais de inovação e aceleração (Demo Days, Hackathons, mostras de MVPs e Pitch Days) em espetáculos dinâmicos e memoráveis inspirados no formato televisivo *The Voice* e *Shark Tank*.
+O **Arena Voice** é uma plataforma corporativa configurável projetada para transformar bancas tradicionais de inovação e aceleração (Demo Days, Hackathons, mostras de MVPs e Pitch Days) em espetáculos dinâmicos e memoráveis de apresentação e avaliação de projetos. A plataforma eleva o projeto apresentado ao status de protagonista absoluto através de uma Keynote Arena arquitetural contemporânea com telão monumental integrado.
 
 A plataforma separa com rigor quatro papéis funcionais interligados por rede local:
 
@@ -32,7 +32,7 @@ A plataforma separa com rigor quatro papéis funcionais interligados por rede lo
                       │ • Round History & Result Engine              │
                       │ • Catálogo de Jurados & Alocação de Banca    │
                       │ • Hub SignalR Realtime em /hubs/arena-poc    │
-                       │ • Persistência Relacional (PostgreSQL 18.6)  │
+                      │ • Persistência Relacional (PostgreSQL 18.6)  │
                       └──────────────┬───────────────────────────────┘
                                      │
            ┌─────────────────────────┴────────────────────────┐
@@ -42,10 +42,11 @@ A plataforma separa com rigor quatro papéis funcionais interligados por rede lo
 │    (Experiência Cênica / Telão)      │     │     (Gestão e Operação da Sessão)    │
 ├──────────────────────────────────────┤     ├──────────────────────────────────────┤
 │ • React 19 + Three.js + R3F + GSAP   │     │ • Dashboard Unificado em 4 Abas:     │
-│ • Anfiteatro 3D procedural e pódio   │     │   - Cockpit: telemetria, stepper,    │
-│ • Neons com theming reativo de cores │     │     timers, placar e reset           │
-│ • Cronômetro central Glass-Panel HUD │     │   - Projetos: fila de startups       │
-│ • Ficha da startup (StageProjectBanner)    │ • Evento: catálogo e branding      │
+│ • Hero Showcase Wall Panorâmico      │     │   - Cockpit: telemetria, stepper,    │
+│   (33.6m × 11.6m — Vídeos & Capas)   │     │     timers, placar, reset e          │
+│ • Pódio central escalonado & cúpula  │     │     Operator Media Transport Control │
+│ • Neons com theming reativo de cores │     │   - Projetos: fila de startups       │
+│ • Cronômetro central Glass-Panel HUD │     │   - Evento: catálogo e branding      │
 │ • Dock dos 5 jurados com foto e glow │     │   - Jurados: catálogo mestre e banca │
 │ • 100% contemplativo (sem controles) │     │ • Ações de pitch, timers e lockout   │
 └──────────────────────────────────────┘     └──────────────────────────────────────┘
@@ -60,18 +61,18 @@ O frontend é uma SPA reativa desenvolvida em **React 19**, **Vite** e **Tailwin
 | Rota | Superfície | Público-Alvo | Responsabilidade |
 | :--- | :--- | :--- | :--- |
 | **`http://localhost:5173/`** | Redirecionamento | Todos | Redireciona automaticamente para a experiência cênica `/stage`. |
-| **`http://localhost:5173/stage`** | **Telão Público 3D** | Plateia / Startups | Projeção em tela cheia do anfiteatro 3D procedural, rotação das cadeiras via GSAP, cronômetro de broadcast, banner da startup e dock nominal dos jurados. Superfície 100% contemplativa sem botões interativos (ADR-009). |
-| **`http://localhost:5173/operator`** | **Cockpit Operacional** | Mesa Técnica | Painel administrativo unificado estruturado em 4 abas contextuais persistentes (ADR-007). |
+| **`http://localhost:5173/stage`** | **Telão Público 3D** | Plateia / Startups | Projeção em tela cheia da Keynote Arena com Hero Showcase Wall panorâmico, reprodução de vídeo/áudio sincronizado, rotação de cadeiras via GSAP, cronômetro de broadcast e dock nominal dos jurados. Superfície 100% contemplativa sem botões interativos (ADR-009). |
+| **`http://localhost:5173/operator`** | **Cockpit Operacional** | Mesa Técnica | Painel administrativo unificado estruturado em 4 abas contextuais persistentes (ADR-007) com controle integrado de mídia e transporte. |
 
 ### Sub-Navegação da Mesa Técnica (`/operator/*`):
-1. **`/operator/cockpit` (Cockpit ao Vivo):** Stepper visual de controle do pitch (6 estágios), controles de cronômetro (Pausar, Retomar, +30s, +60s, +120s), monitoramento individual das 5 cadeiras, placar consolidado e reset autoritativo.
-2. **`/operator/projects` (Fila de Projetos):** Cadastro de startups, ordenação, edição de dados e workflow de seleção atômica no palco (`POST /api/projects/{id}/select`) com proteção `HTTP 409 Conflict`.
+1. **`/operator/cockpit` (Cockpit ao Vivo):** Stepper visual de controle do pitch (6 estágios), controles de cronômetro (Pausar, Retomar, +30s, +60s, +120s), monitoramento individual das 5 cadeiras, placar consolidado, reset autoritativo e **Operator Media Control** (Play, Pause, Restart, Scrubbing na timeline, -10s/+10s e volume do vídeo via BroadcastChannel).
+2. **`/operator/projects` (Fila de Projetos):** Cadastro de startups, ordenação, edição de dados e workflow de seleção atômica no palco (`POST /api/projects/{id}/select`) com upload de logo, capa, vídeo de pitch e mídias complementares (JSONB).
 3. **`/operator/event` (Configurações do Evento):** Catálogo corporativo de eventos com filtros por status (`Draft`, `Ready`, `Active`, `Finished`, `Archived`), ativação atômica no palco, duplicação e seletor de paletas com `ColorSwatch`.
 4. **`/operator/jury` (Banca & Jurados):** Alocação nominal dos 5 jurados às cadeiras físicas (`ChairId: 1..5`) e catálogo global de especialistas com fotos, bios, empresas e tags.
 
 ---
 
-## ⚙️ 3. Motores de Negócio Homologados (Fase 3)
+## ⚙️ 3. Motores de Negócio Homologados (Fases 1 a 4 & Phase 5)
 
 ### 3.1. Governança e Ciclo de Vida de Eventos (Milestone 3A)
 - Máquina de estados explícita: `Draft (0)`, `Ready (1)`, `Active (2)`, `Finished (3)` e `Archived (4)`.
@@ -104,14 +105,20 @@ O frontend é uma SPA reativa desenvolvida em **React 19**, **Vite** e **Tailwin
 - **Soberania do Botão Físico:** A virada física de cadeira (`ChairTurned`) permanece como a decisão oficial e canônica em tempo real.
 - **Dock de Jurados no Palco:** O Telão 3D exibe a banca no rodapé com realce luminoso, glow da cor primária e badge de apoio instantâneo quando a cadeira vira.
 
+### 3.6. Persistência Relacional & Storage Engine (Milestone 4A a 4D)
+- **PostgreSQL Portable 18.6:** Cluster ACID local executado sem instalador de SO e sem necessidade de permissões de administrador de TI.
+- **EF Core 10 & Npgsql 10:** Modelagem objeto-relacional avançada com suporte nativo a `text[]` (expertises de jurados), `int[]` (cadeiras que votaram) e `jsonb` (snapshots imutáveis de temporizadores e `MediaItems` de projetos).
+- **Store Híbrido com IDbContextFactory:** `PostgresArenaProjectStore` isola contextos efêmeros por operação de banco e mantém o estado de palco em tempo real em memória com Hot Cache e Lock Separation.
+- **Crash Recovery & Paused Recovery:** Restauração perfeita de sessões interrompidas com congelamento de cronômetro e recuperação de cadeiras viradas.
+
+### 3.7. Motor de Mídia do Hero Showcase Wall & Live Show (Phase 5)
+- **Hero Showcase Wall Panorâmico (Phase 5C.2B):** Painel monumental de $33.6\,\text{m} \times 11.6\,\text{m}$ posicionado em $Z = -20.6\,\text{m}$, ocupando $75\%$ a $85\%$ do plano de fundo.
+- **Máquina de Estados Narrativos (`wallMode` - Phase 5C.3):** 5 modos cênicos (`event-idle`, `waiting`, `pitch-live`, `voting`, `result`) orquestrando dinamicamente `ScreenImage` e `ScreenVideo` via `@react-three/drei`.
+- **Operator Media Transport Controls (Phase 5C.4A):** Controle de reprodução profissional no Cockpit com Play, Pause, Restart, Scrubbing em timeline, saltos de -10s/+10s, volume com persistência (padrão 70%) e sincronização intra-navegador via `BroadcastChannel('arena_media_controls')`.
+- **Visual Clearance (Phase 5C.5 Fase 1):** Desobstrução total do campo de visão entre os jurados e o telão através da remoção da arquibancada frontal.
+
 ---
 
-### 3.6. Persistência Relacional & Storage Engine (Milestone 4A)
-- **PostgreSQL Portable 18.6:** Cluster ACID local executado sem instalador de SO e sem necessidade de permissões de administrador de TI.
-- **EF Core 10 & Npgsql 10:** Modelagem objeto-relacional avançada com suporte nativo a 	ext[] (expertises de jurados), int[] (cadeiras que votaram) e jsonb (snapshots imutáveis de temporizadores).
-- **DatabaseStartupValidator:** Teste de conectividade TCP em localhost:5432 no boot e aplicação automática e idempotente de migrações (InitialCreate).
-- **Store Híbrido com IDbContextFactory:** PostgresArenaProjectStore isola contextos efêmeros por operação de banco e mantém o estado de palco em tempo real em memória.
-- **Sobrevivência Pós-Restart:** Registros de eventos, startups, jurados e histórico persistem intactos após encerramento forçado e reinicialização a frio.
 ## 📡 4. Contratos de Comunicação e APIs
 
 ### Endpoints REST Auditados
@@ -132,10 +139,11 @@ O frontend é uma SPA reativa desenvolvida em **React 19**, **Vite** e **Tailwin
 | `POST` | `/api/events/{id}/archive` | Arquivamento histórico (protegido com 409 se ativo) | `200 OK` / `409 Conflict` |
 | `POST` | `/api/events/{id}/duplicate` | Clonagem de evento para novo ciclo em `Draft` | `201 Created` |
 | `GET` | `/api/projects` | Lista projetos do evento ativo (`?includeCompleted=bool`) | `200 OK` |
-| `POST` | `/api/projects` | Cadastro de nova startup na fila do evento | `201 Created` |
-| `PUT` | `/api/projects/{id}` | Edição de startup existente | `200 OK` |
+| `POST` | `/api/projects` | Cadastro de nova startup na fila do evento (com mídias e vídeo) | `201 Created` |
+| `PUT` | `/api/projects/{id}` | Edição de startup existente (com mídias e vídeo) | `200 OK` |
 | `DELETE` | `/api/projects/{id}` | Exclusão de projeto (bloqueia projeto ativo no palco) | `200 OK` / `409 Conflict` |
 | `POST` | `/api/projects/{id}/select` | Promoção atômica de startup para o palco e início de rodada | `200 OK` |
+| `POST` | `/api/upload` | Upload seguro de arquivos de mídia (PNG, JPG, WebP, SVG até 20MB) | `200 OK` / `400 Bad Request` |
 | `GET` | `/api/pitch/state` | Estado detalhado da máquina de pitch e timers | `200 OK` |
 | `POST` | `/api/pitch/transition` | Transição canônica de estágio com validação estrita | `200 OK` / `422 Unprocessable` |
 | `POST` | `/api/pitch/reset` | Reset do pitch para Waiting neutralizando cadeiras | `200 OK` |
@@ -172,36 +180,43 @@ O frontend é uma SPA reativa desenvolvida em **React 19**, **Vite** e **Tailwin
 | Macrobloco | Escopo | Status |
 | :--- | :--- | :---: |
 | **Fase 1** | Operator + Stage Foundation (Cadeiras, Reset, 3D Canvas, SignalR) | ✅ **Concluída e Homologada** |
-| **Fase 2** | Event Setup & Project Management (Startups, Branding Dinâmico, Anfiteatro 3D) | ✅ **Concluída e Homologada** |
+| **Fase 2** | Event Setup & Project Management (Startups, Branding Dinâmico, Cenografia 3D) | ✅ **Concluída e Homologada** |
 | **Fase 3A** | Event Lifecycle & Governance (Draft, Ready, Active, Finished, Archived) | ✅ **Concluída e Homologada** |
 | **Fase 3B** | Pitch Lifecycle Engine (6 Estágios de Apresentação, Validações 422) | ✅ **Concluída e Homologada** |
 | **Fase 3C** | Pitch Timers, Pause/Resume & Voting Lockout (HTTP 409 Conflict) | ✅ **Concluída e Homologada** |
 | **Fase 3D** | Round History & Result Engine (Approved, Rejected, Inconclusive) | ✅ **Concluída e Homologada** |
 | **Fase 3E** | Judge Catalog & Event Jury Assignment (Banca 1..5, Palco Nominal) | ✅ **Concluída e Homologada** |
-| **Fase 4** | Platform Reliability & Data Resilience (PostgreSQL Portable, Crash Recovery, Audit, Backup, DR) | ✅ **Concluída e Homologada (v0.4.3-phase4d)** |
-| **Fase 5** | Live Show Experience & Immersive Stage (Web Audio API, R3F Postprocessing, Procedural Sound FX, Glow Reativo) | 🚀 **Em Implementação (Milestones 5A e 5B Concluídos)** |
+| **Fase 4** | Platform Reliability & Data Resilience (PostgreSQL 18.6, Crash Recovery, Audit, Backup, DR) | ✅ **Concluída e Homologada (v0.4.3-phase4d)** |
+| **Fase 5** | Live Show Experience (Hero Showcase Wall, Vídeo com Áudio, Transport Controls, Clearance) | ✅ **Concluída e Homologada (v0.5.0-phase5)** |
+| **Fase 5C.6**| HUD Cleanup (Remoção definitiva do `StageProjectBanner` legado) | 📅 **Planejado** |
+| **Fase 5D** | Arena Soundscape (Trilha e Áudio Ambiental Baseado em Estado) | 📅 **Planejado** |
+| **Fase 5E** | Arena Population (Plateia Lateral em Silhuetas / Phase 5C.5 Fase 2) | 📅 **Planejado** |
 | **Fase 6** | Awards Ceremony, Ranking & Executive Reports (Pódio 3D, Ata Oficial PDF/CSV) | 📅 **Roadmap V2** |
 | **Fase 7** | Operational Hardening, Contingency & Fleet Telemetry (Bypass no Cockpit, ESP32, Chaos) | 📅 **Roadmap V2** |
 | **Fase 8** | Evaluator Portal & Qualitative Rubrics (Módulo Satélite / Complementar) | 📅 **Roadmap V2** |
 
-### Bateria Consolidada de Testes Automatizados (688 Asserções em 14 Suítes / 100% Verde):
+### Bateria Consolidada de Testes Automatizados (Zero Falhas, Zero Regressões):
 ```text
-  tests/test-backend-api.cjs         -> 48 / 48 PASS  (Hardware Bridge & Base API)
-  tests/test-signalr.cjs             -> 46 / 46 PASS  (SignalR Broadcasts & Sincronização)
-  tests/test-projects-api.cjs        -> 62 / 62 PASS  (Projects API & ActiveContext)
-  tests/test-events-api.cjs          -> 38 / 38 PASS  (Event Lifecycle & Governance 3A)
-  tests/test-pitch-lifecycle.cjs     -> 76 / 76 PASS  (Pitch Lifecycle Engine 3B)
-  tests/test-pitch-timers.cjs        -> 50 / 50 PASS  (Timers, Pause/Resume & Lockout 3C)
-  tests/test-round-history.cjs       -> 61 / 61 PASS  (Round History & Result Engine 3D)
-  tests/test-judge-jury.cjs          -> 50 / 50 PASS  (Judge Catalog & Event Jury 3E)
-  tests/test-stage-homologation.cjs  -> 35 / 35 PASS  (Homologação E2E Palco 3D & Unanimidade)
-  tests/test-postgres-persistence.cjs-> 31 / 31 PASS  (PostgreSQL 18.6 ACID Persistence 4A)
-  tests/test-audit-query-layer.cjs   -> 79 / 79 PASS  (Audit Trail & ActivityLog Sync 4C)
-  tests/test-backup-manual.cjs       -> 24 / 24 PASS  (Manual Backup Engine & pg_dump 4D.1)
-  tests/test-disaster-recovery.cjs   -> 28 / 28 PASS  (Physical Restore & Parity Validation 4D.3)
-  tests/test-crash-rehydration.cjs   -> 33 / 33 PASS  (Crash Recovery & Paused Rehydration 4B)
+  tests/test-backend-api.cjs          -> 48 / 48 PASS  (Hardware Bridge & Base API)
+  tests/test-signalr.cjs              -> 46 / 46 PASS  (SignalR Broadcasts & Sincronização)
+  tests/test-projects-api.cjs         -> 62 / 62 PASS  (Projects API & ActiveContext)
+  tests/test-events-api.cjs           -> 38 / 38 PASS  (Event Lifecycle & Governance 3A)
+  tests/test-pitch-lifecycle.cjs      -> 76 / 76 PASS  (Pitch Lifecycle Engine 3B)
+  tests/test-pitch-timers.cjs         -> 50 / 50 PASS  (Timers, Pause/Resume & Lockout 3C)
+  tests/test-round-history.cjs        -> 61 / 61 PASS  (Round History & Result Engine 3D)
+  tests/test-judge-jury.cjs           -> 50 / 50 PASS  (Judge Catalog & Event Jury 3E)
+  tests/test-stage-homologation.cjs   -> 35 / 35 PASS  (Homologação E2E Palco 3D & Unanimidade)
+  tests/test-postgres-persistence.cjs -> 31 / 31 PASS  (PostgreSQL 18.6 ACID Persistence 4A)
+  tests/test-audit-query-layer.cjs    -> 79 / 79 PASS  (Audit Trail & ActivityLog Sync 4C)
+  tests/test-backup-manual.cjs        -> 24 / 24 PASS  (Manual Backup Engine & pg_dump 4D.1)
+  tests/test-disaster-recovery.cjs    -> 28 / 28 PASS  (Physical Restore & Parity Validation 4D.3)
+  tests/test-crash-rehydration.cjs    -> 33 / 33 PASS  (Crash Recovery & Paused Rehydration 4B)
+  tests/test-hero-wall-uploads.cjs    -> 12 / 12 PASS  (Uploads de Mídia & Galeria JSONB)
+  InfrastructureTests (.NET)          -> 72 / 72 PASS  (Persistência Relacional de ProjectMedia)
+  frontend/tests/heroWallMedia        ->  5 /  5 PASS  (Lógica Narrativa do Hero Wall)
+  frontend/tests/operatorMediaControl ->  5 /  5 PASS  (Controles de Mídia do Cockpit)
   ──────────────────────────────────────────────────────────────────────────────
-  TOTAL CONSOLIDADO                  -> 688 / 688 PASS (Zero falhas, zero regressões)
+  TOTAL CONSOLIDADO                   -> 705+ PASS (100% verde em todas as camadas)
 ```
 
 ---
@@ -211,7 +226,8 @@ O frontend é uma SPA reativa desenvolvida em **React 19**, **Vite** e **Tailwin
 ### 1. Pré-Requisitos
 - .NET 10 SDK (ou versão portátil configurada em `.env`)
 - Node.js 20+ e npm
-- Porta 5000 (Backend) e 5173 (Frontend) livres
+- PostgreSQL 18.6 (Portable local na porta 5432)
+- Portas 5000 (Backend) e 5173 (Frontend) livres
 
 ### 2. Configuração de Ambiente
 Copie o template de ambiente:
@@ -231,22 +247,6 @@ copy .env.example .env
   npm run dev
   ```
 
-### 4. Execução da Bateria Completa de Testes
-Com o backend em execução na porta 5000:
-```cmd
-node tests/test-api.cjs
-node tests/test-projects-api.cjs
-node tests/test-events-api.cjs
-node tests/test-signalr-e2e.cjs
-node tests/test-pitch-lifecycle.cjs
-node tests/homologation-2d5.cjs
-node tests/test-timers-lockout.cjs
-node tests/test-round-history.cjs
-node tests/test-judges-jury.cjs
-node tests/test-postgres-persistence.cjs
-```
-
-
 ---
 
 ## 📚 7. Documentação Técnica do Projeto
@@ -255,9 +255,9 @@ Consulte o **[Índice Mestre da Documentação (`docs/README.md`)](docs/README.m
 
 | Área Temática | Documentos Principais |
 | :--- | :--- |
-| **Arquitetura & Decisões** | [Arquitetura Geral (`docs/architecture.md`)](docs/architecture.md) • [Catálogo de ADRs — ADR-001 a ADR-028 (`docs/decision-records/`)](docs/decision-records/) |
+| **Arquitetura & Decisões** | [Arquitetura Geral (`docs/architecture.md`)](docs/architecture.md) • [Catálogo de ADRs — ADR-001 a ADR-030 (`docs/decision-records/`)](docs/decision-records/) |
 | **Produto & Visão** | [Roadmap e Planejamento Progressivo (`docs/roadmap.md`)](docs/roadmap.md) |
 | **Infraestrutura & Campo** | [Guia de Hardware ESP32 & Baseline v0.5.0 (`docs/hardware.md`)](docs/hardware.md) • [Guia de Rede e mDNS (`docs/network.md`)](docs/network.md) |
+| **Operação e Mídia** | [Guia Operacional de Mídia no Cockpit (`docs/guides/cockpit-media-operations.md`)](docs/guides/cockpit-media-operations.md) • [Guia de Arquitetura Cênica 3D (`docs/guides/arena-architecture.md`)](docs/guides/arena-architecture.md) |
 | **Histórico Operacional** | [Tabela Mestra de Marcos (`docs/archives/milestone-history.md`)](docs/archives/milestone-history.md) • [Diário Técnico (`docs/archives/implementation-history.md`)](docs/archives/implementation-history.md) |
-| **Retrospectivas** | [Fase 1](docs/archives/retrospectives/phase1-retrospective.md) • [Fase 2](docs/archives/retrospectives/phase2-retrospective.md) • [Fase 3](docs/archives/retrospectives/phase3-retrospective.md) |
-| **Auditorias & Histórico** | [Auditoria Marco 1 (`docs/archives/audits/software-foundation-audit.md`)](docs/archives/audits/software-foundation-audit.md) • [Rascunho Inicial](docs/archives/historical/roadmap-initial.md) |
+| **Retrospectivas** | [Fase 1](docs/archives/retrospectives/phase1-retrospective.md) • [Fase 2](docs/archives/retrospectives/phase2-retrospective.md) • [Fase 3](docs/archives/retrospectives/phase3-retrospective.md) • [Fechamento 5A/5B](docs/archives/milestones/Phase5AB-Closure-Report.md) |
