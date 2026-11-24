@@ -113,33 +113,48 @@ FASES ENTREGUES E HOMOLOGADAS (CONCLUÍDAS)
        ├─ [x] 5C.2 / 2A / 2B: Hero Showcase Wall (Painel Panorâmico 33.6m e Uploads)
        ├─ [x] 5C.3: Narrative States & Simplified Engine (useHeroWallMedia, useTexture, useVideoTexture)
        ├─ [x] 5C.4 / 5C.4A: Operator Media Transport Controls (Áudio, Timeline, Volume, BroadcastChannel)
-       └─ [x] 5C.5 Fase 1: Hero Wall Visual Clearance (Remoção da arquibancada frontal)
+       ├─ [x] 5C.5 Fase 1: Hero Wall Visual Clearance (Remoção da arquibancada frontal)
+       └─ [x] 5C.X: Event Media Foundation (Mídia de standby do evento no BrandingConfig)
 ════════════════════════════════════════════════════════════════════════════════
-PRÓXIMAS ENTREGAS PRIORITÁRIAS (ROADMAP V2 REVISADO)
+PRÓXIMAS ENTREGAS PRIORITÁRIAS (ROADMAP V2 INTEGRADO AO EVOLUTION PLAN)
 ════════════════════════════════════════════════════════════════════════════════
   │
-  ├─► FASE 5C.6: HUD Cleanup & Visual De-clutter (IMEDIATA)
-  │     └─ Remoção definitiva do componente legado StageProjectBanner
+  ├─► [x] FASE 5C.6: HUD Cleanup & Fechamento da Trilha 5C (CONCLUÍDA)
+  │     └─ Remoção definitiva do componente legado StageProjectBanner em StageHUD
   │
-  ├─► FASE 5D: Arena Soundscape (HIGH PRIORITY)
-  │     ├─ Áudio ambiental contínuo por estado narrativo (5 faixas discretas)
-  │     ├─ Transições com crossfade sonoro suave entre estados
-  │     └─ Controle de volume de ambiência no Cockpit
+  ├─► [x] FASE 5H: Architectural Foundation, Auth/RBAC & Experience Event Bus (CONCLUÍDA)
+  │     ├─ 5H.1: ExperienceEventBus no frontend + Recuperação de estado pós-refresh/SignalR
+  │     ├─ 5H.2: Autenticação JWT, Roles (Admin/Operator/Viewer), Proteção de Rotas & Endpoints + Audit
+  │     ├─ 5H.3: Autenticação independente para Hardware ESP32 (X-Device-Key compatível v0.5.0)
+  │     └─ 5H.4: Política e validação de segurança para Uploads (extensão, magic bytes, autorização)
+  │     └─ [x] 6A (Antecipação Integrada): Motor de Ranking Oficial consolidado (GET /api/events/:id/results)
   │
-  ├─► FASE 5E: Arena Population (HIGH PRIORITY)
-  │     ├─ Phase 5C.5 Fase 2: Assentos laterais em leque (Lateral Amphitheater Wings)
-  │     └─ Silhuetas estáticas de plateia integrada à iluminação rasante
+  ├─► [x] FASE 5I: Database Hardening (PostgreSQL RLS) & Admin Governance (CONCLUÍDA)
+  │     ├─ Row-Level Security (RLS) nas tabelas `users` e `audit_events` (`20261124200000_EnableRowLevelSecurity.cs`)
+  │     ├─ Role PostgreSQL `arena_readonly` sem acesso a linhas (isolamento validado via `SET LOCAL ROLE`)
+  │     └─ Painel Admin (`/admin`, `/api/admin/users/*`), auditoria de operações e suíte de regressão JWT (692/692 + 32/32 Admin Panel)
   │
-  ├─► FASE 5F: Visual Refinements & Stage Lighting (MEDIUM PRIORITY)
-  │     ├─ Redesign tipográfico e estético do cronômetro de broadcast (cinematográfico)
-  │     └─ Spotlights dinâmicos individuais por cadeira na revelação do resultado
+  ├─► FASE 5D: Arena Soundscape & Configurable Audio System (HIGH PRIORITY)
+  │     ├─ Biblioteca configurável de sons (sound_library) com upload validado no Cockpit
+  │     ├─ Associação de efeitos/músicas aos eventos do ExperienceEventBus (anti-sobreposição)
+  │     └─ Áudio ambiental contínuo por estado narrativo e controle de volumes no Cockpit
+  │
+  ├─► FASE 5E: Arena Population & Audience Reactions (HIGH PRIORITY)
+  │     ├─ Phase 5C.5 Fase 2: Plateia fictícia 3D em leque (InstancedMesh leve)
+  │     └─ Reações visuais e partículas sincronizadas exclusivamente com eventos reais ChairTurned
+  │
+  ├─► FASE 5F: Visual Refinements, Stage Lighting & Cinematography (MEDIUM PRIORITY)
+  │     ├─ Iluminação de borda (Rim Lighting) por estado nas cadeiras + Feixes de votação (VoteBeams)
+  │     ├─ Identidade institucional integrada ao palco (BrandLogo3D / CPTM) + 3 presets de arco
+  │     ├─ Câmera cinematográfica automática via GSAP (useCinematicCamera) + Redesign cronômetro
+  │     └─ Framework modular de Easter Eggs da marca/evento
   │
   ├─► FASE 5G: Background Music Adaptativa (MEDIUM PRIORITY)
-  │     └─ Trilha de abertura corporativa de keynote com crescendo no resultado
+  │     └─ Trilha de abertura corporativa de keynote com crossfade e crescendo no resultado
   │
   ├─► FASE 6: Awards Ceremony, Ranking & Executive Reports (ROADMAP V2)
-  │     ├─ 6A: Motor de Ranking Oficial (Desempate por Modo de Aprovação e Votos)
-  │     ├─ 6B: Telão Cênico de Premiação e Pódio (/stage com visual de celebração)
+  │     ├─ 6A: Motor de Ranking Oficial (Antecipado junto à 5H — desempate oficial no backend)
+  │     ├─ 6B: Pódio Cinematográfico Integrado à Cena 3D Existente (Revelação sequencial 3º → 2º → 1º)
   │     └─ 6C: Emissão da Ata da Banca (Exportação Executiva em PDF e CSV)
   │
   ├─► FASE 7: Operational Hardening, Contingency & Fleet Telemetry
@@ -165,19 +180,23 @@ A Phase 5 superou a meta original de ser apenas uma "fase de áudio" e transform
 4. **5C.3 (Máquina de Estados Narrativos):** Hook `useHeroWallMedia.js` orquestrando os 5 estados narrativos (`event-idle`, `waiting`, `pitch-live`, `voting`, `result`) via loaders declarativos Drei (`useTexture` e `useVideoTexture`).
 5. **5C.4 e 5C.4A (Operator Media Transport Controls):** Player profissional no Cockpit com Play, Pause, Restart, Scrubbing em timeline, saltos de -10s/+10s, volume a 70% com persistência e comunicação via `BroadcastChannel('arena_media_controls')`.
 6. **5C.5 Fase 1 (Visual Clearance):** Remoção da arquibancada frontal desobstruindo 100% da visibilidade do telão a partir da câmera principal.
+7. **5C.X (Event Media Foundation):** Mídia institucional de standby (imagem/vídeo/auto) configurável por evento em `BrandingConfig` e reproduzida no estado `event-idle`.
+8. **5C.6 (HUD Cleanup — ✅ Concluída):** Remoção definitiva do `StageProjectBanner` em `StageHUD.jsx`, encerrando 100% da trilha 5C.
+9. **5H (Architectural Foundation, Auth/RBAC & Experience Event Bus — ✅ Concluída):** `ExperienceEventBus` reativo no frontend, autenticação JWT com roles (`Admin`, `Operator`, `Viewer`), autenticação independente para dispositivos ESP32 (`X-Device-Key`), proteção de rotas (`/login`, `<RequireAuth>`) e endpoints, validação de uploads por magic bytes e auditoria de segurança (`tests/test-auth-and-ranking.cjs`: 32/32 aprovados).
+10. **5I (PostgreSQL RLS & User Governance — ✅ Concluída):** Ativação de Row-Level Security nas tabelas `users` e `audit_events`, criação da role isolada `arena_readonly` validada com `SET LOCAL ROLE`, Painel Administrativo de Usuários (`/admin` + `/api/admin/users/*` protegido por `PolicyAdminOnly`) com auditoria e adaptação integral das 14 suítes de regressão para JWT (`tests/test-admin-panel.cjs`: 32/32, `tests/run-regression-suite.cjs`: 692/692).
 
 ---
 
 ### FASE 6: Awards Ceremony, Ranking & Executive Reports
-*Consolidar a apuração do evento com pódio visual no telão e emissão de ata executiva formal.*
+*Consolidar a apuração do evento com pódio visual integrado à cena 3D e emissão de ata executiva formal.*
 
-- **STATUS:** 📅 PLANEJADA (Roadmap V2)
-- **OBJETIVO:** Computar a classificação geral dos pitches apresentados, projetar a cerimônia de premiação no palco e exportar a ata oficial em PDF e CSV para a comissão organizadora.
-- **PRÉ-REQUISITOS:** Fase 4 (Persistência) e Fase 3D (Result Engine).
+- **STATUS:** 🔄 EM INÍCIO (6A antecipado junto à fundação 5H)
+- **OBJETIVO:** Computar a classificação geral dos pitches apresentados, projetar a cerimônia de premiação integrada ao palco 3D existente e exportar a ata oficial em PDF e CSV para a comissão organizadora.
+- **PRÉ-REQUISITOS:** Fase 4 (Persistência), Fase 3D (Result Engine) e Fase 5H (Segurança & EventBus).
 - **DIRETRIZ DE HARDWARE:** **Firmware Congelado.** Nenhuma alteração no código embarcado dos ESP32 é introduzida na Fase 6. O firmware baseline `v0.5.0` permanece intacto e estável enquanto a evolução ocorre exclusivamente no backend e frontend.
 - **SUBFASES E ESCOPO:**
-  - **Milestone 6A — Motor de Ranking Oficial:** Algoritmo de classificação baseado nos snapshots do `RoundHistoryEntry` com desempate por: `ApprovalMode` (Unanimidade > Maioria) ➔ Total de Votos ➔ Ordem cronológica.
-  - **Milestone 6B — Telão Cênico de Premiação e Pódio:** Visualização de encerramento no `/stage` com revelação do Top 3 / Top 5 das startups apoiadas pela banca com iluminação dourada e efeitos cênicos.
+  - **Milestone 6A — Motor de Ranking Oficial (✅ Concluído junto à 5H):** Algoritmo determinístico no backend (`GET /api/events/:id/results`) baseado nos snapshots do `RoundHistoryEntry` com desempate por: `Result` (`Approved` primeiro) ➔ `ApprovalMode` (`Unanimous` > `Majority` > `Minority` > `None`) ➔ `TurnedChairCount` ➔ Menor duração efetiva / ordem cronológica.
+  - **Milestone 6B — Pódio Cinematográfico Integrado à Cena 3D:** Modo integrado na cena `StagePage`/`StudioScene` reutilizando palco, cadeiras, luzes, câmera e `AudioEngine`, com revelação sequencial obrigatória (`3º Lugar` → `2º Lugar` → `1º Lugar`) e persistência de estado em recuperação pós-refresh.
   - **Milestone 6C — Emissão de Ata da Banca:** Endpoints `GET /api/reports/minutes?format=pdf|csv` e botão no cockpit "Exportar Ata do Evento", gerando documento executivo pronto para assinatura do comitê.
 
 ---
@@ -223,6 +242,6 @@ A Phase 5 superou a meta original de ser apenas uma "fase de áudio" e transform
 ## 🎯 PRÓXIMA FASE OFICIAL RECOMENDADA
 
 > [!IMPORTANT]
-> **A Próxima Fase a ser desenvolvida é a FASE 5C.6: HUD CLEANUP & REMOÇÃO DO STAGEPROJECTBANNER.**  
-> Branch oficial recomendada: `feat/phase5-live-show-experience`  
-> Com o Hero Showcase Wall e os controles de mídia consolidados, o card inferior esquerdo `StageProjectBanner` tornou-se totalmente redundante. Sua remoção definitiva limpa a interface do telão público, desobstruindo a visualização da bancada e pavimentando o caminho para a **Phase 5D (Arena Soundscape)**.
+> **Hardening 5I Concluído (`5I` ✅):** PostgreSQL RLS (`users`, `audit_events`, `arena_readonly`), Painel Administrativo de Usuários (`/admin` + `/api/admin/users/*`) e Suíte de Regressão JWT 100% verde (`692/692` em 14 suítes + `32/32` em `test-admin-panel.cjs` + `32/32` em `test-auth-and-ranking.cjs`).  
+> **Próxima Fase Recomendada:** **FASE 5D (Arena Soundscape & Configurable Audio System)** aguardando autorização.  
+> Branch oficial: `feat/phase5-live-show-experience`
