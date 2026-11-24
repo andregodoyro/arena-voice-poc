@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { StagePage } from './pages/StagePage';
 import { LoginPage } from './pages/LoginPage';
+import { AdminPage } from './pages/AdminPage';
 import { OperatorLayout } from './components/operator/OperatorLayout';
 import { OperatorCockpitTab } from './pages/operator/OperatorCockpitTab';
 import { OperatorProjectsTab } from './pages/operator/OperatorProjectsTab';
@@ -12,7 +13,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { RequireAuth } from './components/auth/RequireAuth';
 
 /**
- * App — Orquestrador de Estado, Autenticação, Sincronização e Roteamento (Milestone 2C.5 / 3E / 5H).
+ * App — Orquestrador de Estado, Autenticação, Sincronização e Roteamento (Milestone 2C.5 / 3E / 5H / 5I).
  */
 export default function App() {
   return (
@@ -27,6 +28,16 @@ export default function App() {
 
           {/* Superfície Cênica: Telão Público 3D */}
           <Route path="/stage" element={<StagePage />} />
+
+          {/* Painel Administrativo: restrito a Admin (Milestone 5I) */}
+          <Route
+            path="/admin"
+            element={
+              <RequireAuth allowedRoles={['Admin']}>
+                <AdminPage />
+              </RequireAuth>
+            }
+          />
 
           {/* Mesa Técnica Protegida: Cockpit do Operador com Sub-Navegação por Abas */}
           <Route

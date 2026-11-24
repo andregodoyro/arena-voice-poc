@@ -1,12 +1,13 @@
 import React from 'react';
-import { Radio, ExternalLink, LogOut, ShieldCheck } from 'lucide-react';
+import { Radio, ExternalLink, LogOut, ShieldCheck, Settings } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 /**
  * OperatorHeader — Cabeçalho institucional, status de prontidão e sessão autenticada (Milestone 5H.2).
  */
 export function OperatorHeader({ connectionStatus }) {
-  const { user, logout } = useAuth();
+  const { user, logout, hasRole } = useAuth();
 
   const getProductStatus = () => {
     switch (connectionStatus) {
@@ -73,6 +74,18 @@ export function OperatorHeader({ connectionStatus }) {
           <span>Ver Telão</span>
           <ExternalLink className="w-3.5 h-3.5" />
         </a>
+
+        {/* Painel Admin — visível apenas para Admin */}
+        {hasRole('Admin') && (
+          <Link
+            to="/admin"
+            className="px-3 py-2 rounded-xl border border-red-500/30 bg-red-500/5 hover:bg-red-500/15 text-red-300 hover:text-red-200 text-xs font-medium flex items-center gap-1.5 transition-all"
+            title="Acessar Painel Administrativo"
+          >
+            <Settings className="w-3.5 h-3.5" />
+            <span>Painel Admin</span>
+          </Link>
+        )}
 
         {/* Perfil do Usuário Autenticado + Logout */}
         {user && (
