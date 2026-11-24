@@ -1,4 +1,4 @@
-using ArenaVoicePocBackend.Domain.Entities;
+﻿using ArenaVoicePocBackend.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -30,6 +30,9 @@ public class EventConfiguration : IEntityTypeConfiguration<Event>
             b.Property(p => p.SecondaryColor).HasColumnName("secondary_color").HasMaxLength(9).IsRequired();
             b.Property(p => p.LogoUrl).HasColumnName("logo_url").HasMaxLength(500).IsRequired();
             b.Property(p => p.Tagline).HasColumnName("tagline").HasMaxLength(200).IsRequired();
+            b.Property(p => p.CoverImageUrl).HasColumnName("cover_image_url").HasMaxLength(500).HasDefaultValue(string.Empty);
+            b.Property(p => p.VideoUrl).HasColumnName("video_url").HasMaxLength(500).HasDefaultValue(string.Empty);
+            b.Property(p => p.MediaMode).HasColumnName("media_mode").HasMaxLength(20).HasDefaultValue("auto");
         });
 
         // Owned Type: TimerConfig

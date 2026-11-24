@@ -7,6 +7,9 @@ import {
   Type,
   FileText,
   Image as ImageIcon,
+  Film,
+  Monitor,
+  Upload,
   Loader2,
   AlertCircle,
   Tag,
@@ -15,9 +18,16 @@ import {
 import { ColorSwatch } from './ColorSwatch';
 import { ColorPreviewCard } from './ColorPreviewCard';
 import { EVENT_STATUS } from '../../utils/eventStatus';
+import { eventsApi } from '../../api/eventsApi';
 
 /**
- * EventModal — Modal completo de criação e edição de eventos (Milestone 3A).
+ * EventModal — Modal completo de criação e edição de eventos (Milestone 3A / 5C.X).
+ *
+ * Inclui:
+ *  - Metadados do evento (Título, Descrição, Data, Status)
+ *  - Iluminação cênica do palco (Cores primária e secundária)
+ *  - Mídia de Standby do Evento (MediaMode: auto | video | image, Capa, Vídeo e Logo)
+ *  - Timers e Trava de Votação (Lockout)
  */
 export function EventModal({
   isOpen,
@@ -36,6 +46,10 @@ export function EventModal({
   const [secondaryColor, setSecondaryColor] = useState('#ffd166');
   const [logoUrl, setLogoUrl] = useState('');
   const [tagline, setTagline] = useState('');
+  const [coverImageUrl, setCoverImageUrl] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
+  const [mediaMode, setMediaMode] = useState('auto');
+  const [uploadingTarget, setUploadingTarget] = useState(null);
   const [pitchDuration, setPitchDuration] = useState(180);
   const [qaDuration, setQaDuration] = useState(120);
   const [votingDuration, setVotingDuration] = useState(30);
@@ -65,6 +79,9 @@ export function EventModal({
       setSecondaryColor(initialEvent.branding?.secondaryColor || '#ffd166');
       setLogoUrl(initialEvent.branding?.logoUrl || '');
       setTagline(initialEvent.branding?.tagline || '');
+      setCoverImageUrl(initialEvent.branding?.coverImageUrl || '');
+      setVideoUrl(initialEvent.branding?.videoUrl || '');
+      setMediaMode(initialEvent.branding?.mediaMode || 'auto');
       setPitchDuration(initialEvent.timers?.pitchDurationSeconds ?? 180);
       setQaDuration(initialEvent.timers?.qaDurationSeconds ?? 120);
       setVotingDuration(initialEvent.timers?.votingDurationSeconds ?? 30);
@@ -78,6 +95,9 @@ export function EventModal({
       setSecondaryColor('#ffd166');
       setLogoUrl('/branding/event-logo.png');
       setTagline('O palco onde as melhores ideias conquistam as cadeiras.');
+      setCoverImageUrl('');
+      setVideoUrl('');
+      setMediaMode('auto');
       setPitchDuration(180);
       setQaDuration(120);
       setVotingDuration(30);
@@ -87,6 +107,30 @@ export function EventModal({
   }, [initialEvent, isOpen]);
 
   if (!isOpen) return null;
+
+  const handleFileUpload = async (e, target) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingTarget(target);
+    setErrorMsg(null);
+
+    try {
+      const result = await eventsApi.uploadMedia(files[0]);
+      if (target === 'logo') {
+        setLogoUrl(result.url);
+      } else if (target === 'cover') {
+        setCoverImageUrl(result.url);
+      } else if (target === 'video') {
+        setVideoUrl(result.url);
+      }
+    } catch (err) {
+      setErrorMsg(`Falha no upload do arquivo: ${err.message || 'Erro desconhecido'}`);
+    } finally {
+      setUploadingTarget(null);
+      e.target.value = '';
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -105,6 +149,9 @@ export function EventModal({
         secondaryColor,
         logoUrl: logoUrl.trim() || '/branding/event-logo.png',
         tagline: tagline.trim(),
+        coverImageUrl: coverImageUrl.trim(),
+        videoUrl: videoUrl.trim(),
+        mediaMode: mediaMode || 'auto',
       },
       timers: {
         pitchDurationSeconds: Number(pitchDuration) || 180,
@@ -157,9 +204,9 @@ export function EventModal({
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* COLUNA ESQUERDA: DADOS INSTITUCIONAIS (7 colunas) */}
+            {/* COLUNA ESQUERDA: DADOS INSTITUCIONAIS & MÍDIA DE STANDBY (7 colunas) */}
             <div className="lg:col-span-7 space-y-4">
-              {/* Título */}
+              {/* Título do Evento */}
               <div>
                 <label className="block text-xs font-semibold text-gray-300 mb-1.5 flex items-center gap-1.5">
                   <Type className="w-3.5 h-3.5 text-amber-400" />
@@ -167,11 +214,10 @@ export function EventModal({
                 </label>
                 <input
                   type="text"
+                  required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="ex: Demo Day Inovação 2027"
-                  maxLength={150}
-                  required
+                  placeholder="ex: Demo Day Inovação 2026"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-amber-500/50"
                 />
               </div>
@@ -180,19 +226,20 @@ export function EventModal({
               <div>
                 <label className="block text-xs font-semibold text-gray-300 mb-1.5 flex items-center gap-1.5">
                   <FileText className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Descrição / Objetivo</span>
+                  <span>Descrição Institucional</span>
                 </label>
                 <textarea
+                  rows={2}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                  placeholder="Descreva o propósito, regulamento ou público da dinâmica..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-amber-500/50 resize-none"
+                  placeholder="Breve resumo dos objetivos do evento e perfil das apresentações..."
+                  className="w-full px-3.5 py-2 rounded-xl bg-black/40 border border-white/10 text-white placeholder-gray-500 text-xs focus:outline-none focus:border-amber-500/50 resize-none"
                 />
               </div>
 
-              {/* Data & Status */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Grid: Data Agendada & Status Inicial */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Data Agendada */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-300 mb-1.5 flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-amber-400" />
@@ -202,31 +249,29 @@ export function EventModal({
                     type="datetime-local"
                     value={scheduledDate}
                     onChange={(e) => setScheduledDate(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-amber-500/50"
+                    className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-amber-500/50 [color-scheme:dark]"
                   />
                 </div>
 
+                {/* Status */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-300 mb-1.5 flex items-center gap-1.5">
                     <Tag className="w-3.5 h-3.5 text-amber-400" />
-                    <span>{isEditing ? 'Status do Evento' : 'Status Inicial'}</span>
+                    <span>Status do Evento</span>
                   </label>
-                  {isEditing && (initialEvent?.status === EVENT_STATUS.ACTIVE || initialEvent?.status === 'Active' || initialEvent?.status === 2) ? (
-                    <div className="w-full px-3.5 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                        Ativo na Arena
-                      </span>
-                      <span className="text-[10px] text-emerald-500/80 uppercase font-mono tracking-wider">Em Execução</span>
+                  {isEditing && initialEvent.status === EVENT_STATUS.ACTIVE ? (
+                    <div className="px-3.5 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>Ativo na Arena (Bloqueado)</span>
                     </div>
                   ) : (
                     <select
                       value={status}
                       onChange={(e) => setStatus(Number(e.target.value))}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-amber-500/50"
+                      className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-xs focus:outline-none focus:border-amber-500/50"
                     >
                       <option value={EVENT_STATUS.DRAFT}>Rascunho (Draft)</option>
-                      <option value={EVENT_STATUS.READY}>Pronto (Ready)</option>
+                      <option value={EVENT_STATUS.READY}>Pronto para Iniciar (Ready)</option>
                       <option value={EVENT_STATUS.FINISHED}>Encerrado (Finished)</option>
                       <option value={EVENT_STATUS.ARCHIVED}>Arquivado (Archived)</option>
                     </select>
@@ -252,19 +297,190 @@ export function EventModal({
                 />
               </div>
 
-              {/* Logo URL */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1.5 flex items-center gap-1.5">
-                  <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
-                  <span>URL do Logotipo</span>
-                </label>
-                <input
-                  type="text"
-                  value={logoUrl}
-                  onChange={(e) => setLogoUrl(e.target.value)}
-                  placeholder="/branding/event-logo.png ou https://..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white placeholder-gray-500 text-xs focus:outline-none focus:border-amber-500/50 font-mono"
-                />
+              {/* ── SEÇÃO: MÍDIA DE STANDBY DO EVENTO (Phase 5C.X) ──────────────── */}
+              <div className="p-4 rounded-xl bg-white/[0.02] border border-white/10 space-y-4">
+                <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Monitor className="w-4 h-4 text-amber-400 shrink-0" />
+                    <div>
+                      <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider">
+                        Mídia de Standby do Evento
+                      </h4>
+                      <p className="text-[11px] text-gray-400">
+                        Conteúdo institucional exibido no Hero Wall durante o estado de standby/abertura (EventIdle)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modo de Apresentação (MediaMode) */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-300 mb-1.5">
+                    Modo de Apresentação no Hero Wall
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMediaMode('auto')}
+                      className={`px-2.5 py-2 rounded-lg text-xs font-medium text-left transition-all border ${
+                        mediaMode === 'auto'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/10'
+                          : 'bg-black/30 text-gray-400 border-white/5 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <span className="block font-semibold">Auto (Padrão)</span>
+                      <span className="block text-[10px] text-gray-400 mt-0.5">Vídeo → Capa → Logo</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setMediaMode('video')}
+                      className={`px-2.5 py-2 rounded-lg text-xs font-medium text-left transition-all border ${
+                        mediaMode === 'video'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/10'
+                          : 'bg-black/30 text-gray-400 border-white/5 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <span className="block font-semibold">Vídeo</span>
+                      <span className="block text-[10px] text-gray-400 mt-0.5">Prioriza reprodução</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setMediaMode('image')}
+                      className={`px-2.5 py-2 rounded-lg text-xs font-medium text-left transition-all border ${
+                        mediaMode === 'image'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/10'
+                          : 'bg-black/30 text-gray-400 border-white/5 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <span className="block font-semibold">Apenas Imagem</span>
+                      <span className="block text-[10px] text-gray-400 mt-0.5">Capa fixa (sem vídeo)</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Imagem de Capa do Evento (CoverImageUrl) */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-gray-300 flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Imagem Institucional de Capa</span>
+                    </label>
+                    <label className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[11px] font-medium cursor-pointer transition-colors flex items-center gap-1">
+                      <Upload className="w-3 h-3" />
+                      <span>{uploadingTarget === 'cover' ? 'Enviando...' : 'Fazer Upload'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingTarget !== null}
+                        onChange={(e) => handleFileUpload(e, 'cover')}
+                      />
+                    </label>
+                  </div>
+
+                  {coverImageUrl && (
+                    <div className="relative group w-full h-24 rounded-lg overflow-hidden border border-white/10 bg-black/60 flex items-center justify-center">
+                      <img
+                        src={coverImageUrl}
+                        alt="Preview Capa Evento"
+                        className="w-full h-full object-cover object-center"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setCoverImageUrl('')}
+                        className="absolute top-1.5 right-1.5 p-1 rounded-md bg-red-950/80 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Remover imagem de capa"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  <input
+                    type="text"
+                    value={coverImageUrl}
+                    onChange={(e) => setCoverImageUrl(e.target.value)}
+                    placeholder="/branding/event-cover.png ou URL da imagem panorâmica..."
+                    className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white placeholder-gray-500 text-xs font-mono focus:outline-none focus:border-amber-500/50"
+                  />
+                </div>
+
+                {/* Vídeo Institucional do Evento (VideoUrl) */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-gray-300 flex items-center gap-1.5">
+                      <Film className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Vídeo Institucional de Abertura / Standby</span>
+                    </label>
+                    <label className="px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-300 text-[11px] font-medium cursor-pointer transition-colors flex items-center gap-1">
+                      <Upload className="w-3 h-3" />
+                      <span>{uploadingTarget === 'video' ? 'Enviando...' : 'Fazer Upload'}</span>
+                      <input
+                        type="file"
+                        accept="video/*"
+                        className="hidden"
+                        disabled={uploadingTarget !== null}
+                        onChange={(e) => handleFileUpload(e, 'video')}
+                      />
+                    </label>
+                  </div>
+
+                  {videoUrl && (
+                    <div className="p-2 rounded-lg bg-blue-950/30 border border-blue-500/20 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs text-blue-200 truncate">
+                        <Film className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <span className="truncate font-mono text-[11px]">{videoUrl}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setVideoUrl('')}
+                        className="p-1 rounded-md hover:bg-red-950/80 text-gray-400 hover:text-red-400 transition-colors ml-2 shrink-0"
+                        title="Remover vídeo"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  <input
+                    type="text"
+                    value={videoUrl}
+                    onChange={(e) => setVideoUrl(e.target.value)}
+                    placeholder="/uploads/event-standby.mp4 ou URL de vídeo..."
+                    className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white placeholder-gray-500 text-xs font-mono focus:outline-none focus:border-amber-500/50"
+                  />
+                </div>
+
+                {/* Logotipo do Evento */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-gray-300 flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Logotipo do Evento</span>
+                    </label>
+                    <label className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[11px] font-medium cursor-pointer transition-colors flex items-center gap-1">
+                      <Upload className="w-3 h-3" />
+                      <span>{uploadingTarget === 'logo' ? 'Enviando...' : 'Fazer Upload'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingTarget !== null}
+                        onChange={(e) => handleFileUpload(e, 'logo')}
+                      />
+                    </label>
+                  </div>
+
+                  <input
+                    type="text"
+                    value={logoUrl}
+                    onChange={(e) => setLogoUrl(e.target.value)}
+                    placeholder="/branding/event-logo.png ou https://..."
+                    className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white placeholder-gray-500 text-xs font-mono focus:outline-none focus:border-amber-500/50"
+                  />
+                </div>
               </div>
 
               {/* Seção de Timers & Lockout (Milestone 3C) */}

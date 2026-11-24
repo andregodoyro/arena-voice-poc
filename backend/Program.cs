@@ -1,4 +1,4 @@
-using ArenaVoicePocBackend.Configuration;
+﻿using ArenaVoicePocBackend.Configuration;
 using ArenaVoicePocBackend.Domain;
 using ArenaVoicePocBackend.Domain.DTOs;
 using ArenaVoicePocBackend.Domain.Entities;
@@ -20,36 +20,106 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Configuração de host e porta (permite sobrescrita por variáveis de ambiente)
 var hostEnv = Environment.GetEnvironmentVariable("BACKEND_HOST") ?? "0.0.0.0";
-var portEnv = Environment.GetEnvironmentVariable("BACKEND_PORT");
+var portEnv = Environment.GetEnvironmentVariable("PORT") ?? Environment.GetEnvironmentVariable("BACKEND_PORT");
 var port = int.TryParse(portEnv, out var p) ? p : 5000;
 
 builder.WebHost.ConfigureKestrel(options =>
 {
     var bindAddress = hostEnv == "127.0.0.1" || hostEnv == "localhost" ? IPAddress.Loopback : IPAddress.Any;
     options.Listen(bindAddress, port);
+    // Aumentar limite de request body para suportar upload de vídeos de até 100 MB (Phase 5C.4)
+    options.Limits.MaxRequestBodySize = 105 * 1024 * 1024; // 105 MB com margem de overhead
 });
 
-// Configuração CORS permissiva para desenvolvimento local
+// Configuração CORS: suporte a origens configuráveis via env var, Vercel e dev local
+var rawAllowedOrigins = Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGINS") 
+                     ?? Environment.GetEnvironmentVariable("FRONTEND_URL");
+
+var explicitOrigins = (rawAllowedOrigins ?? "https://arena-voice-poc.vercel.app")
+    .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.SetIsOriginAllowed(_ => true)
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
+        policy.SetIsOriginAllowed(origin =>
+        {
+            if (string.IsNullOrWhiteSpace(origin)) return false;
+
+            var trimmedOrigin = origin.TrimEnd('/');
+
+            // 1. Origens explicitamente permitidas (ex: https://arena-voice-poc.vercel.app)
+            if (explicitOrigins.Any(allowed => trimmedOrigin.Equals(allowed.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)))
+                return true;
+
+            // 2. Todos os deploys da Vercel (*.vercel.app)
+            if (trimmedOrigin.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // 3. Desenvolvimento local
+            if (trimmedOrigin.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase) ||
+                trimmedOrigin.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            return false;
+        })
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials();
     });
 });
 
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = true;
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+    options.HandshakeTimeout = TimeSpan.FromSeconds(15);
+});
 
 // =========================================================================
 // CONFIGURAÇÃO DE PERSISTÊNCIA & REGISTRO CONDICIONAL DE SERVIÇOS (MILESTONE 4A)
 // =========================================================================
+static string NormalizePostgresConnectionString(string raw)
+{
+    if (string.IsNullOrWhiteSpace(raw)) return raw;
+    raw = raw.Trim();
+    if (raw.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
+        raw.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+    {
+        var uri = new Uri(raw);
+        var userInfo = uri.UserInfo.Split(':');
+        var username = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : "";
+        var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
+        var port = uri.Port > 0 ? uri.Port : 5432;
+        var database = uri.AbsolutePath.TrimStart('/');
+        return $"Host={uri.Host};Port={port};Database={database};Username={username};Password={password};SSL Mode=Require;Trust Server Certificate=true;";
+    }
+
+    if (!raw.Contains("SSL Mode", StringComparison.OrdinalIgnoreCase) && 
+        !raw.Contains("localhost", StringComparison.OrdinalIgnoreCase) && 
+        !raw.Contains("127.0.0.1"))
+    {
+        raw = raw.TrimEnd(';') + ";SSL Mode=Require;Trust Server Certificate=true;";
+    }
+
+    return raw;
+}
+
 var persistenceSection = builder.Configuration.GetSection(ArenaPersistenceOptions.SectionName);
 builder.Services.Configure<ArenaPersistenceOptions>(persistenceSection);
 
 var persistenceOptions = persistenceSection.Get<ArenaPersistenceOptions>() ?? new ArenaPersistenceOptions();
+var rawConnString = Environment.GetEnvironmentVariable("DATABASE_URL")
+                 ?? Environment.GetEnvironmentVariable("ArenaPersistence__ConnectionString")
+                 ?? persistenceOptions.ConnectionString;
+var effectiveConnectionString = NormalizePostgresConnectionString(rawConnString);
+
+builder.Services.PostConfigure<ArenaPersistenceOptions>(opts =>
+{
+    opts.ConnectionString = effectiveConnectionString;
+});
 var storageEngineEnv = Environment.GetEnvironmentVariable("ARENA_STORAGE_ENGINE") ?? Environment.GetEnvironmentVariable("ARENA_STORAGE");
 var effectiveStorageEngine = !string.IsNullOrWhiteSpace(storageEngineEnv)
     ? storageEngineEnv
@@ -95,10 +165,12 @@ else
     // Modo Oficial: PostgreSQL Portable via EF Core 10 + Npgsql
     builder.Services.AddPooledDbContextFactory<ArenaDbContext>(opt =>
     {
-        opt.UseNpgsql(persistenceOptions.ConnectionString, npgsqlOpt =>
+        opt.UseNpgsql(effectiveConnectionString, npgsqlOpt =>
         {
             npgsqlOpt.CommandTimeout(persistenceOptions.CommandTimeoutSeconds);
         });
+
+        opt.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
 
         if (persistenceOptions.EnableSensitiveDataLogging)
         {
@@ -116,7 +188,34 @@ var app = builder.Build();
 var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseStartup");
 DatabaseStartupValidator.ValidateAndMigrate(app.Services, logger);
 
+app.UseWebSockets();
+
 app.UseCors();
+
+// Health check para Render e monitoramento de proxies
+app.MapGet("/health", () => Results.Ok(new
+{
+    status = "healthy",
+    timestamp = DateTimeOffset.UtcNow,
+    environment = app.Environment.EnvironmentName
+}));
+
+// Servir arquivos estáticos para uploads
+var configuredUploads = Environment.GetEnvironmentVariable("UPLOADS_DIR") ?? Environment.GetEnvironmentVariable("UPLOADS_PATH");
+var uploadsDir = !string.IsNullOrWhiteSpace(configuredUploads)
+    ? configuredUploads
+    : Path.Combine(app.Environment.ContentRootPath, "uploads");
+if (!Directory.Exists(uploadsDir)) Directory.CreateDirectory(uploadsDir);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsDir),
+    RequestPath = "/uploads",
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
+        ctx.Context.Response.Headers.Append("Cache-Control", "public, max-age=86400");
+    }
+});
 
 // =========================================================================
 // 1. ENDPOINTS PRINCIPAIS DE CADEIRA: LOCKOUT AUTORITATIVO & HARDWARE BRIDGE
@@ -335,7 +434,10 @@ app.MapPut("/api/events/current", async (UpdateEventDto dto, IArenaProjectStore 
             PrimaryColor = primary,
             SecondaryColor = secondary,
             LogoUrl = dto.Branding.LogoUrl ?? currentEvent.Branding.LogoUrl,
-            Tagline = dto.Branding.Tagline ?? currentEvent.Branding.Tagline
+            Tagline = dto.Branding.Tagline ?? currentEvent.Branding.Tagline,
+            CoverImageUrl = dto.Branding.CoverImageUrl ?? currentEvent.Branding.CoverImageUrl,
+            VideoUrl = dto.Branding.VideoUrl ?? currentEvent.Branding.VideoUrl,
+            MediaMode = dto.Branding.MediaMode ?? currentEvent.Branding.MediaMode
         };
         brandingChanged = true;
     }
@@ -433,7 +535,10 @@ app.MapPost("/api/events", (CreateEventDto dto, IArenaProjectStore store) =>
             PrimaryColor = primary,
             SecondaryColor = secondary,
             LogoUrl = dto.Branding?.LogoUrl?.Trim() ?? "/branding/event-logo.png",
-            Tagline = dto.Branding?.Tagline?.Trim() ?? "O palco onde as melhores ideias conquistam as cadeiras."
+            Tagline = dto.Branding?.Tagline?.Trim() ?? "O palco onde as melhores ideias conquistam as cadeiras.",
+            CoverImageUrl = dto.Branding?.CoverImageUrl?.Trim() ?? string.Empty,
+            VideoUrl = dto.Branding?.VideoUrl?.Trim() ?? string.Empty,
+            MediaMode = dto.Branding?.MediaMode?.Trim() ?? "auto"
         },
         Timers = new TimerConfig
         {
@@ -506,7 +611,10 @@ app.MapPut("/api/events/{id}", async (string id, UpdateEventDto dto, IArenaProje
             PrimaryColor = primary,
             SecondaryColor = secondary,
             LogoUrl = dto.Branding.LogoUrl ?? evt.Branding.LogoUrl,
-            Tagline = dto.Branding.Tagline ?? evt.Branding.Tagline
+            Tagline = dto.Branding.Tagline ?? evt.Branding.Tagline,
+            CoverImageUrl = dto.Branding.CoverImageUrl ?? evt.Branding.CoverImageUrl,
+            VideoUrl = dto.Branding.VideoUrl ?? evt.Branding.VideoUrl,
+            MediaMode = dto.Branding.MediaMode ?? evt.Branding.MediaMode
         };
         brandingChanged = true;
     }
@@ -843,7 +951,9 @@ app.MapPost("/api/projects", (CreateProjectDto dto, IArenaProjectStore store) =>
         Media = new ProjectMedia
         {
             LogoUrl = dto.LogoUrl?.Trim() ?? string.Empty,
-            CoverImageUrl = dto.CoverImageUrl?.Trim() ?? string.Empty
+            CoverImageUrl = dto.CoverImageUrl?.Trim() ?? string.Empty,
+            VideoUrl = dto.VideoUrl?.Trim() ?? string.Empty,
+            Items = dto.MediaItems ?? new()
         }
     };
 
@@ -851,14 +961,68 @@ app.MapPost("/api/projects", (CreateProjectDto dto, IArenaProjectStore store) =>
     return Results.Created($"/api/projects/{created.Id}", created);
 });
 
+// POST /api/upload — Upload de ativos visuais e de vídeo do projeto (Phase 5C.2B / 5C.4)
+app.MapPost("/api/upload", async (IFormFile? file, IWebHostEnvironment env) =>
+{
+    if (file == null || file.Length == 0)
+    {
+        return Results.BadRequest(new { error = "Nenhum arquivo enviado." });
+    }
+
+    // Imagens: até 20 MB | Vídeos: até 100 MB
+    var allowedImages = new[] { ".jpg", ".jpeg", ".png", ".webp", ".svg" };
+    var allowedVideos = new[] { ".mp4", ".webm" };
+    var allowedExtensions = allowedImages.Concat(allowedVideos).ToArray();
+
+    var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+    if (!allowedExtensions.Contains(ext))
+    {
+        return Results.BadRequest(new { error = $"Formato '{ext}' não suportado. Formatos aceitos: JPG, JPEG, PNG, WEBP, SVG, MP4, WEBM." });
+    }
+
+    bool isVideo = allowedVideos.Contains(ext);
+    long maxBytes = isVideo ? 100L * 1024 * 1024 : 20L * 1024 * 1024;
+    string limitLabel = isVideo ? "100MB" : "20MB";
+
+    if (file.Length > maxBytes)
+    {
+        return Results.BadRequest(new { error = $"O arquivo excede o limite de {limitLabel} para {(isVideo ? "vídeos" : "imagens")}." });
+    }
+
+    var safeFileName = $"{Guid.NewGuid():N}{ext}";
+    var configuredUploads = Environment.GetEnvironmentVariable("UPLOADS_DIR") ?? Environment.GetEnvironmentVariable("UPLOADS_PATH");
+    var targetDir = !string.IsNullOrWhiteSpace(configuredUploads)
+        ? configuredUploads
+        : Path.Combine(env.ContentRootPath, "uploads");
+    if (!Directory.Exists(targetDir)) Directory.CreateDirectory(targetDir);
+    var targetPath = Path.Combine(targetDir, safeFileName);
+
+    using (var stream = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.Read))
+    {
+        await file.CopyToAsync(stream);
+        await stream.FlushAsync();
+    }
+
+    return Results.Ok(new
+    {
+        url = $"/uploads/{safeFileName}",
+        fileName = file.FileName,
+        safeFileName,
+        size = file.Length,
+        contentType = file.ContentType
+    });
+}).DisableAntiforgery();
+
 // PUT /api/projects/{id} — Atualiza dados de um projeto existente
 app.MapPut("/api/projects/{id}", async (string id, UpdateProjectDto dto, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
 {
+
     var project = store.GetProjectById(id);
     if (project == null)
     {
         return Results.NotFound(new { error = "Projeto não encontrado.", id });
     }
+
 
     if (!string.IsNullOrWhiteSpace(dto.Title))
     {
@@ -891,12 +1055,21 @@ app.MapPut("/api/projects/{id}", async (string id, UpdateProjectDto dto, IArenaP
         project.OrderIndex = dto.OrderIndex.Value;
     }
 
-    if (dto.LogoUrl != null || dto.CoverImageUrl != null)
+    if (dto.LogoUrl != null || dto.CoverImageUrl != null || dto.VideoUrl != null || dto.MediaItems != null)
     {
+        // Regra: string vazia ("") preserva o valor existente no banco (não sobrescreve).
+        // Apenas uma URL preenchida com conteúdo efetivo atualiza o campo.
+        // Isso evita que "não editar o campo" (envio de "") apague uma URL previamente salva.
+        var newLogoUrl       = string.IsNullOrWhiteSpace(dto.LogoUrl)       ? project.Media.LogoUrl       : dto.LogoUrl.Trim();
+        var newCoverImageUrl = string.IsNullOrWhiteSpace(dto.CoverImageUrl) ? project.Media.CoverImageUrl : dto.CoverImageUrl.Trim();
+        var newVideoUrl      = string.IsNullOrWhiteSpace(dto.VideoUrl)      ? project.Media.VideoUrl      : dto.VideoUrl.Trim();
+
         project.Media = new ProjectMedia
         {
-            LogoUrl = dto.LogoUrl?.Trim() ?? project.Media.LogoUrl,
-            CoverImageUrl = dto.CoverImageUrl?.Trim() ?? project.Media.CoverImageUrl
+            LogoUrl       = newLogoUrl,
+            CoverImageUrl = newCoverImageUrl,
+            VideoUrl      = newVideoUrl,
+            Items         = dto.MediaItems ?? project.Media.Items ?? new()
         };
     }
 
@@ -905,7 +1078,10 @@ app.MapPut("/api/projects/{id}", async (string id, UpdateProjectDto dto, IArenaP
         project.Status = dto.Status.Value;
     }
 
+
     store.UpdateProject(project);
+
+    var reloadedAfterSave = store.GetProjectById(id);
 
     var activeContext = store.GetActiveContext();
     if (activeContext.CurrentProjectId == id)
@@ -918,7 +1094,7 @@ app.MapPut("/api/projects/{id}", async (string id, UpdateProjectDto dto, IArenaP
         });
     }
 
-    return Results.Ok(project);
+    return Results.Ok(reloadedAfterSave ?? project);
 });
 
 // DELETE /api/projects/{id} — Remove um projeto

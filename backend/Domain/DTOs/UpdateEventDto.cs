@@ -8,6 +8,9 @@ public record UpdateEventBrandingDto
     public string? SecondaryColor { get; init; }
     public string? LogoUrl { get; init; }
     public string? Tagline { get; init; }
+    public string? CoverImageUrl { get; init; }
+    public string? VideoUrl { get; init; }
+    public string? MediaMode { get; init; }
 }
 
 public record UpdateEventDto

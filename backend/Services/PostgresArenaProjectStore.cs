@@ -1251,7 +1251,21 @@ public class PostgresArenaProjectStore : IArenaProjectStore
         existing.Description = project.Description;
         existing.OrderIndex = project.OrderIndex;
         existing.Status = project.Status;
-        existing.Media = project.Media;
+        if (existing.Media == null)
+        {
+            existing.Media = new ProjectMedia();
+        }
+        existing.Media.LogoUrl = project.Media?.LogoUrl ?? string.Empty;
+        existing.Media.CoverImageUrl = project.Media?.CoverImageUrl ?? string.Empty;
+        existing.Media.VideoUrl = project.Media?.VideoUrl ?? string.Empty;
+        existing.Media.Items = project.Media?.Items != null
+            ? new List<ProjectMediaItem>(project.Media.Items)
+            : new List<ProjectMediaItem>();
+        var mediaEntry = context.Entry(existing).Reference(p => p.Media).TargetEntry;
+        if (mediaEntry != null)
+        {
+            mediaEntry.State = EntityState.Modified;
+        }
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
         context.SaveChanges();

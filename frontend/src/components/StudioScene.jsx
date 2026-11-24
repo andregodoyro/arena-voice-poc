@@ -1,30 +1,46 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { Chair } from './Chair';
+import { HeroShowcaseWall } from './stage/HeroShowcaseWall';
 import gsap from 'gsap';
 import * as THREE from 'three';
 
 /**
- * ArenaFloor — Piso geral da arena/auditório corporativo.
- * Preserva o piso amplo e escuro no nível Y = 0 estabelecido no Milestone 2D.3.
+ * ArchitecturalFloor — Piso nobre da arena corporativa de inovação.
+ * 
+ * Phase 5C.1:
+ * - Substituição do piso frio e linhas técnicas por assoalho amadeirado escuro;
+ * - Anéis concêntricos de circulação em latão/bronze arquitetural suave;
+ * - Material PBR com reflexão sutil dos halos do teto e do pódio central.
  */
-function ArenaFloor() {
+function ArchitecturalFloor() {
+  const guideRings = [9.5, 12.0, 15.0, 18.5, 22.0];
+
   return (
     <group position={[0, 0, 0]}>
-      {/* Base geral da arena */}
+      {/* Placa circular principal da arena */}
       <mesh position={[0, -0.1, 0]} receiveShadow>
-        <cylinderGeometry args={[26, 26.5, 0.2, 64]} />
+        <cylinderGeometry args={[28, 28.5, 0.2, 64]} />
         <meshStandardMaterial
-          color="#161928"
+          color="#16120e"
           roughness={0.45}
-          metalness={0.5}
+          metalness={0.18}
         />
       </mesh>
 
-      {/* Linhas de piso técnico / circulação do auditório */}
-      {[-6, -3, 0, 3, 6, 9].map((z, i) => (
-        <mesh key={`floor-line-${i}`} position={[0, 0.005, z]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[28, 0.02]} />
-          <meshBasicMaterial color="#334155" transparent opacity={0.55} />
+      {/* Frisos circulares embutidos em latão fosco (circulação e zoneamento) */}
+      {guideRings.map((radius, i) => (
+        <mesh
+          key={`floor-ring-${i}`}
+          position={[0, 0.005, -3.2]}
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <ringGeometry args={[radius, radius + 0.035, 64]} />
+          <meshBasicMaterial
+            color="#c49a6c"
+            transparent
+            opacity={0.25}
+            side={THREE.DoubleSide}
+          />
         </mesh>
       ))}
     </group>
@@ -32,44 +48,42 @@ function ArenaFloor() {
 }
 
 /**
- * CentralPitchStage — Palco delimitado da startup e Pódio de pitch.
+ * TieredPitchStage — Pódio Central Circular Escalonado (Dois Níveis).
  * 
- * Milestone 2D.4:
- * - Fita de luz do palco da startup reativa a primaryColor;
- * - Anel de demarcação do pódio reativo a secondaryColor;
- * - Retícula central institucional reativa a primaryColor;
- * - Aura e pulso cênico institucional de Unanimidade (5 de 5 cadeiras);
- * - Interpolação suave de cores e intensidades via GSAP (0.8s - 1.2s).
+ * Phase 5C.1:
+ * - Diretamente inspirado na arquitetura circular da arena de referência;
+ * - Nível 1 (Plataforma Base): Raio 5.8m, altura 0.22m, acabamento em nogueira;
+ * - Nível 2 (Pódio do Orador): Raio 3.5m, altura 0.22m (Y total 0.44m), carvalho nobre;
+ * - Fita de luz indireta (cove halo) embutida na base de cada degrau (2900K - 3100K);
+ * - Inlay circular de alinhamento do orador em latão nobre;
+ * - Reatividade cênica preservada via GSAP:
+ *   * isVotingOpen: respiração luminosa suave no rodapé do palco;
+ *   * isUrgent: pulso sutil em tom âmbar nos últimos 15s;
+ *   * isVotingClosed: afunilamento intimista do spotlight;
+ *   * isUnanimous: celebração em ouro âmbar arquitetural (5 de 5 cadeiras).
  */
-function CentralPitchStage({
+function TieredPitchStage({
   primaryColor = '#ef233c',
-  secondaryColor = '#3a86ff',
+  secondaryColor = '#d4a373',
   isUnanimous = false,
+  isVotingOpen = false,
+  isUrgent = false,
+  isVotingClosed = false,
 }) {
-  const stageRingMatRef = useRef();
-  const podiumRingMatRef = useRef();
-  const reticleMatRef = useRef();
+  const stageCoveMatRef = useRef();
+  const podiumCoveMatRef = useRef();
+  const keynoteInlayMatRef = useRef();
   const spotLightRef = useRef();
   const unanimityAuraRef = useRef();
   const unanimityMatRef = useRef();
 
-  // Transição reativa de cores de branding via GSAP
+  // Transição reativa de cores e intensidades via GSAP
   useEffect(() => {
     const targetPrimary = new THREE.Color(primaryColor);
     const targetSecondary = new THREE.Color(secondaryColor);
 
-    if (stageRingMatRef.current) {
-      gsap.to(stageRingMatRef.current.color, {
-        r: targetPrimary.r,
-        g: targetPrimary.g,
-        b: targetPrimary.b,
-        duration: 1.2,
-        ease: 'power2.out',
-      });
-    }
-
-    if (podiumRingMatRef.current) {
-      gsap.to(podiumRingMatRef.current.color, {
+    if (stageCoveMatRef.current) {
+      gsap.to(stageCoveMatRef.current.color, {
         r: targetSecondary.r,
         g: targetSecondary.g,
         b: targetSecondary.b,
@@ -78,11 +92,21 @@ function CentralPitchStage({
       });
     }
 
-    if (reticleMatRef.current) {
-      gsap.to(reticleMatRef.current.color, {
-        r: targetPrimary.r,
-        g: targetPrimary.g,
-        b: targetPrimary.b,
+    if (podiumCoveMatRef.current) {
+      gsap.to(podiumCoveMatRef.current.color, {
+        r: targetSecondary.r,
+        g: targetSecondary.g,
+        b: targetSecondary.b,
+        duration: 1.2,
+        ease: 'power2.out',
+      });
+    }
+
+    if (keynoteInlayMatRef.current) {
+      gsap.to(keynoteInlayMatRef.current.color, {
+        r: targetSecondary.r,
+        g: targetSecondary.g,
+        b: targetSecondary.b,
         duration: 1.2,
         ease: 'power2.out',
       });
@@ -99,13 +123,14 @@ function CentralPitchStage({
     }
   }, [primaryColor, secondaryColor]);
 
-  // Efeito Cênico Institucional de Unanimidade (5 de 5 cadeiras)
+  // Efeito Cênico de Unanimidade e Foco de Iluminação
   useEffect(() => {
     let pulseTween = null;
 
     if (spotLightRef.current) {
+      const targetIntensity = isUnanimous ? 9.5 : (isVotingClosed ? 7.6 : (isVotingOpen ? 7.0 : 6.4));
       gsap.to(spotLightRef.current, {
-        intensity: isUnanimous ? 9.0 : 6.5,
+        intensity: targetIntensity,
         duration: 1.2,
         ease: 'power2.out',
       });
@@ -113,14 +138,13 @@ function CentralPitchStage({
 
     if (unanimityMatRef.current && unanimityAuraRef.current) {
       if (isUnanimous) {
-        // Pulso luminoso prestigioso no palco da startup
         gsap.to(unanimityMatRef.current, {
-          opacity: 0.5,
+          opacity: 0.6,
           duration: 0.8,
           ease: 'power2.out',
           onComplete: () => {
             pulseTween = gsap.to(unanimityMatRef.current, {
-              opacity: 0.75,
+              opacity: 0.85,
               repeat: -1,
               yoyo: true,
               duration: 1.4,
@@ -139,7 +163,6 @@ function CentralPitchStage({
           ease: 'sine.inOut',
         });
       } else {
-        // Retorno suave ao estado operacional padrão
         gsap.to(unanimityMatRef.current, {
           opacity: 0,
           duration: 0.8,
@@ -158,46 +181,87 @@ function CentralPitchStage({
     return () => {
       if (pulseTween) pulseTween.kill();
     };
-  }, [isUnanimous]);
+  }, [isUnanimous, isVotingOpen, isVotingClosed]);
+
+  // Efeito Visual de Urgência nos últimos 15 segundos
+  useEffect(() => {
+    let urgencyTween = null;
+
+    if (isUrgent && keynoteInlayMatRef.current && stageCoveMatRef.current) {
+      const alertColor = new THREE.Color('#ff9f43');
+      urgencyTween = gsap.to([keynoteInlayMatRef.current.color, stageCoveMatRef.current.color], {
+        r: alertColor.r,
+        g: alertColor.g,
+        b: alertColor.b,
+        repeat: -1,
+        yoyo: true,
+        duration: 0.55,
+        ease: 'sine.inOut',
+      });
+    } else {
+      const targetSecondary = new THREE.Color(secondaryColor);
+      if (keynoteInlayMatRef.current) {
+        gsap.to(keynoteInlayMatRef.current.color, {
+          r: targetSecondary.r,
+          g: targetSecondary.g,
+          b: targetSecondary.b,
+          duration: 0.8,
+        });
+      }
+      if (stageCoveMatRef.current) {
+        gsap.to(stageCoveMatRef.current.color, {
+          r: targetSecondary.r,
+          g: targetSecondary.g,
+          b: targetSecondary.b,
+          duration: 0.8,
+        });
+      }
+    }
+
+    return () => {
+      if (urgencyTween) urgencyTween.kill();
+    };
+  }, [isUrgent, secondaryColor]);
 
   return (
     <group position={[0, 0, -3.2]}>
-      {/* ── 1. Palco da Startup (Plataforma Circular Intermediária) ────── */}
+      {/* ── NÍVEL 1: Plataforma Inferior do Palco (Raio 5.8m) ─────────────── */}
       <group position={[0, 0, 0]}>
-        {/* Base elevada do palco da startup */}
-        <mesh position={[0, 0.09, 0]} receiveShadow>
-          <cylinderGeometry args={[6.0, 6.2, 0.18, 64]} />
+        {/* Corpo cilíndrico do degrau inferior em nogueira nobre */}
+        <mesh position={[0, 0.11, 0]} receiveShadow>
+          <cylinderGeometry args={[5.8, 5.95, 0.22, 64]} />
           <meshStandardMaterial
-            color="#1c2136"
-            roughness={0.2}
-            metalness={0.8}
-            envMapIntensity={1.3}
+            color="#281e16"
+            roughness={0.4}
+            metalness={0.16}
           />
         </mesh>
 
-        {/* Chanfro perimetral do palco */}
-        <mesh position={[0, 0.181, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[5.85, 6.0, 64]} />
-          <meshStandardMaterial color="#334155" roughness={0.3} metalness={0.7} />
+        {/* Superfície do degrau 1 com friso perimetral em latão escovado */}
+        <mesh position={[0, 0.221, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[5.68, 5.8, 64]} />
+          <meshStandardMaterial color="#4a3726" roughness={0.35} metalness={0.65} />
         </mesh>
 
-        {/* Fita de luz de piso do palco da startup (Reativa ao Branding) */}
-        <mesh position={[0, 0.182, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[5.65, 5.75, 64]} />
+        {/* Fita de luz indireta inferior (Under-step Cove Light — 2900K) */}
+        <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[5.75, 5.92, 64]} />
           <meshBasicMaterial
-            ref={stageRingMatRef}
-            color={primaryColor}
+            ref={stageCoveMatRef}
+            color={secondaryColor}
+            transparent
+            opacity={0.85}
             side={THREE.DoubleSide}
           />
         </mesh>
 
-        {/* Aura Cênica de Unanimidade (Pulse de Prestígio) */}
+        {/* Aura de Unanimidade arquitetural (Pulso de prestígio no pódio) */}
         <mesh
           ref={unanimityAuraRef}
-          position={[0, 0.183, 0]}
+          position={[0, 0.223, 0]}
           rotation={[-Math.PI / 2, 0, 0]}
         >
-          <ringGeometry args={[2.9, 5.6, 64]} />
+          <ringGeometry args={[3.6, 5.7, 64]} />
           <meshBasicMaterial
             ref={unanimityMatRef}
             color={primaryColor}
@@ -208,60 +272,63 @@ function CentralPitchStage({
         </mesh>
       </group>
 
-      {/* ── 2. Pódio do Pitch (Área Principal do Apresentador / Startup) ─── */}
-      <group position={[0, 0.18, 0]}>
-        {/* Base do pódio elevado */}
-        <mesh position={[0, 0.08, 0]} receiveShadow castShadow>
-          <cylinderGeometry args={[2.75, 2.85, 0.16, 64]} />
+      {/* ── NÍVEL 2: Pódio Superior do Orador (Raio 3.5m, Y = +0.22m) ───────── */}
+      <group position={[0, 0.22, 0]}>
+        {/* Corpo cilíndrico do pódio do orador em carvalho arquitetural */}
+        <mesh position={[0, 0.11, 0]} receiveShadow castShadow>
+          <cylinderGeometry args={[3.48, 3.58, 0.22, 64]} />
           <meshStandardMaterial
-            color="#252b45"
-            roughness={0.25}
-            metalness={0.85}
-            envMapIntensity={1.4}
+            color="#3a2a1d"
+            roughness={0.34}
+            metalness={0.14}
           />
         </mesh>
 
-        {/* Piso técnico de oratória (disco superior de pitch) */}
-        <mesh position={[0, 0.162, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[2.7, 64]} />
+        {/* Piso de oratória do orador (superfície madeira nobre tratada) */}
+        <mesh position={[0, 0.222, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[3.46, 64]} />
           <meshStandardMaterial
-            color="#2d3452"
-            roughness={0.4}
-            metalness={0.5}
+            color="#463323"
+            roughness={0.32}
+            metalness={0.12}
           />
         </mesh>
 
-        {/* Anel de demarcação de keynote do orador (Reativo à Cor Secundária) */}
-        <mesh position={[0, 0.165, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[2.45, 2.55, 64]} />
+        {/* Fita de luz indireta do pódio central (Under-step Cove Light — 3100K) */}
+        <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[3.45, 3.56, 64]} />
           <meshBasicMaterial
-            ref={podiumRingMatRef}
+            ref={podiumCoveMatRef}
             color={secondaryColor}
+            transparent
+            opacity={0.9}
             side={THREE.DoubleSide}
           />
         </mesh>
 
-        {/* Retícula central de alinhamento institucional (Reativa à Cor Primária) */}
-        <mesh position={[0, 0.165, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.7, 0.75, 32]} />
+        {/* Inlay sutil em latão para orientação do orador na arena */}
+        <mesh position={[0, 0.224, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[1.4, 1.45, 48]} />
           <meshBasicMaterial
-            ref={reticleMatRef}
-            color={primaryColor}
+            ref={keynoteInlayMatRef}
+            color={secondaryColor}
+            transparent
+            opacity={0.5}
             side={THREE.DoubleSide}
           />
         </mesh>
       </group>
 
-      {/* Refletor spot cênico focalizado no pódio com suporte a Unanimidade */}
+      {/* ── Refletor Zenital Arquitetural Focalizado no Pódio ─────────────── */}
       <spotLight
         ref={spotLightRef}
-        position={[0, 11, 2]}
-        target-position={[0, 0.34, -3.2]}
-        intensity={6.5}
-        angle={Math.PI / 5.8}
+        position={[0, 13.5, 0.5]}
+        target-position={[0, 0.44, -3.2]}
+        intensity={isUnanimous ? 9.5 : (isVotingClosed ? 7.6 : 6.4)}
+        angle={isVotingClosed ? Math.PI / 6.5 : Math.PI / 5.5}
         penumbra={0.65}
-        color="#f8fafc"
-        distance={25}
+        color="#fff6ed"
+        distance={28}
         castShadow
         shadow-mapSize={[1024, 1024]}
       />
@@ -270,375 +337,249 @@ function CentralPitchStage({
 }
 
 /**
- * AmphitheaterTiers — Arquibancada semicircular procedural de auditório corporativo.
+ * AcousticCanopy — Cúpula Arquitetural Zenital do Auditório.
  * 
- * Milestone 2D.4:
- * Balizamento luminoso arquitetural dos degraus reativo à cor secundária do branding.
+ * Phase 5C.1:
+ * - Inspirada na magnífica cúpula circular com anel de luz da referência visual;
+ * - Estrutura superior em disco côncavo de madeira com aletas acústicas radiais;
+ * - Dois anéis concêntricos de iluminação indireta (cove halo) banhando a arena;
+ * - Óculo central com projetores de palco integrados.
  */
-function AmphitheaterTiers({ secondaryColor = '#3a86ff' }) {
-  const stepMatRefs = useRef([]);
+function AcousticCanopy({ secondaryColor = '#ffd8a8' }) {
+  const outerHaloMatRef = useRef();
+  const innerHaloMatRef = useRef();
 
-  const tiers = [
-    { inner: 11.5, outer: 13.5, y: 0.45, stepH: 0.45 },
-    { inner: 13.8, outer: 15.8, y: 1.05, stepH: 0.60 },
-    { inner: 16.1, outer: 18.1, y: 1.75, stepH: 0.70 },
-    { inner: 18.4, outer: 20.4, y: 2.55, stepH: 0.80 },
-  ];
-
-  const cylThetaStart = Math.PI * 0.61;
-  const cylThetaLength = Math.PI * 0.78;
-
-  const ringAlphaStart = Math.PI * 0.11;
-  const ringAlphaLength = Math.PI * 0.78;
-
-  useEffect(() => {
-    const targetSecondary = new THREE.Color(secondaryColor);
-    stepMatRefs.current.forEach((mat) => {
-      if (!mat) return;
-      gsap.to(mat.color, {
-        r: targetSecondary.r,
-        g: targetSecondary.g,
-        b: targetSecondary.b,
-        duration: 1.2,
-        ease: 'power2.out',
-      });
-    });
-  }, [secondaryColor]);
+  // 32 aletas acústicas radiais posicionadas na cúpula
+  const radialFins = useMemo(() => {
+    const fins = [];
+    const count = 32;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      fins.push({ angle, id: i });
+    }
+    return fins;
+  }, []);
 
   return (
-    <group position={[0, 0, -3.2]}>
-      {tiers.map((tier, idx) => {
-        const benchRadius = (tier.inner + tier.outer) / 2;
-        return (
-          <group key={`tier-${idx}`}>
-            {/* Piso do patamar da arquibancada */}
-            <mesh position={[0, tier.y, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[tier.inner, tier.outer, 48, 1, ringAlphaStart, ringAlphaLength]} />
-              <meshStandardMaterial
-                color="#1a1e33"
-                roughness={0.5}
-                metalness={0.4}
-                side={THREE.DoubleSide}
-              />
-            </mesh>
-
-            {/* Espelho vertical (riser) frontal do degrau */}
-            <mesh position={[0, tier.y - tier.stepH / 2, 0]}>
-              <cylinderGeometry
-                args={[
-                  tier.inner,
-                  tier.inner,
-                  tier.stepH,
-                  48,
-                  1,
-                  true,
-                  cylThetaStart,
-                  cylThetaLength,
-                ]}
-              />
-              <meshStandardMaterial
-                color="#121524"
-                roughness={0.6}
-                metalness={0.5}
-                side={THREE.DoubleSide}
-              />
-            </mesh>
-
-            {/* Friso luminoso de balizamento de segurança (Reativo ao Branding) */}
-            <mesh position={[0, tier.y + 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[tier.inner, tier.inner + 0.08, 48, 1, ringAlphaStart, ringAlphaLength]} />
-              <meshBasicMaterial
-                ref={(el) => (stepMatRefs.current[idx] = el)}
-                color={secondaryColor}
-                transparent
-                opacity={0.65}
-                side={THREE.DoubleSide}
-              />
-            </mesh>
-
-            {/* Fileira de assentos contínuos estilizados de auditório */}
-            <mesh position={[0, tier.y + 0.14, 0]}>
-              <cylinderGeometry
-                args={[
-                  benchRadius,
-                  benchRadius,
-                  0.28,
-                  48,
-                  1,
-                  true,
-                  cylThetaStart,
-                  cylThetaLength,
-                ]}
-              />
-              <meshStandardMaterial
-                color="#222842"
-                roughness={0.4}
-                metalness={0.3}
-                side={THREE.DoubleSide}
-              />
-            </mesh>
-          </group>
-        );
-      })}
-
-      {/* Parapeito / Guarda-corpo arquitetural do topo do anfiteatro */}
-      <mesh position={[0, 3.25, 0]}>
-        <cylinderGeometry
-          args={[20.5, 20.5, 0.6, 48, 1, true, cylThetaStart, cylThetaLength]}
-        />
+    <group position={[0, 13.5, -3.2]}>
+      {/* Disco côncavo principal da cúpula de forro em madeira nobre */}
+      <mesh position={[0, 0.2, 0]} rotation={[0, 0, 0]}>
+        <cylinderGeometry args={[12.2, 10.8, 0.8, 64, 1, true]} />
         <meshStandardMaterial
-          color="#1f253d"
-          roughness={0.4}
-          metalness={0.6}
+          color="#281e16"
+          roughness={0.5}
+          metalness={0.12}
+          side={THREE.BackSide}
+        />
+      </mesh>
+
+      {/* Forro de fechamento superior da cúpula */}
+      <mesh position={[0, 0.6, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[4.2, 12.2, 64]} />
+        <meshStandardMaterial
+          color="#201711"
+          roughness={0.6}
+          metalness={0.1}
           side={THREE.DoubleSide}
         />
       </mesh>
-    </group>
-  );
-}
 
-/**
- * ScenicArches — Arcos cênicos de grande escala e portal de keynote corporativo.
- * 
- * Milestone 2D.4:
- * - 3 arcos concêntricos com neons embutidos reativos imediatamente ao branding;
- * - Arco 0 (frontal): primaryColor;
- * - Arco 1 (central): secondaryColor;
- * - Arco 2 (traseiro): primaryColor;
- * - Luzes volumétricas cênicas interpolam cores e reforçam intensidade na Unanimidade.
- */
-function ScenicArches({
-  primaryColor = '#ef233c',
-  secondaryColor = '#3a86ff',
-  isUnanimous = false,
-}) {
-  const arch0MatRef = useRef();
-  const arch1MatRef = useRef();
-  const arch2MatRef = useRef();
-  const lightTopRef = useRef();
-  const lightLeftRef = useRef();
-  const lightRightRef = useRef();
+      {/* Anel de luz indireta externo (Cove Halo 2800K — 10.4m) */}
+      <mesh position={[0, -0.15, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[10.2, 10.55, 64]} />
+        <meshBasicMaterial
+          ref={outerHaloMatRef}
+          color="#ffcca0"
+          side={THREE.DoubleSide}
+        />
+      </mesh>
 
-  const arches = [
-    { radius: 8.6, tube: 0.12, z: -8.0, heightOffset: 0.2 },
-    { radius: 10.4, tube: 0.14, z: -10.4, heightOffset: 0.6 },
-    { radius: 12.2, tube: 0.16, z: -12.8, heightOffset: 1.0 },
-  ];
+      {/* Anel de luz indireta interno (Cove Halo 3100K — 4.5m) */}
+      <mesh position={[0, -0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[4.35, 4.65, 64]} />
+        <meshBasicMaterial
+          ref={innerHaloMatRef}
+          color="#ffe4cc"
+          side={THREE.DoubleSide}
+        />
+      </mesh>
 
-  // Interpolação de cores com GSAP
-  useEffect(() => {
-    const targetPrimary = new THREE.Color(primaryColor);
-    const targetSecondary = new THREE.Color(secondaryColor);
+      {/* Óculo central com carcaça dos refletores de teto em bronze escovado */}
+      <mesh position={[0, 0.1, 0]}>
+        <cylinderGeometry args={[4.2, 4.2, 0.4, 32]} />
+        <meshStandardMaterial color="#1a1410" roughness={0.35} metalness={0.7} />
+      </mesh>
 
-    if (arch0MatRef.current) {
-      gsap.to(arch0MatRef.current.color, {
-        r: targetPrimary.r,
-        g: targetPrimary.g,
-        b: targetPrimary.b,
-        duration: 1.2,
-        ease: 'power2.out',
-      });
-    }
-
-    if (arch1MatRef.current) {
-      gsap.to(arch1MatRef.current.color, {
-        r: targetSecondary.r,
-        g: targetSecondary.g,
-        b: targetSecondary.b,
-        duration: 1.2,
-        ease: 'power2.out',
-      });
-    }
-
-    if (arch2MatRef.current) {
-      gsap.to(arch2MatRef.current.color, {
-        r: targetPrimary.r,
-        g: targetPrimary.g,
-        b: targetPrimary.b,
-        duration: 1.2,
-        ease: 'power2.out',
-      });
-    }
-
-    if (lightTopRef.current) {
-      gsap.to(lightTopRef.current.color, {
-        r: targetSecondary.r,
-        g: targetSecondary.g,
-        b: targetSecondary.b,
-        duration: 1.2,
-        ease: 'power2.out',
-      });
-    }
-
-    if (lightLeftRef.current) {
-      gsap.to(lightLeftRef.current.color, {
-        r: targetPrimary.r,
-        g: targetPrimary.g,
-        b: targetPrimary.b,
-        duration: 1.2,
-        ease: 'power2.out',
-      });
-    }
-
-    if (lightRightRef.current) {
-      gsap.to(lightRightRef.current.color, {
-        r: targetPrimary.r,
-        g: targetPrimary.g,
-        b: targetPrimary.b,
-        duration: 1.2,
-        ease: 'power2.out',
-      });
-    }
-  }, [primaryColor, secondaryColor]);
-
-  // Efeito de Unanimidade nos Arcos
-  useEffect(() => {
-    let pulseTween = null;
-
-    if (lightTopRef.current) {
-      gsap.to(lightTopRef.current, {
-        intensity: isUnanimous ? 7.5 : 3.8,
-        duration: 1.2,
-        ease: 'power2.out',
-      });
-    }
-
-    if (lightLeftRef.current && lightRightRef.current) {
-      gsap.to([lightLeftRef.current, lightRightRef.current], {
-        intensity: isUnanimous ? 5.5 : 2.5,
-        duration: 1.2,
-        ease: 'power2.out',
-        onComplete: () => {
-          if (isUnanimous) {
-            pulseTween = gsap.to([lightLeftRef.current, lightRightRef.current], {
-              intensity: 6.8,
-              repeat: -1,
-              yoyo: true,
-              duration: 1.4,
-              ease: 'sine.inOut',
-            });
-          }
-        },
-      });
-    }
-
-    return () => {
-      if (pulseTween) pulseTween.kill();
-    };
-  }, [isUnanimous]);
-
-  const matRefs = [arch0MatRef, arch1MatRef, arch2MatRef];
-  const initialColors = [primaryColor, secondaryColor, primaryColor];
-
-  return (
-    <group position={[0, 0, 0]}>
-      {arches.map((arch, i) => (
-        <group key={`scenic-arch-${i}`} position={[0, arch.heightOffset, arch.z]}>
-          {/* Arco tubular semicircular principal */}
-          <mesh position={[0, 0, 0]}>
-            <torusGeometry args={[arch.radius, arch.tube, 16, 64, Math.PI]} />
-            <meshStandardMaterial
-              color="#262d47"
-              roughness={0.25}
-              metalness={0.85}
-              envMapIntensity={1.3}
-            />
-          </mesh>
-
-          {/* Friso luminoso interno do arco (Reativo ao Branding) */}
-          <mesh position={[0, 0, 0]}>
-            <torusGeometry args={[arch.radius - 0.2, arch.tube * 0.45, 12, 64, Math.PI]} />
-            <meshBasicMaterial
-              ref={matRefs[i]}
-              color={initialColors[i]}
-            />
-          </mesh>
-
-          {/* Pilares laterais estruturais esquerdos */}
-          <mesh position={[-arch.radius, arch.radius / 2 - 0.2, 0]}>
-            <cylinderGeometry args={[arch.tube * 1.3, arch.tube * 1.3, arch.radius, 16]} />
-            <meshStandardMaterial color="#1c2236" roughness={0.3} metalness={0.8} />
-          </mesh>
-
-          {/* Pilares laterais estruturais direitos */}
-          <mesh position={[arch.radius, arch.radius / 2 - 0.2, 0]}>
-            <cylinderGeometry args={[arch.tube * 1.3, arch.tube * 1.3, arch.radius, 16]} />
-            <meshStandardMaterial color="#1c2236" roughness={0.3} metalness={0.8} />
+      {/* Aletas acústicas radiais esculpidas sob a cúpula */}
+      {radialFins.map((fin) => (
+        <group key={`canopy-fin-${fin.id}`} rotation={[0, fin.angle, 0]}>
+          <mesh position={[7.2, 0.1, 0]}>
+            <boxGeometry args={[5.2, 0.28, 0.06]} />
+            <meshStandardMaterial color="#3a2a1d" roughness={0.45} metalness={0.15} />
           </mesh>
         </group>
       ))}
 
-      {/* Painel acústico de fundo da arena (curved slat backdrop) */}
-      <mesh position={[0, 7.0, -14.8]}>
-        <cylinderGeometry
-          args={[18, 18, 14, 48, 1, true, Math.PI * 0.65, Math.PI * 0.70]}
-        />
-        <meshStandardMaterial
-          color="#0e111f"
-          roughness={0.7}
-          metalness={0.2}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-
-      {/* Luzes cênicas de contorno e preenchimento dos arcos */}
-      <pointLight
-        ref={lightTopRef}
-        position={[0, 10.5, -11.5]}
-        intensity={3.8}
-        color={secondaryColor}
-        distance={25}
-      />
-      <pointLight
-        ref={lightLeftRef}
-        position={[-9, 5.5, -9.5]}
-        intensity={2.5}
-        color={primaryColor}
-        distance={22}
-      />
-      <pointLight
-        ref={lightRightRef}
-        position={[9, 5.5, -9.5]}
-        intensity={2.5}
-        color={primaryColor}
-        distance={22}
-      />
+      {/* Luz ambiente zenital difusa projetada pela cúpula */}
+      <pointLight position={[0, -0.5, 0]} intensity={2.8} color="#ffe8cc" distance={22} />
     </group>
   );
 }
 
 /**
- * StudioScene — Orquestrador cênico 3D da Arena Voice.
+ * AcousticTimberWalls — Paredes e Painéis de Ripas Acústicas da Arena.
  * 
- * Milestone 2D.4: Dynamic Theming & Reactive Stage Experience.
- * - Conecta o palco ao branding do evento ativo (primaryColor e secondaryColor);
- * - Orquestra a resposta em tempo real aos eventos SignalR;
- * - Ativa celebração institucional de Unanimidade (5 de 5 cadeiras apoiando);
- * - Iluminação aprimorada para clareza, prestígio e legibilidade cênica.
+ * Phase 5C.1:
+ * - Linguagem arquitetural baseada em "Acoustic Timber Slats";
+ * - Estrutura semicircular monumental que abraça a arena e o anfiteatro;
+ * - Ripas de madeira vertical distribuídas ao longo do raio perimetral;
+ * - Banho de luz rasante vertical (linear grazing) que valoriza a textura da madeira.
  */
-export function StudioScene({ chairs = [], branding = {} }) {
+function AcousticTimberWalls() {
+  const radius = 23.0;
+
+  // Ripas acústicas nas alas laterais (Left Wing e Right Wing) emoldurando o telão panorâmico
+  const slats = useMemo(() => {
+    const list = [];
+    const slatsPerWing = 22;
+
+    // Ala Esquerda: da lateral externa até o início do telão
+    const leftStart = Math.PI * 0.58;
+    const leftEnd = Math.PI * 0.74;
+    for (let i = 0; i < slatsPerWing; i++) {
+      const t = i / (slatsPerWing - 1);
+      const angle = leftStart + t * (leftEnd - leftStart);
+      const x = Math.sin(angle) * radius;
+      const z = Math.cos(angle) * radius - 3.2;
+      const rotY = angle + Math.PI;
+      list.push({ id: `left-${i}`, pos: [x, 7.0, z], rotY });
+    }
+
+    // Ala Direita: do fim do telão até a lateral externa
+    const rightStart = Math.PI * 1.26;
+    const rightEnd = Math.PI * 1.42;
+    for (let i = 0; i < slatsPerWing; i++) {
+      const t = i / (slatsPerWing - 1);
+      const angle = rightStart + t * (rightEnd - rightStart);
+      const x = Math.sin(angle) * radius;
+      const z = Math.cos(angle) * radius - 3.2;
+      const rotY = angle + Math.PI;
+      list.push({ id: `right-${i}`, pos: [x, 7.0, z], rotY });
+    }
+
+    return list;
+  }, []);
+
+  return (
+    <group position={[0, 0, 0]}>
+      {/* Alvenaria de fundo acústico escuro contínua */}
+      <mesh position={[0, 7.0, -3.2]}>
+        <cylinderGeometry
+          args={[radius + 0.3, radius + 0.3, 14.5, 48, 1, true, Math.PI * 0.55, Math.PI * 0.90]}
+        />
+        <meshStandardMaterial
+          color="#120e0a"
+          roughness={0.7}
+          metalness={0.1}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* Ripas verticais de madeira nobre nas alas laterais de emolduramento */}
+      {slats.map((slat) => (
+        <mesh
+          key={`slat-${slat.id}`}
+          position={slat.pos}
+          rotation={[0, slat.rotY, 0]}
+          receiveShadow
+        >
+          <boxGeometry args={[0.22, 14.0, 0.16]} />
+          <meshStandardMaterial
+            color="#3a2a1c"
+            roughness={0.46}
+            metalness={0.12}
+          />
+        </mesh>
+      ))}
+
+      {/* Escadas e portais arquiteturais laterais iluminados (Conceito Visual Callout 03) */}
+      <group position={[-18.5, 3.5, -16.5]} rotation={[0, 0.65, 0]}>
+        {[0, 1, 2, 3].map((stepIdx) => (
+          <mesh key={`step-l-${stepIdx}`} position={[stepIdx * 0.45, stepIdx * 0.5, 0]}>
+            <boxGeometry args={[1.6, 0.45, 3.2]} />
+            <meshStandardMaterial color="#261c14" roughness={0.4} metalness={0.2} />
+          </mesh>
+        ))}
+      </group>
+      <group position={[18.5, 3.5, -16.5]} rotation={[0, -0.65, 0]}>
+        {[0, 1, 2, 3].map((stepIdx) => (
+          <mesh key={`step-r-${stepIdx}`} position={[-stepIdx * 0.45, stepIdx * 0.5, 0]}>
+            <boxGeometry args={[1.6, 0.45, 3.2]} />
+            <meshStandardMaterial color="#261c14" roughness={0.4} metalness={0.2} />
+          </mesh>
+        ))}
+      </group>
+
+      {/* Iluminação rasante (grazing lights) nas ripas de madeira e escadas laterais */}
+      <pointLight position={[-18, 6.0, -14]} intensity={2.4} color="#ffd4a8" distance={22} />
+      <pointLight position={[18, 6.0, -14]} intensity={2.4} color="#ffd4a8" distance={22} />
+      <pointLight position={[0, 7.5, -23]} intensity={1.8} color="#ffe2c4" distance={20} />
+    </group>
+  );
+}
+
+/**
+ * StudioScene — Orquestrador Cênico 3D da Arena Voice.
+ * 
+ * Phase 5C.1: Architectural Arena Redesign.
+ * - Integra a nova arquitetura de auditório e keynote arena de alto nível;
+ * - Palco central circular escalonado de dois níveis com iluminação indireta;
+ * - Cúpula arquitetural zenital inspirada na referência visual;
+ * - Paredes com ripas acústicas de madeira nobre (Acoustic Timber Slats);
+ * - Nicho estrutural reservado para o Telão Monumental (Phase 5C.2);
+ * - As 5 cadeiras da banca preservadas em semicírculo com materiais PBR nobres;
+ * - Preservação estrita dos gatilhos de áudio cênico e SignalR (ADR-027 / ADR-028).
+ */
+export function StudioScene({
+  chairs = [],
+  branding = {},
+  pitchState = null,
+  currentProject = null,
+  currentEvent = null,
+}) {
   const ambientLightRef = useRef();
 
   const primaryColor = branding?.primaryColor || '#ef233c';
-  const secondaryColor = branding?.secondaryColor || '#3a86ff';
+  const secondaryColor = branding?.secondaryColor || '#d4a373'; // âmbar/bronze quente padrão
 
   const turnedCount = chairs.filter((c) => c.isTurned).length;
   const isUnanimous = chairs.length === 5 && turnedCount === 5;
 
-  // Interpolação suave da iluminação global na Unanimidade
+  // Análise dos estados cênicos para acionamento visual coordenado
+  const stageName = pitchState?.stage || pitchState?.stageName || 'Waiting';
+  const isVotingOpen = stageName === 'VotingOpen' || Boolean(pitchState?.isVotingAllowed);
+  const isTimedStage = ['PitchRunning', 'QA', 'VotingOpen'].includes(stageName);
+  const remSec = typeof pitchState?.remainingSeconds === 'number'
+    ? Math.round(pitchState.remainingSeconds)
+    : null;
+  const isUrgent = isTimedStage && !pitchState?.isPaused && remSec !== null && remSec > 0 && remSec <= 15;
+  const isVotingClosed = ['VotingClosed', 'Finished'].includes(stageName);
+
+  // Interpolação suave da iluminação global ambiente
   useEffect(() => {
     if (ambientLightRef.current) {
+      const targetAmbient = isUnanimous ? 1.0 : (isVotingClosed ? 0.65 : 0.78);
       gsap.to(ambientLightRef.current, {
-        intensity: isUnanimous ? 1.0 : 0.75,
+        intensity: targetAmbient,
         duration: 1.2,
         ease: 'power2.out',
       });
     }
-  }, [isUnanimous]);
+  }, [isUnanimous, isVotingClosed]);
 
   /**
    * Distribuição em arco semicircular para as 5 cadeiras da banca de jurados.
-   * Posicionadas em primeiro plano no piso da arena (Y = 0), orientadas para o pódio de pitch.
+   * Posicionadas no piso nobre da arena (Y = 0), voltadas para o pódio central.
    */
   const ARC_RADIUS = 6.4;
   const ARC_Z_BASE = 4.2;
@@ -652,14 +593,14 @@ export function StudioScene({ chairs = [], branding = {} }) {
 
   return (
     <>
-      {/* ── Iluminação Global da Arena (Calibrada para Legibilidade) ──────── */}
-      <ambientLight ref={ambientLightRef} intensity={0.75} color="#20263e" />
+      {/* ── Iluminação Global da Arena (3000K Arquitetural Quente) ─────────── */}
+      <ambientLight ref={ambientLightRef} intensity={0.78} color="#2e2219" />
 
       {/* Luz principal superior frontal com projeção de sombras suaves */}
       <directionalLight
         position={[8, 22, 16]}
-        intensity={2.4}
-        color="#f8fafc"
+        intensity={2.3}
+        color="#fff6ed"
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-camera-near={1}
@@ -670,37 +611,46 @@ export function StudioScene({ chairs = [], branding = {} }) {
         shadow-camera-bottom={-22}
       />
 
-      {/* Luz de preenchimento frontal suave para a bancada de jurados */}
-      <directionalLight position={[-8, 14, 15]} intensity={1.1} color="#cbd5e1" />
+      {/* Luz de preenchimento frontal suave em tom âmbar quente */}
+      <directionalLight position={[-8, 14, 15]} intensity={1.05} color="#e2d2c2" />
 
-      {/* Luzes de recorte lateral para silhueta das cadeiras da banca */}
-      <pointLight position={[-9, 2.5, 5]} intensity={2.2} color="#94a3b8" distance={16} />
-      <pointLight position={[9, 2.5, 5]} intensity={2.2} color="#94a3b8" distance={16} />
+      {/* Luzes de recorte lateral para silhueta elegante das cadeiras */}
+      <pointLight position={[-9, 2.5, 5]} intensity={2.0} color="#d4a373" distance={16} />
+      <pointLight position={[9, 2.5, 5]} intensity={2.0} color="#d4a373" distance={16} />
 
-      {/* ── Arquitetura Cênica da Arena (Reativa ao Branding) ─────────────── */}
-      <ArenaFloor />
-      <CentralPitchStage
+      {/* ── Arquitetura Cênica da Arena (Phase 5C.1) ───────────────────────── */}
+      <ArchitecturalFloor />
+      <TieredPitchStage
         primaryColor={primaryColor}
         secondaryColor={secondaryColor}
         isUnanimous={isUnanimous}
+        isVotingOpen={isVotingOpen}
+        isUrgent={isUrgent}
+        isVotingClosed={isVotingClosed}
       />
-      <AmphitheaterTiers secondaryColor={secondaryColor} />
-      <ScenicArches
-        primaryColor={primaryColor}
-        secondaryColor={secondaryColor}
-        isUnanimous={isUnanimous}
+      <AcousticCanopy secondaryColor={secondaryColor} />
+      <AcousticTimberWalls />
+      <HeroShowcaseWall
+        currentProject={currentProject}
+        currentEvent={currentEvent}
+        pitchState={pitchState}
+        branding={branding}
       />
 
-      {/* ── As 5 Cadeiras da Banca de Avaliação (Conectadas ao Branding) ───── */}
+      {/* ── As 5 Cadeiras da Banca de Avaliação ─────────────────────────────── */}
       {chairDefs.map((c) => (
         <Chair
           key={c.id}
           id={c.id}
           name={c.name}
           isTurned={c.isTurned}
+          isVotingOpen={isVotingOpen}
           position={c.pos}
           baseRotY={c.baseRotY}
-          branding={branding}
+          branding={{
+            primaryColor,
+            secondaryColor,
+          }}
         />
       ))}
     </>

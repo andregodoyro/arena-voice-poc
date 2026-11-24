@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using ArenaVoicePocBackend.Domain.Entities;
 using ArenaVoicePocBackend.Domain.Enums;
 
@@ -336,7 +336,10 @@ public class ArenaProjectStore : IArenaProjectStore
                 PrimaryColor = source.Branding.PrimaryColor,
                 SecondaryColor = source.Branding.SecondaryColor,
                 LogoUrl = source.Branding.LogoUrl,
-                Tagline = source.Branding.Tagline
+                Tagline = source.Branding.Tagline,
+                CoverImageUrl = source.Branding.CoverImageUrl,
+                VideoUrl = source.Branding.VideoUrl,
+                MediaMode = source.Branding.MediaMode
             },
             Timers = new TimerConfig
             {

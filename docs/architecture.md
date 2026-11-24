@@ -1,8 +1,8 @@
 # Arquitetura — Arena Voice
 
-> **Status:** Fases 1 a 3 e Milestones 4A/4B Concluídos e Homologados (`v0.4.1-phase4b`)  
+> **Status:** Fases 1 a 4 e Phase 5 (5A a 5C.5 Fase 1) Concluídas e Homologadas (`v0.5.0-phase5`)  
 > **Referência de Produto:** [Roadmap Oficial e Arquitetura de Produto (docs/roadmap.md)](roadmap.md)  
-> **Cobertura Automatizada:** 530 verificações em 11 suítes de testes automatizados (100% de aprovação, zero falhas, zero regressões).
+> **Cobertura Automatizada:** 705+ verificações automatizadas (100% de aprovação, zero falhas, zero regressões).
 
 ---
 
@@ -12,25 +12,25 @@ A arquitetura do Arena Voice baseia-se na segregação estrita de responsabilida
 
 ```text
 Operator Screen (Cockpit Operacional / Mesa Técnica)
-    │ (Ações de Negócio: Resetar Arena, Transicionar Pitch, Ajustar Cronômetro, Alocar Jurados)
+    │ (Ações de Negócio: Resetar Arena, Transicionar Pitch, Ajustar Cronômetro, Alocar Jurados, Controle de Mídia)
     ▼
 Camada de Serviços / Frontend
     │ (Requisições HTTP de comando e consultas de snapshot)
     ▼
 Backend / Regras de Negócio / Estado Oficial (ASP.NET Core .NET 10)
-    │ (Validação autoritativa, máquinas de estado, lockout, result engine e emissão de eventos)
+    │ (Validação autoritativa, máquinas de estado, lockout, result engine, persistência e emissão de eventos)
     ▼
-Infraestrutura de Comunicação (SignalR Hub / WebSockets / REST)
+Infraestrutura de Comunicação (SignalR Hub / WebSockets / REST / BroadcastChannel)
     │ (Transporte transparente de eventos em tempo real)
     ▼
-Stage Screen (Telão Público 3D — Three.js + GSAP)
+Stage Screen (Telão Público 3D — Keynote Arena + Hero Showcase Wall — Three.js + GSAP)
 ```
 
 1. **OPERATOR (Mesa Técnica — `/operator`):**
    - Superfície 2D responsiva e ergonômica voltada à condução, parametrização e monitoramento da dinâmica;
    - Quatro abas funcionais:
-     - **Cockpit (`/operator/cockpit`):** Stepper visual do pitch, cronômetro de palco, grade das 5 cadeiras com identificação nominal dos jurados, placar segmentado e log de auditoria em tempo real;
-     - **Projetos (`/operator/projects`):** Gestão da fila de pitches, cadastro/edição/exclusão de startups com modal assistido e ação de seleção atômica no palco;
+     - **Cockpit (`/operator/cockpit`):** Stepper visual do pitch, cronômetro de palco, grade das 5 cadeiras com identificação nominal dos jurados, placar segmentado, log de auditoria em tempo real e **Operator Media Control** (Play, Pause, Restart, Scrubbing em timeline, saltos -10s/+10s e controle de volume de vídeo);
+     - **Projetos (`/operator/projects`):** Gestão da fila de pitches, cadastro/edição/exclusão de startups com modal assistido, upload de logo, capa, vídeo de pitch e mídias complementares (JSONB) e ação de seleção atômica no palco;
      - **Eventos (`/operator/event`):** Governança do ciclo de vida dos eventos (Draft, Ready, Active, Finished, Archived), controle de branding e seletor cromático (`ColorSwatch`);
      - **Jurados (`/operator/judges`):** Catálogo global de jurados corporativos e alocação dinâmica nas cadeiras 1 a 5 do evento ativo;
    - Despacha intenções de negócio para as APIs do backend sem expor jargões de infraestrutura ao usuário.
@@ -40,9 +40,11 @@ Stage Screen (Telão Público 3D — Three.js + GSAP)
    - Superfície estritamente passiva e contemplativa: sem botões, sem formulários, sem interações de mouse e sem dados de infraestrutura ou rede;
    - Elementos em tela:
      - Topo: Identidade institucional do evento ativo (`StageHeader`);
-     - Centro: Anfiteatro 3D procedural com 5 cadeiras físicas, pódio de pitch laqueado e portal de neons reativos (`primaryColor` / `secondaryColor`);
+     - Fundo Monumental ($Z = -20.6\,\text{m}$): **Hero Showcase Wall** panorâmico ($33.6\,\text{m} \times 11.6\,\text{m}$), renderizando vídeos de pitch com áudio (`ScreenVideo`) e imagens de capa em alta definição (`ScreenImage`) guiados por estados narrativos;
+     - Centro: Pódio de oratória escalonado em 2 níveis (`TieredPitchStage`) e cúpula zenital acústica (`AcousticCanopy`);
+     - Primeiro Plano ($Z \approx 4.2\,\text{m}$ a $6.0\,\text{m}$): As 5 cadeiras físicas da banca com rotação de 180° e iluminação individual;
      - HUD Superior: Cronômetro cênico sincronizado (`StageHUD`) com alerta visual de contagem regressiva (<15s) e indicação de pausa;
-     - Rodapé Esquerdo: Card broadcast da startup no palco (`StageProjectBanner`) com badge do estágio operacional;
+     - Rodapé Esquerdo: Badge residual da startup no palco (`StageProjectBanner` — anotado formalmente com `@deprecated`, mantido temporariamente até a Phase 5C.6);
      - Rodapé Inferior: Dock nominal da banca de jurados (`StageJuryDock`) com cards translúcidos, avatares e anéis de neon reativos ao acionamento das cadeiras;
    - Dirigida 100% por eventos autoritativos e snapshots recebidos do backend.
 
@@ -55,7 +57,10 @@ Stage Screen (Telão Público 3D — Three.js + GSAP)
    - Emite deltas em broadcast em tempo real através do Hub SignalR (`/hubs/arena-poc`).
 
 4. **INFRAESTRUTURA (Rede e Transporte):**
-   - Camada de transporte transparente (WebSockets/SignalR e HTTP REST Minimal APIs);
+   - Camada de transporte transparente:
+     - SignalR Hub / WebSockets para sincronização de eventos entre backend e clientes;
+     - HTTP REST Minimal APIs para comandos autoritativos e snapshots;
+     - `BroadcastChannel('arena_media_controls')` para controle de reprodução de mídia de latência zero entre o Cockpit e o telão 3D.
    - Protocolos e detalhes técnicos ficam encapsulados nos serviços de frontend (`useSignalR.js`, módulos de API), nunca vazando para o vocabulário das interfaces operacionais.
 
 ---
@@ -69,7 +74,7 @@ O `ActiveContext` centraliza em memória o estado operacional em tempo real da a
 ```text
 ActiveContext
 ├── CurrentEvent: Event (ID, Branding, Configurações de Temporização)
-├── CurrentProject: Project (ID, Título, Equipe, Categoria, Mídias)
+├── CurrentProject: Project (ID, Título, Equipe, Categoria, Mídias, VideoUrl, MediaItems)
 ├── PitchStage: PitchStage (Waiting, PitchRunning, QA, VotingOpen, VotingClosed, Finished)
 ├── PitchStageStartedAt: DateTimeOffset? (Âncora temporal oficial)
 ├── CurrentStageDurationSeconds: int (Duração configurada para o estágio atual)
@@ -134,7 +139,7 @@ A dinâmica de contagem de tempo e bloqueio de acionamentos opera de forma autor
 2. **Sincronização Contínua Sem Desvio (Drift-Free):**
    Tanto o cockpit do operador quanto o telão 3D utilizam tickers locais sincronizados ancorados em `remainingSeconds` e calibrados via eventos SignalR `PitchTimerUpdated` e `PitchStageChanged`.
 3. **Ajustes Dinâmicos em Tempo Real:**
-   O operador pode pausar, retomar ou adicionar tempo extra (+30s, +60s, +120s) a qualquer momento através de endpoints dedicados (`POST /api/pitch/pause`, `resume`, `add-time`).
+   O operador pode pausar, retomar ou adicionar tempo extra (+30s, +60s, +120s) a qualquer momento através de endpoints dedicados (`POST /api/pitch/pause`, `resume`, `adjust`).
 4. **Lockout Físico e Digital (HTTP 409 Conflict):**
    O acionamento de cadeiras (`POST /api/chair-press`) é rigorosamente filtrado pelo backend:
    - Se `PitchStage == VotingOpen` e `!IsPaused`: o voto é aceito (`HTTP 200 OK`), a cadeira vira e o evento `ChairTurned` é emitido.
@@ -244,28 +249,11 @@ sequenceDiagram
     end
 ```
 
-### 3.3. Sincronização Dupla: Snapshot + Realtime
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Client as Qualquer Cliente (/stage ou /operator)
-    participant API as Backend REST (/api/state)
-    participant Hub as SignalR Hub (/hubs/arena-poc)
-
-    Client->>API: 1. GET /api/state (Snapshot Inicial)
-    API-->>Client: 200 OK { chairs: {...}, activeEvent: {...}, currentProject: {...}, pitchState: {...}, eventJury: [...] }
-    Client->>Client: Hidrata estado completo (3D, HUD, Stepper, Dock e Placar)
-
-    Client->>Hub: 2. Estabelece Conexão WebSocket
-    Hub-->>Client: Conexão Estabelecida (Pronto para receber deltas subsequentes)
-```
-
 ---
 
 ## 4. Contratos de Interface da Plataforma
 
-### 4.1. Endpoints REST (34 Endpoints Canônicos)
+### 4.1. Endpoints REST Canônicos
 
 | Grupo | Método | Endpoint | Descrição / Regra de Negócio |
 | :--- | :--- | :--- | :--- |
@@ -286,19 +274,21 @@ sequenceDiagram
 | | `POST` | `/api/events/{id}/duplicate` | Duplicação de evento para novo ciclo em `Draft`. |
 | **Projetos** | `GET` | `/api/projects` | Listagem de pitches do evento (`?includeCompleted=true` opcional). |
 | | `GET` | `/api/projects/{id}` | Detalhes de um projeto específico. |
-| | `POST` | `/api/projects` | Cadastro de projeto na fila do evento ativo. |
-| | `PUT` | `/api/projects/{id}` | Edição dos dados e mídias de um projeto. |
+| | `POST` | `/api/projects` | Cadastro de projeto na fila do evento ativo (com suporte a mídias e galeria JSONB). |
+| | `PUT` | `/api/projects/{id}` | Edição dos dados, vídeo e mídias de um projeto. |
 | | `DELETE` | `/api/projects/{id}` | Exclusão de projeto (bloqueia exclusão do projeto ativo com `409 Conflict`). |
 | | `POST` | `/api/projects/{id}/select` | Seleção autoritativa do projeto no palco com reset das cadeiras e inicialização em `Waiting`. |
+| **Uploads** | `POST` | `/api/upload` | Upload seguro de imagens/mídias (PNG, JPG, WebP, SVG até 20MB) servido em `/uploads/*`. |
 | **Pitch Lifecycle** | `GET` | `/api/pitch/state` | Consulta do estado atual da máquina de estados do pitch e transições permitidas. |
 | | `POST` | `/api/pitch/transition` | Transição formal de estágio (`422 Unprocessable` para transições inválidas). |
 | | `POST` | `/api/pitch/reset` | Reinício do ciclo da apresentação para `Waiting` com neutralização de cadeiras. |
-| **Timers** | `POST` | `/api/pitch/pause` | Congela a contagem do cronômetro da apresentação. |
-| | `POST` | `/api/pitch/resume` | Retoma a contagem do cronômetro sem drift temporal. |
-| | `POST` | `/api/pitch/add-time` | Adiciona segundos extras (+30s, +60s, +120s) ao estágio corrente. |
-| **Histórico** | `GET` | `/api/history` | Consulta do histórico consolidado de rodadas arquivadas. |
-| | `GET` | `/api/history/{id}` | Detalhes de um snapshot imutável de rodada específica. |
-| **Jurados** | `GET` | `/api/judges` | Catálogo global de jurados cadastrados (`?activeOnly=true` opcional). |
+| **Timers** | `POST` | `/api/pitch/timer/pause` | Congela a contagem do cronômetro da apresentação. |
+| | `POST` | `/api/pitch/timer/resume` | Retoma a contagem do cronômetro sem drift temporal. |
+| | `POST` | `/api/pitch/timer/adjust` | Adiciona ou subtrai segundos (+30s, +60s, +120s) ao estágio corrente. |
+| **Histórico** | `GET` | `/api/rounds` | Consulta do histórico consolidado de rodadas arquivadas. |
+| | `GET` | `/api/rounds/last` | Detalhes da última rodada arquivada. |
+| | `GET` | `/api/rounds/{id}` | Detalhes de um snapshot imutável de rodada específica. |
+| **Jurados** | `GET` | `/api/judges` | Catálogo global de jurados cadastrados (`?includeInactive=bool` opcional). |
 | | `GET` | `/api/judges/{id}` | Detalhes de um jurado do catálogo. |
 | | `POST` | `/api/judges` | Cadastro de novo jurado com foto, bio e dados profissionais. |
 | | `PUT` | `/api/judges/{id}` | Atualização cadastral de jurado existente. |
@@ -312,7 +302,7 @@ sequenceDiagram
 | :--- | :---: | :--- | :--- |
 | `ChairTurned` | Server $\rightarrow$ Client | `{ chairId, timestamp, source }` | Gira a cadeira no telão 3D, acende halo no dock do jurado e atualiza placar do operador. |
 | `ChairsReset` | Server $\rightarrow$ Client | *Sem payload* | Retorna as 5 cadeiras para 0° e zera o placar em todas as telas conectadas. |
-| `CurrentProjectChanged` | Server $\rightarrow$ Client | `{ project, previousProjectId, timestamp }` | Atualiza a startup no palco (`StageProjectBanner`) e destaca a linha na fila do operador. |
+| `CurrentProjectChanged` | Server $\rightarrow$ Client | `{ project, previousProjectId, timestamp }` | Atualiza o projeto no palco e telão monumental e destaca a linha na fila do operador. |
 | `EventBrandingUpdated` | Server $\rightarrow$ Client | `{ eventId, branding, timestamp }` | Interpola dinamicamente as cores dos neons cênicos e atualiza a identidade visual. |
 | `ActiveEventChanged` | Server $\rightarrow$ Client | `{ event, timestamp }` | Reconcilia o evento ativo da arena, sincronizando o catálogo do operador e o telão. |
 | `PitchStageChanged` | Server $\rightarrow$ Client | `{ projectId, currentStage, stageCode, ... }` | Atualiza o badge de palco, avança o stepper do operador e calibra o cronômetro. |
@@ -334,7 +324,6 @@ O serviço de comunicação em tempo real (`frontend/src/services/useSignalR.js`
    - Ao restabelecer: *"Sistema Operacional"* / *"Telão Conectado"*.
 3. **Resync Automático via Versão de Conexão (`reconnectVersion`):**
    A cada reconexão bem-sucedida, um contador interno é incrementado. O orquestrador raiz consulta imediatamente o snapshot `GET /api/state`, reconciliando cadeiras, pitch, cronômetro e banca sem demandar intervenção do operador (F5 manual).
-
 
 ---
 
@@ -375,3 +364,71 @@ Na inicialização do backend em `RehydrateSessionState()`:
 3. **Preservação Temporal no Checkpoint:** O tempo restante é congelado exatamente no ponto registrado no último snapshot válido (`LastCheckpointAt`), garantindo que o cronômetro não continue correndo durante a indisponibilidade física do servidor.
 4. **Decisão Soberana do Operador:** O operador na mesa técnica decide entre **Retomar (`POST /api/pitch/timer/resume`)** ou **Reiniciar (`POST /api/pitch/reset`)**, conferindo total previsibilidade e governança à produção do evento.
 5. **Metadados de Diagnóstico:** Flags `RecoveredFromCrash`, `InterruptedStage`, `RecoveredAt` e `LastCheckpointAt` são expostas nos DTOs para auditoria.
+
+---
+
+## 7. Subsistema de Hardware & Firmware ESP32 (Baseline Oficial v0.5.0)
+
+Conforme estabelecido na decisão arquitetural [ADR-028: Firmware Architecture & Hardware Integration Strategy](decision-records/ADR-028-firmware-architecture-hardware-integration.md), o subsistema embarcado é formalmente homologado como um **sensor transdutor e ponte de eventos de baixa latência**, mantendo a autoridade integral do backend e a operação offline-first:
+
+```text
+                                  REDE LOCAL / WI-FI 2.4 GHz
+            [Botão Físico ESP32]                   [Simulador de Testes]
+            (GPIO 18 / Debounce)                   (scripts/simulate-esp32)
+                     │                                       │
+                     └───────────────────┬───────────────────┘
+                                         │ HTTP POST /api/chair-press (Fail-Fast < 1s)
+                                         ▼
+                     ┌──────────────────────────────────────────────┐
+                     │             BACKEND ARENA VOICE              │
+                     │     ASP.NET Core (.NET 10 Minimal API)       │
+                     │             Binds em 0.0.0.0:5000            │
+                     ├──────────────────────────────────────────────┤
+                     │ • Lockout Autoritativo (VotingOpen? / 409)   │
+                     │ • Audit Trail (audit_events com ms e IP)     │
+                     │ • Persistência ACID (turned_chairs int[])    │
+                     │ • Hub SignalR Realtime (/hubs/arena-poc)     │
+                     └──────────────┬───────────────────────────────┘
+                                    │
+           ┌────────────────────────┴────────────────────────┐
+           ▼ Broadcast Realtime (SignalR)                      ▼ Snapshot REST (/api/state)
+┌──────────────────────────────────────┐     ┌──────────────────────────────────────┐
+│      /stage — TELÃO PÚBLICO 3D       │     │    /operator — COCKPIT DA MESA       │
+│    (Experiência Cênica / Telão)      │     │     (Gestão e Operação da Sessão)    │
+├──────────────────────────────────────┤     ├──────────────────────────────────────┤
+│ • Web Audio Synth (< 50ms)           │     │ • Placar e Status das 5 Cadeiras     │
+│ • Rotação Procedural 3D com GSAP     │     │ • Stepper e Controles de Pitch       │
+│ • Glow Neon e Dock de Jurados        │     │ • Bypass Manual (Fase 7A)            │
+└──────────────────────────────────────┘     └──────────────────────────────────────┘
+```
+
+---
+
+## 8. Motor de Mídia do Hero Showcase Wall & Controle ao Vivo (Phase 5C)
+
+Consolidado em [ADR-029](decision-records/ADR-029-hero-wall-media-engine-and-narrative-states.md) e [ADR-030](decision-records/ADR-030-project-media-persistence-jsonb.md), a experiência cênica do telão monumental transforma o projeto no protagonista absoluto através de uma arquitetura declarativa e reativa:
+
+### 8.1. Máquina de Estados Narrativos (`wallMode`)
+O hook [`useHeroWallMedia.js`](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/frontend/src/hooks/useHeroWallMedia.js) traduz o contexto de sessão em 5 modos visuais:
+- **`event-idle`:** Billboard institucional com logotipo e capa do evento ativo quando não há projeto selecionado.
+- **`waiting`:** Exibição da imagem de capa (`coverImageUrl`) do projeto em formato panorâmico com gradientes de fusão e lower-third.
+- **`pitch-live`:** Ativação do subcomponente `ScreenVideo` com `useVideoTexture` e **áudio desmutado**. Em caso de ausência ou falha de vídeo, ativa fallback determinístico para a capa (`ScreenImage`).
+- **`voting`:** Transição imediata para a imagem de capa estática; o áudio do vídeo é cortado instantaneamente para garantir foco na banca.
+- **`result`:** Imagem do projeto acompanhada de iluminação cênica de celebração em caso de aprovação.
+
+### 8.2. Protocolo de Comunicação de Mídia via `BroadcastChannel`
+A comunicação entre o Cockpit (`OperatorMediaControl.jsx`) e a cena 3D (`HeroShowcaseWall.jsx`) utiliza o canal nativo `BroadcastChannel('arena_media_controls')` com latência intra-navegador $< 5\,\text{ms}$:
+
+| Direção | Mensagem | Payload | Descrição |
+| :--- | :--- | :--- | :--- |
+| Cockpit $\rightarrow$ Stage | `PLAY` | — | Inicia ou retoma a reprodução do vídeo. |
+| Cockpit $\rightarrow$ Stage | `PAUSE` | — | Pausa a reprodução no frame atual. |
+| Cockpit $\rightarrow$ Stage | `RESTART` | — | Move o cursor para `00:00` e dispara o play. |
+| Cockpit $\rightarrow$ Stage | `SEEK` | `{ time: number }` | Salta diretamente para o timestamp em segundos. |
+| Cockpit $\rightarrow$ Stage | `VOLUME` | `{ volume: number }` | Atualiza o volume (0.0 a 1.0) e muta se for 0. |
+| Cockpit $\rightarrow$ Stage | `UNMUTE` | — | Desmuta e restaura o volume de sessão. |
+| Cockpit $\rightarrow$ Stage | `REQUEST_STATUS` | — | Solicita status atual ao montar o Cockpit. |
+| Stage $\rightarrow$ Cockpit | `MEDIA_STATUS` | `{ isPlaying, currentTime, duration, volume, isMuted, isEnded, isAudioBlocked }` | Telemetria contínua a cada ~250ms via evento `timeupdate`. |
+
+### 8.3. Persistência Relacional de Mídia de Projetos (JSONB)
+A entidade `Project` armazena `LogoUrl`, `CoverImageUrl`, `VideoUrl` e uma coleção dinâmica `MediaItems` serializada em coluna nativa `jsonb` no PostgreSQL 18.6 via EF Core 10, garantindo sobrevivência total a restarts e dispensando tabelas associativas prematuras.

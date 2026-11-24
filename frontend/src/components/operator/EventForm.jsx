@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Save, RotateCcw, AlertCircle, Loader2, Sparkles, Sliders } from 'lucide-react';
+import { Save, RotateCcw, AlertCircle, Loader2, Sparkles, Sliders, Monitor, Image as ImageIcon, Film } from 'lucide-react';
 import { ColorSwatch } from './ColorSwatch';
 import { isValidMediaUrl } from '../../utils/mediaValidation';
 
 /**
  * EventForm — Formulário operacional de edição de dados e identidade do evento.
  * 
- * Segue o contrato REST do Milestone 2B/2C.4 (PUT /api/events/current):
+ * Segue o contrato REST do Milestone 2B/2C.4 (PUT /api/events/current) e Phase 5C.X:
  * - Título institucional (3 a 150 caracteres)
  * - Descrição detalhada
  * - Tagline cênica
- * - Logo institucional (aceita vazio, caminhos relativos /samples/* e URLs)
- * - Cores primária e secundária (hexadecimal #RRGGBB com validação e presets)
+ * - Mídia de Standby do Evento (MediaMode: auto | video | image, Capa, Vídeo e Logo)
+ * - Cores primária e secundária (hexadecimal #RRGGBB)
  */
 export function EventForm({
   event,
@@ -24,6 +24,9 @@ export function EventForm({
     description: event?.description || '',
     tagline: event?.branding?.tagline || '',
     logoUrl: event?.branding?.logoUrl || '',
+    coverImageUrl: event?.branding?.coverImageUrl || '',
+    videoUrl: event?.branding?.videoUrl || '',
+    mediaMode: event?.branding?.mediaMode || 'auto',
     primaryColor: event?.branding?.primaryColor || '#d90429',
     secondaryColor: event?.branding?.secondaryColor || '#00ffff',
   }));
@@ -38,6 +41,9 @@ export function EventForm({
         description: event.description || '',
         tagline: event.branding?.tagline || '',
         logoUrl: event.branding?.logoUrl || '',
+        coverImageUrl: event.branding?.coverImageUrl || '',
+        videoUrl: event.branding?.videoUrl || '',
+        mediaMode: event.branding?.mediaMode || 'auto',
         primaryColor: event.branding?.primaryColor || '#d90429',
         secondaryColor: event.branding?.secondaryColor || '#00ffff',
       };
@@ -68,6 +74,9 @@ export function EventForm({
       description: event.description || '',
       tagline: event.branding?.tagline || '',
       logoUrl: event.branding?.logoUrl || '',
+      coverImageUrl: event.branding?.coverImageUrl || '',
+      videoUrl: event.branding?.videoUrl || '',
+      mediaMode: event.branding?.mediaMode || 'auto',
       primaryColor: event.branding?.primaryColor || '#d90429',
       secondaryColor: event.branding?.secondaryColor || '#00ffff',
     };
@@ -113,6 +122,9 @@ export function EventForm({
       branding: {
         tagline: formData.tagline.trim(),
         logoUrl,
+        coverImageUrl: formData.coverImageUrl.trim(),
+        videoUrl: formData.videoUrl.trim(),
+        mediaMode: formData.mediaMode || 'auto',
         primaryColor,
         secondaryColor,
       },
@@ -187,23 +199,112 @@ export function EventForm({
           />
         </div>
 
-        {/* Logotipo Cênico */}
-        <div>
-          <label className="block text-xs font-medium text-gray-300 mb-1">
-            Logotipo do Evento (Caminho Relativo ou URL)
-          </label>
-          <input
-            type="text"
-            name="logoUrl"
-            value={formData.logoUrl}
-            onChange={handleChange}
-            placeholder="/branding/event-logo.png ou https://..."
-            disabled={isSubmitting}
-            className={inputClasses}
-          />
-          <p className="text-[11px] text-gray-500 mt-1">
-            Aceita caminhos locais (/branding/*, /samples/*) ou URLs externas seguras.
-          </p>
+        {/* ── SEÇÃO: MÍDIA DE STANDBY DO EVENTO ───────────────────────────── */}
+        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/10 space-y-3.5">
+          <div className="flex items-center gap-2 border-b border-white/5 pb-2">
+            <Monitor className="w-4 h-4 text-amber-400 shrink-0" />
+            <div>
+              <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider">
+                Mídia de Standby do Evento
+              </h4>
+              <p className="text-[11px] text-gray-400">
+                Conteúdo institucional exibido no Hero Wall durante o estado de standby/abertura (EventIdle)
+              </p>
+            </div>
+          </div>
+
+          {/* Modo de Mídia (auto, video, image) */}
+          <div>
+            <label className="block text-[11px] font-semibold text-gray-300 mb-1">
+              Modo de Apresentação
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, mediaMode: 'auto' }))}
+                className={`px-2 py-1.5 rounded-lg text-xs font-medium border text-left ${
+                  formData.mediaMode === 'auto'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : 'bg-black/30 text-gray-400 border-white/5'
+                }`}
+              >
+                Auto (Padrão)
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, mediaMode: 'video' }))}
+                className={`px-2 py-1.5 rounded-lg text-xs font-medium border text-left ${
+                  formData.mediaMode === 'video'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : 'bg-black/30 text-gray-400 border-white/5'
+                }`}
+              >
+                Vídeo Prioritário
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, mediaMode: 'image' }))}
+                className={`px-2 py-1.5 rounded-lg text-xs font-medium border text-left ${
+                  formData.mediaMode === 'image'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : 'bg-black/30 text-gray-400 border-white/5'
+                }`}
+              >
+                Apenas Imagem
+              </button>
+            </div>
+          </div>
+
+          {/* Imagem de Capa */}
+          <div>
+            <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1.5">
+              <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+              <span>Imagem de Capa (Hero Wall)</span>
+            </label>
+            <input
+              type="text"
+              name="coverImageUrl"
+              value={formData.coverImageUrl}
+              onChange={handleChange}
+              placeholder="/branding/event-cover.png ou URL..."
+              disabled={isSubmitting}
+              className={inputClasses}
+            />
+          </div>
+
+          {/* Vídeo Institucional */}
+          <div>
+            <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1.5">
+              <Film className="w-3.5 h-3.5 text-amber-400" />
+              <span>Vídeo Institucional de Abertura</span>
+            </label>
+            <input
+              type="text"
+              name="videoUrl"
+              value={formData.videoUrl}
+              onChange={handleChange}
+              placeholder="/uploads/event-standby.mp4 ou URL..."
+              disabled={isSubmitting}
+              className={inputClasses}
+            />
+          </div>
+
+          {/* Logotipo */}
+          <div>
+            <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1.5">
+              <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+              <span>Logotipo do Evento</span>
+            </label>
+            <input
+              type="text"
+              name="logoUrl"
+              value={formData.logoUrl}
+              onChange={handleChange}
+              placeholder="/branding/event-logo.png ou https://..."
+              disabled={isSubmitting}
+              className={inputClasses}
+            />
+          </div>
         </div>
 
         {/* Descrição do Evento */}

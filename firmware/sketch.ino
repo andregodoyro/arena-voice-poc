@@ -1,181 +1,149 @@
 /*
   =============================================================================
-  ARENA VOICE — POC FÍSICO-DIGITAL LOCAL
-  Firmware ESP32 #1 -> Wi-Fi Hotspot -> HTTP POST -> Backend ASP.NET
+  ARENA VOICE — FIRMWARE BASELINE v0.5.0 (FW-01)
+  Subsistema de Hardware Oficial da Banca de Jurados (Cadeiras #1 a #5)
   =============================================================================
 
-  Conexão de Hardware:
-  GPIO 18 -> Botão Arcade (Microswitch terminal NO)
-  GND     -> Botão Arcade (Microswitch terminal COM)
-  (Utilizando pull-up interno: pinMode(BUTTON_PIN, INPUT_PULLUP))
+  Conformidade Arquitetural:
+  - ADR-001 (Backend Authoritative)
+  - ADR-013 (Authoritative Timers & Voting Lockout)
+  - ADR-015 (Decoupled Judge Identity)
+  - ADR-016 (Offline-First Persistence Strategy)
+  - ADR-028 (Firmware Architecture & Hardware Integration Strategy)
 
-  Transição monitorada: HIGH -> LOW (quando o botão é pressionado).
-  Debounce de 50ms para evitar registros espúrios ou múltiplos disparos.
+  Conexão de Hardware (ESP32 DevKit C V4):
+  - GPIO 18 -> Botão Arcade Industrial (Terminal NO)
+  - GND     -> Botão Arcade Industrial (Terminal COM)
+  - GPIO 2  -> LED Azul de Feedback IHM (Embutido)
+
+  Transmissão:
+  - Prioridade 1: mDNS "arena-voice.local" (UDP 5353)
+  - Prioridade 3: Fallback determinístico para BACKEND_FALLBACK_IP
+  - Protocolo: HTTP/1.1 POST para /api/chair-press (Fail-Fast <= 1.000 ms)
+  =============================================================================
 */
 
-#include <WiFi.h>
-#include <HTTPClient.h>
+#include <Arduino.h>
 #include "config.h"
+#include "DeviceIdentity.h"
+#include "LedController.h"
+#include "NetworkManager.h"
+#include "ButtonController.h"
+#include "HttpTransport.h"
+#include "Telemetry.h"
 
-// LED de status (definido em config.h, padrao GPIO 2)
-const int PINO_STATUS_LED = LED_PIN;
+// -----------------------------------------------------------------------------
+// INSTÂNCIAS DOS CONTROLADORES MODULARES
+// -----------------------------------------------------------------------------
+DeviceIdentity   identity;
+LedController    led;
+NetworkManager   network;
+ButtonController button;
+HttpTransport    transport;
+TelemetryManager telemetry;
 
-// Variáveis de controle de debounce e borda
-int ultimoEstadoBotao = HIGH;
-unsigned long ultimoTempoDebounce = 0;
-unsigned long ultimoDisparoSucesso = 0;
-
-void conectarWiFi() {
-  if (WiFi.status() == WL_CONNECTED) return;
-
-  Serial.println();
-  Serial.println("-------------------------------------------------------------");
-  Serial.print("Conectando ao Wi-Fi: ");
-  Serial.println(WIFI_SSID);
-
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-  int tentativas = 0;
-  while (WiFi.status() != WL_CONNECTED && tentativas < 30) {
-    delay(500);
-    Serial.print(".");
-    digitalWrite(PINO_STATUS_LED, !digitalRead(PINO_STATUS_LED)); // Pisca enquanto conecta
-    tentativas++;
-  }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    digitalWrite(PINO_STATUS_LED, LOW);
-    Serial.println();
-    Serial.println(">>> Wi-Fi CONECTADO COM SUCESSO!");
-    Serial.print(">>> IP do ESP32: ");
-    Serial.println(WiFi.localIP());
-    Serial.print(">>> Gateway/Hotspot: ");
-    Serial.println(WiFi.gatewayIP());
-    Serial.print(">>> Backend Alvo: http://");
-    Serial.print(BACKEND_HOST);
-    Serial.print(":");
-    Serial.print(BACKEND_PORT);
-    Serial.println(BACKEND_PATH);
-    Serial.println("-------------------------------------------------------------");
-  } else {
-    Serial.println();
-    Serial.println(">>> [FALHA] Nao foi possivel conectar ao Wi-Fi.");
-    Serial.println("    Verifique se o Hotspot esta ativo em 2.4 GHz e o SSID/senha.");
-  }
-}
-
-void enviarAcionamentoCadeira() {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[AVISO] Wi-Fi desconectado! Reconectando...");
-    conectarWiFi();
-    if (WiFi.status() != WL_CONNECTED) {
-      Serial.println("[ERRO] Abortando envio: sem conexao de rede.");
-      return;
-    }
-  }
-
-  // Acende LED para indicar envio em andamento
-  digitalWrite(PINO_STATUS_LED, HIGH);
-
-  unsigned long inicioEnvio = millis();
-  Serial.println();
-  Serial.println("=============================================================");
-  Serial.print("[BOTAO FISICO PRESSIONADO] Disparando acionamento Cadeira #");
-  Serial.println(CHAIR_ID);
-
-  HTTPClient http;
-  String url = "http://" + String(BACKEND_HOST) + ":" + String(BACKEND_PORT) + String(BACKEND_PATH);
-  Serial.print("Enviando HTTP POST para: ");
-  Serial.println(url);
-
-  http.begin(url);
-  http.addHeader("Content-Type", "application/json");
-  http.setTimeout(2500); // Timeout de 2.5s para evitar travamento em rede instável
-
-  // Payload padrão da POC com suporte retrocompatível
-  String payload = "{\"chairId\":" + String(CHAIR_ID) + ",\"seatNumber\":" + String(CHAIR_ID) + "}";
-  Serial.print("Payload JSON: ");
-  Serial.println(payload);
-
-  int codigoHttp = http.POST(payload);
-  unsigned long latencia = millis() - inicioEnvio;
-
-  Serial.print("Resposta HTTP: ");
-  Serial.print(codigoHttp);
-  Serial.print(" (tempo: ");
-  Serial.print(latencia);
-  Serial.println(" ms)");
-
-  if (codigoHttp >= 200 && codigoHttp <= 299) {
-    String resposta = http.getString();
-    Serial.println(">>> [SUCESSO] Backend confirmou o evento!");
-    Serial.print(">>> Resposta do Servidor: ");
-    Serial.println(resposta);
-    ultimoDisparoSucesso = millis();
-
-    // Pisca rápido duas vezes para indicar confirmação
-    digitalWrite(PINO_STATUS_LED, LOW);
-    delay(70);
-    digitalWrite(PINO_STATUS_LED, HIGH);
-    delay(70);
-    digitalWrite(PINO_STATUS_LED, LOW);
-  } else {
-    Serial.print(">>> [ERRO] Falha ao contatar backend. Codigo HTTP: ");
-    Serial.println(codigoHttp);
-    digitalWrite(PINO_STATUS_LED, LOW);
-  }
-
-  http.end();
-  Serial.println("=============================================================");
-}
-
+// =============================================================================
+// SETUP (INICIALIZAÇÃO DO MICROCONTROLADOR)
+// =============================================================================
 void setup() {
-  Serial.begin(SERIAL_BAUD_RATE);
-  delay(1000);
+    Serial.begin(SERIAL_BAUD_RATE);
+    delay(500);
 
-  Serial.println("\n\n");
-  Serial.println("=============================================================");
-  Serial.println("   ARENA VOICE — FIRMWARE ESP32 POC INICIADO                ");
-  Serial.print("   CADEIRA ATRIBUIDA: #");
-  Serial.println(CHAIR_ID);
-  Serial.print("   PINO DO BOTAO:     GPIO ");
-  Serial.println(BUTTON_PIN);
-  Serial.println("=============================================================");
+    Serial.println();
+    Serial.println("=============================================================");
+    Serial.println("   ARENA VOICE — FIRMWARE BASELINE v0.5.0 (FW-01)           ");
+    Serial.println("   Subsistema de Hardware Oficial da Banca de Jurados        ");
+    Serial.println("=============================================================");
 
-  // Configuração dos pinos
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
-  pinMode(PINO_STATUS_LED, OUTPUT);
-  digitalWrite(PINO_STATUS_LED, LOW);
+    // 1. Inicialização dos Periféricos de Hardware
+    led.init(LED_PIN);
+    button.init(BUTTON_PIN, DEBOUNCE_MS, LOCKOUT_MS);
+    transport.init(HTTP_TIMEOUT_MS); // M-03: Inicialização explícita com timeout oficial calibrado
 
-  // Conecta ao Wi-Fi configurado
-  conectarWiFi();
+    Serial.print("[Hardware] Botao Arcade configurado no pino GPIO ");
+    Serial.print(BUTTON_PIN);
+    Serial.println(" com pull-up interno.");
+    Serial.print("[Hardware] LED de status configurado no pino GPIO ");
+    Serial.println(LED_PIN);
 
-  Serial.print("Aguardando acionamento fisico do botao (GPIO ");
-  Serial.print(BUTTON_PIN);
-  Serial.println(" -> GND)...");
+    // 2. Conexão à Rede Wi-Fi Local (2.4 GHz)
+    network.init(BACKEND_PORT, BACKEND_PATH);
+    network.connectWiFi(WIFI_SSID, WIFI_PASSWORD, led);
+
+    // 3. Inicialização da Identidade Estruturada do Dispositivo
+    initDeviceIdentity(identity, CHAIR_ID, FIRMWARE_VERSION, HARDWARE_REVISION);
+
+    // 4. Resolução de Endereço do Servidor (mDNS com Fallback e Hostname Único por Cadeira - M-02)
+    network.resolveBackendHost(MDNS_TARGET_HOST, BACKEND_FALLBACK_IP, MDNS_TIMEOUT_MS, identity.deviceTag);
+
+    Serial.println("-------------------------------------------------------------");
+    Serial.print("[Identidade] Cadeira Atribuida: #");
+    Serial.println(identity.chairId);
+    Serial.print("[Identidade] Tag do Dispositivo: ");
+    Serial.println(identity.deviceTag);
+    Serial.print("[Identidade] Firmware:           ");
+    Serial.println(identity.firmwareVersion);
+    Serial.print("[Identidade] MAC Address:        ");
+    Serial.println(identity.macAddress);
+    Serial.print("[Conexao]   Backend Alvo:       ");
+    Serial.println(network.getBackendURL());
+    Serial.println("=============================================================");
+    Serial.println(">>> ARENA VOICE PRONTO. Aguardando acionamento do jurado...");
+    Serial.println();
+
+    // 5. Inicialização de Telemetria (Stubs inativos para Fase 7)
+    telemetry.init();
 }
 
+// =============================================================================
+// LOOP PRINCIPAL (100% NÃO-BLOQUEANTE)
+// =============================================================================
 void loop() {
-  int leituraAtual = digitalRead(BUTTON_PIN);
+    // 1. Atualização Contínua da IHM de LED (Máquina de Estados millis)
+    led.update();
 
-  // Detecção de transição com debounce mecânico
-  if ((millis() - ultimoTempoDebounce) > DEBOUNCE_MS) {
-    // Detecta EXCLUSIVAMENTE a transição HIGH -> LOW (apertou o botão para o GND)
-    if (ultimoEstadoBotao == HIGH && leituraAtual == LOW) {
-      ultimoTempoDebounce = millis();
-
-      // Trava de segurança para evitar múltiplos envios se mantiver pressionado
-      if (millis() - ultimoDisparoSucesso > LOCKOUT_MS) {
-        enviarAcionamentoCadeira();
-      } else {
-        Serial.println("[DEBOUNCE] Clique ignorado (intervalo mínimo entre acionamentos)");
-      }
+    // 2. Monitoramento de Reconexão Wi-Fi em Segundo Plano
+    if (!network.isConnected()) {
+        led.triggerSearching();
+        delay(10);
+        return;
     }
-  }
 
-  ultimoEstadoBotao = leituraAtual;
+    // 3. Detecção Eletromecânica do Botão Arcade com Debounce
+    if (button.pollButtonPress()) {
+        Serial.println();
+        Serial.println("-------------------------------------------------------------");
+        Serial.print("[BOTAO FISICO ACIONADO] Jurado pressionou a Cadeira #");
+        Serial.println(identity.chairId);
 
-  // Pequeno delay de 10ms para alívio da CPU do microcontrolador
-  delay(10);
+        // Monta o payload JSON enriquecido
+        String payload = buildChairPayload(identity);
+        String targetUrl = network.getBackendURL();
+
+        // Dispara o envio HTTP atômico com política Fail-Fast
+        TransportStatus status = transport.sendChairPress(targetUrl, payload, led);
+
+        if (status == STATUS_SUCCESS_200) {
+            // Sucesso: marca o timestamp para trava local anti-repulsão (1.500 ms)
+            button.markTriggerSuccess();
+        } else if (status == STATUS_LOCKOUT_409) {
+            // Lockout de negócio: não atualiza sucesso, LED apaga sem piscar
+            Serial.println("[Aviso] Voto bloqueado pelas regras de negocio do evento.");
+        } else if (status == STATUS_NETWORK_FAILURE) {
+            // Falha persistente de rádio/rede
+            Serial.println("[Alerta] Falha de conexao com o backend.");
+
+            // Se falhou repetidamente (>= 2 vezes), invalida cache e força novo mDNS
+            if (transport.getConsecutiveFailures() >= 2) {
+                network.invalidateCache(MDNS_TARGET_HOST, BACKEND_FALLBACK_IP, MDNS_TIMEOUT_MS, identity.deviceTag);
+                transport.resetFailures();
+            }
+        }
+    }
+
+    // 4. Processamento de Telemetria (Stubs dormindo — Zero overhead na Fase 5)
+    telemetry.processTelemetry(identity);
+
+    // 5. Alívio de CPU para o escalonador do RTOS do ESP32
+    delay(5);
 }

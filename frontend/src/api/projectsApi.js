@@ -1,10 +1,11 @@
 import { request } from './apiClient';
 
 /**
- * projectsApi — Endpoints operacionais de Projetos (Milestones 2B & 2C.3).
- * 
- * Segue ADR-001 (Backend Authoritative), ADR-005 (Project Selection Lifecycle)
- * e ADR-006 (Project Deletion Protection).
+ * projectsApi — Endpoints operacionais de Projetos (Milestones 2B, 2C.3, 5C.2B, 5C.4).
+ *
+ * Segue ADR-001 (Backend Authoritative), ADR-005 (Project Selection Lifecycle),
+ * ADR-006 (Project Deletion Protection), Milestone 5C.2B (Hero Wall Occupancy Pass &
+ * Upload Support) e Phase 5C.4 (Video no LED Wall).
  */
 export const projectsApi = {
   /**
@@ -25,7 +26,7 @@ export const projectsApi = {
 
   /**
    * Cria um novo projeto vinculado ao evento ativo (POST /api/projects).
-   * @param {Object} projectData - Dados do projeto (title, pitchLeader, track, description, orderIndex, logoUrl, coverImageUrl).
+   * @param {Object} projectData - Dados do projeto (title, pitchLeader, track, description, orderIndex, logoUrl, coverImageUrl, videoUrl, mediaItems).
    */
   createProject: (projectData) => {
     return request('/api/projects', {
@@ -37,7 +38,7 @@ export const projectsApi = {
   /**
    * Atualiza dados de um projeto existente (PUT /api/projects/{id}).
    * @param {string} id - Identificador do projeto.
-   * @param {Object} projectData - Dados atualizados.
+   * @param {Object} projectData - Dados atualizados (Phase 5C.4: inclui videoUrl).
    */
   updateProject: (id, projectData) => {
     return request(`/api/projects/${encodeURIComponent(id)}`, {
@@ -65,6 +66,53 @@ export const projectsApi = {
   selectProject: (id) => {
     return request(`/api/projects/${encodeURIComponent(id)}/select`, {
       method: 'POST',
+    });
+  },
+
+  /**
+   * Faz upload de ativos visuais ou de vídeo para o servidor (POST /api/upload).
+   * Formatos suportados: JPG, JPEG, PNG, WEBP, SVG (imagens) e MP4, WEBM (vídeos — Phase 5C.4).
+   * Limite: 20 MB para imagens, 100 MB para vídeos.
+   * Possui fallback resiliente para dataURL caso o backend esteja offline (apenas imagens).
+   * @param {File} file - Arquivo a enviar.
+   * @returns {Promise<{ url: string, fileName: string, size: number }>}
+   */
+  uploadMedia: async (file) => {
+    try {
+      const baseUrl = (
+        localStorage.getItem('arena_poc_backend_url') ||
+        import.meta.env.VITE_BACKEND_URL ||
+        'http://localhost:5000'
+      ).replace(/\/+$/, '');
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`${baseUrl}/api/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (err) {
+      console.warn('[projectsApi] Upload via API falhou, utilizando fallback local DataURL:', err);
+    }
+
+    // Fallback offline-first via FileReader DataURL
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        resolve({
+          url: reader.result,
+          fileName: file.name,
+          size: file.size,
+          contentType: file.type,
+        });
+      };
+      reader.onerror = () => reject(new Error('Erro ao ler o arquivo local.'));
+      reader.readAsDataURL(file);
     });
   },
 };
