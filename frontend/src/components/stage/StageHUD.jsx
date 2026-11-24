@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Flame, Radio, Clock, Pause, AlertTriangle } from 'lucide-react';
-import { StageProjectBanner } from './StageProjectBanner';
 import { useStageTimer } from '../../hooks/useStageTimer';
 
 /**
@@ -8,12 +7,12 @@ import { useStageTimer } from '../../hooks/useStageTimer';
  * 
  * Milestone 2D.1: Infraestrutura de Dados, Contexto e HUD Cênico.
  * Milestone 3C & 3D: Cronômetro Cênico Principal de Alta Visibilidade.
+ * Phase 5C.6: Remoção do componente legado StageProjectBanner (protagonismo no Hero Showcase Wall).
  * 
  * Foco estrito na experiência do público e da plateia:
  * - Identidade visual do evento ativo (CurrentEvent: título, tagline, logo e branding);
  * - Cronômetro cênico principal centralizado com tipografia grande e destaque visual;
- * - Ficha cênica do projeto em apresentação no palco (StageProjectBanner);
- * - Placar consolidado de cadeiras viradas ("X / 5") com feedback luminoso;
+ * - Dock da banca de jurados e placar consolidado de cadeiras viradas ("X / 5");
  * - Sem botões interativos, sem Modo Dev, sem termos técnicos ou controles de rede (ADR-009).
  */
 export function StageHUD({
@@ -221,10 +220,8 @@ export function StageHUD({
         </div>
       </header>
 
-      {/* ── FOOTER CÊNICO: Banner do Projeto + Banca de Jurados (5 Cadeiras) ── */}
-      <footer className="w-full flex flex-col lg:flex-row items-end justify-between gap-4">
-        <StageProjectBanner project={currentProject} branding={currentEvent?.branding} pitchState={pitchState} />
-
+      {/* ── FOOTER CÊNICO: Banca de Jurados (5 Cadeiras — Phase 5C.6 HUD Clean) ── */}
+      <footer className="w-full flex items-end justify-end gap-4">
         {/* ── BARRA DA BANCA DE JURADOS (Milestone 3E) ───────────────────────── */}
         <div
           className="glass-panel rounded-2xl px-3 py-2 md:px-4 md:py-2.5 flex items-center gap-2.5 border shadow-2xl backdrop-blur-xl transition-all duration-300"
