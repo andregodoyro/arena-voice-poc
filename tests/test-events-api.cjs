@@ -1,23 +1,27 @@
 /**
  * test-events-api.cjs — Suíte de Testes Automatizados para o Milestone 3A
- * 
- * Validação rigorosa do Ciclo de Vida e Catálogo de Eventos (Event Lifecycle & Management):
+ * Atualizado para Milestone 5H: todas as requisições a endpoints protegidos
+ * utilizam Bearer token JWT de Operator ou Admin.
+ *
+ * Validação rigorosa do Ciclo de Vida e Catálogo de Eventos:
  * 1. GET /api/events (catálogo completo e filtros por status)
  * 2. GET /api/events/{id} (detalhes e 404)
  * 3. POST /api/events (criação e validações de cores/título)
  * 4. PUT /api/events/{id} (edição de metadados/branding)
  * 5. POST /api/events/{id}/duplicate (clonagem para Draft)
- * 6. POST /api/events/{id}/activate (ativação atômica: anterior vira Ready, novo vira Active)
- * 7. POST /api/events/{id}/finish (ação explícita de encerramento)
- * 8. POST /api/events/{id}/archive (rejeição 409 Conflict se ativo, 200 se inativo)
+ * 6. POST /api/events/{id}/activate (ativação atômica)
+ * 7. POST /api/events/{id}/finish (encerramento)
+ * 8. POST /api/events/{id}/archive (proteção 409 Conflict)
  * 9. Isolamento e restauração de estado (ADR-008)
  */
 
-const http = require('http');
+const BASE_URL = process.env.TEST_BASE_URL || process.env.BASE_URL || 'http://localhost:5000';
+const TEST_ADMIN_EMAIL    = process.env.ARENA_ADMIN_EMAIL    || 'admin@arenavoice.local';
+const TEST_ADMIN_PASSWORD = process.env.ARENA_ADMIN_PASSWORD || 'ArenaAdmin@2026';
 
-const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:5000';
 let totalAssertions = 0;
 let passedAssertions = 0;
+let bearerToken = '';
 
 function assert(condition, message, details = '') {
   totalAssertions++;
@@ -31,44 +35,46 @@ function assert(condition, message, details = '') {
   }
 }
 
-function request(method, path, body = null) {
-  return new Promise((resolve, reject) => {
-    const url = new URL(path, BASE_URL);
-    const options = {
-      method,
-      hostname: url.hostname,
-      port: url.port,
-      path: url.pathname + url.search,
-      headers: {
-        'Accept': 'application/json',
-      },
-    };
+async function request(method, path, body = null) {
+  const headers = {
+    'Accept': 'application/json',
+  };
 
-    let postData = null;
-    if (body !== null) {
-      postData = JSON.stringify(body);
-      options.headers['Content-Type'] = 'application/json';
-      options.headers['Content-Length'] = Buffer.byteLength(postData);
-    }
+  if (bearerToken) {
+    headers['Authorization'] = `Bearer ${bearerToken}`;
+  }
 
-    const req = http.request(options, (res) => {
-      let data = '';
-      res.on('data', (chunk) => { data += chunk; });
-      res.on('end', () => {
-        let parsed = null;
-        try {
-          if (data) parsed = JSON.parse(data);
-        } catch (e) {
-          parsed = data;
-        }
-        resolve({ status: res.statusCode, body: parsed, headers: res.headers });
-      });
-    });
+  if (body !== null) {
+    headers['Content-Type'] = 'application/json';
+  }
 
-    req.on('error', reject);
-    if (postData) req.write(postData);
-    req.end();
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method,
+    headers,
+    body: body !== null ? JSON.stringify(body) : undefined,
   });
+
+  let parsed = null;
+  const text = await res.text();
+  try {
+    if (text) parsed = JSON.parse(text);
+  } catch {
+    parsed = text;
+  }
+
+  return { status: res.status, body: parsed, headers: Object.fromEntries(res.headers.entries()) };
+}
+
+async function authenticate() {
+  const res = await fetch(`${BASE_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD }),
+  });
+  if (!res.ok) throw new Error(`Login falhou: HTTP ${res.status}`);
+  const data = await res.json();
+  bearerToken = data.accessToken;
+  console.log(`  [AUTH] Login bem-sucedido como ${TEST_ADMIN_EMAIL} (role: ${data.user?.role})`);
 }
 
 async function run() {
@@ -77,6 +83,11 @@ async function run() {
   console.log('============================================================\n');
 
   try {
+    // ── 0. Autenticação JWT ───────────────────────────────────────────────
+    console.log('[0/8] Autenticação JWT para testes protegidos...');
+    await authenticate();
+    assert(!!bearerToken, 'Token JWT obtido com sucesso');
+
     // ── 1. Healthcheck e Estado Inicial ──────────────────────────────────
     console.log('[1/8] Verificando conectividade e catálogo inicial...');
     const health = await request('GET', '/api/status');
@@ -165,18 +176,15 @@ async function run() {
 
     // ── 7. Ativação Não-Destrutiva (POST /api/events/{id}/activate) ───────
     console.log('\n[7/8] Testando ativação atômica e regra não-destrutiva (Ajuste 1)...');
-    // Descobre o evento atualmente ativo
     const stateBefore = await request('GET', '/api/state');
     const prevActiveId = stateBefore.body?.currentEvent?.id;
 
-    // Ativa o evento criado
     const activateRes = await request('POST', `/api/events/${createdEventId}/activate`);
     assert(activateRes.status === 200, 'POST /api/events/{id}/activate retorna HTTP 200');
     assert(activateRes.body?.success === true, 'Payload de ativação indica sucesso');
     assert(activateRes.body?.activatedEvent?.status === 2, 'Novo evento torna-se Active (2)');
     assert(activateRes.body?.previousEvent?.status === 1, 'REGRA AJUSTE 1: Evento anteriormente ativo retornou para Ready (1), NÃO Finished!');
 
-    // Valida no snapshot global
     const stateAfter = await request('GET', '/api/state');
     assert(stateAfter.body?.currentEvent?.id === createdEventId, 'GET /api/state reflete o novo evento ativo');
     assert(stateAfter.body?.currentProject === null, 'Projeto ativo no palco foi limpo para a nova fila de pitches');
@@ -184,16 +192,13 @@ async function run() {
 
     // ── 8. Encerramento (Finish) e Arquivamento com Proteção 409 ──────────
     console.log('\n[8/8] Testando POST finish e archive com proteção 409...');
-    // Tentativa de arquivar o evento ativo
     const archiveActive = await request('POST', `/api/events/${createdEventId}/archive`);
     assert(archiveActive.status === 409, 'POST /api/events/{id}/archive rejeita arquivar evento ativo com HTTP 409 Conflict');
 
-    // Encerrar evento ativo
     const finishRes = await request('POST', `/api/events/${createdEventId}/finish`);
     assert(finishRes.status === 200, 'POST /api/events/{id}/finish encerra evento formalmente com HTTP 200');
     assert(finishRes.body?.finishedEvent?.status === 3, 'Status alterado para Finished (3)');
 
-    // Arquivar evento inativo (o duplicado que criamos)
     const archiveInactive = await request('POST', `/api/events/${duplicatedId}/archive`);
     assert(archiveInactive.status === 200, 'POST /api/events/{id}/archive arquiva evento inativo com HTTP 200');
     assert(archiveInactive.body?.archivedEvent?.status === 4, 'Status alterado para Archived (4)');
@@ -202,7 +207,6 @@ async function run() {
     console.log('\n[Restauração] Reativando evento padrão e higienizando dados de teste...');
     if (prevActiveId) {
       await request('POST', `/api/events/${prevActiveId}/activate`);
-      // Restaura o projeto 1 ativo
       await request('POST', '/api/projects/proj-neurosync-01/select');
     }
 

@@ -23,6 +23,7 @@
  */
 
 const http = require('http');
+const { loginAs, authHeaders } = require('./test-auth-helper.cjs');
 
 let signalR = null;
 try {
@@ -38,6 +39,7 @@ try {
 const BASE_URL = process.env.TEST_BASE_URL || 'http://127.0.0.1:5000';
 let totalAssertions = 0;
 let passedAssertions = 0;
+let operatorToken = '';
 
 function assert(condition, message, details = '') {
   totalAssertions++;
@@ -59,9 +61,7 @@ function request(method, path, body = null) {
       hostname: url.hostname,
       port: url.port,
       path: url.pathname + url.search,
-      headers: {
-        'Accept': 'application/json',
-      },
+      headers: authHeaders(operatorToken, { 'Accept': 'application/json' }),
     };
 
     let postData = null;
@@ -98,6 +98,7 @@ function request(method, path, body = null) {
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function run() {
+  operatorToken = await loginAs('Operator', { baseUrl: BASE_URL });
   console.log('============================================================');
   console.log('  ARENA VOICE POC — TEST SUITE: TIMERS & LOCKOUT (3C)        ');
   console.log('============================================================');

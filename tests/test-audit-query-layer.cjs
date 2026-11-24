@@ -15,10 +15,12 @@
  */
 
 const http = require('http');
+const { loginAs, authHeaders } = require('./test-auth-helper.cjs');
 
 const BASE = 'http://localhost:5000';
 let pass = 0;
 let fail = 0;
+let operatorToken = '';
 const failures = [];
 
 function assert(condition, label) {
@@ -39,7 +41,7 @@ async function req(method, path, body = null) {
             port: url.port,
             path: url.pathname + url.search,
             method,
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders(operatorToken, { 'Content-Type': 'application/json' }),
             timeout: 10000
         };
 
@@ -70,6 +72,7 @@ async function sleep(ms) {
 // ============================================================
 
 async function runTests() {
+    operatorToken = await loginAs('Operator', { baseUrl: BASE });
     console.log('============================================================');
     console.log('  ARENA VOICE — 4C.4 AUDIT QUERY LAYER TESTS');
     console.log('============================================================\n');

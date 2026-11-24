@@ -12,11 +12,13 @@
  */
 
 const http = require('http');
+const { loginAs, authHeaders } = require('./test-auth-helper.cjs');
 
 const BASE_URL = process.env.ARENA_API_URL || 'http://127.0.0.1:5000';
 
 let testsPassed = 0;
 let testsFailed = 0;
+let operatorToken = '';
 
 function assert(condition, message) {
   if (condition) {
@@ -36,10 +38,7 @@ async function request(method, path, body = null) {
       hostname: url.hostname,
       port: url.port,
       path: url.pathname + url.search,
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      }
+      headers: authHeaders(operatorToken, { 'Accept': 'application/json', 'Content-Type': 'application/json' })
     };
 
     const req = http.request(options, (res) => {
@@ -70,6 +69,7 @@ async function runTests() {
   console.log('   ARENA VOICE — POSTGRESQL PERSISTENCE VALIDATION   ');
   console.log('======================================================');
   console.log(`Target: ${BASE_URL}\n`);
+  operatorToken = await loginAs('Operator', { baseUrl: BASE_URL });
 
   try {
     // -------------------------------------------------------------------------

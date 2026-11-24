@@ -22,6 +22,7 @@
  */
 
 const http = require('http');
+const { loginAs, authHeaders } = require('./test-auth-helper.cjs');
 
 let signalR = null;
 try {
@@ -37,6 +38,7 @@ try {
 const BASE_URL = process.env.TEST_BASE_URL || 'http://127.0.0.1:5000';
 let totalAssertions = 0;
 let passedAssertions = 0;
+let operatorToken = '';
 
 function assert(condition, message, details = '') {
   totalAssertions++;
@@ -62,9 +64,7 @@ function request(method, path, body = null) {
       port: url.port,
       path: url.pathname + url.search,
       method: method,
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: authHeaders(operatorToken, { 'Content-Type': 'application/json' }),
     };
 
     const req = http.request(options, (res) => {
@@ -98,6 +98,7 @@ async function runTests() {
   console.log('  ARENA VOICE POC — TEST SUITE: JUDGES & JURY (MILESTONE 3E)');
   console.log('============================================================');
   console.log(`Alvo do teste: ${BASE_URL}\n`);
+  operatorToken = await loginAs('Operator', { baseUrl: BASE_URL });
 
   let dynamicEventId = null;
   let createdJudgeId = null;

@@ -191,7 +191,7 @@ async function runRegression() {
       try {
         output = execSync(`"${NODE_EXE}" "${suitePath}"`, {
           cwd: __dirname,
-          env: { ...process.env, ARENA_API_URL: BASE_URL, BASE_URL: BASE_URL },
+          env: { ...process.env, ARENA_API_URL: BASE_URL, BASE_URL: BASE_URL, TEST_BASE_URL: BASE_URL, ARENA_ADMIN_EMAIL: process.env.ARENA_ADMIN_EMAIL || 'admin@arenavoice.local', ARENA_ADMIN_PASSWORD: process.env.ARENA_ADMIN_PASSWORD || 'ArenaAdmin@2026', ARENA_OPERATOR_PASSWORD: process.env.ARENA_OPERATOR_PASSWORD || 'ArenaOperator@2026' },
           encoding: 'utf8',
           maxBuffer: 10 * 1024 * 1024
         });
@@ -290,3 +290,5 @@ async function runRegression() {
 }
 
 runRegression();
+
+

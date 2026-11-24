@@ -1,9 +1,19 @@
+/**
+ * test-api.cjs — Suíte principal de validação da API Arena Voice.
+ * Atualizado para Milestone 5H: todas as chamadas a endpoints protegidos
+ * utilizam autenticação JWT (Bearer token de Operator ou Admin).
+ */
+
 const backendUrl = (
-    process.env.VITE_BACKEND_URL || 'http://127.0.0.1:5000'
+    process.env.VITE_BACKEND_URL || process.env.BASE_URL || 'http://127.0.0.1:5000'
 ).replace(/\/+$/, '');
+
+const TEST_ADMIN_EMAIL    = process.env.ARENA_ADMIN_EMAIL    || 'admin@arenavoice.local';
+const TEST_ADMIN_PASSWORD = process.env.ARENA_ADMIN_PASSWORD || 'ArenaAdmin@2026';
 
 let passed = 0;
 let failed = 0;
+let operatorToken = '';
 
 function pass(name) {
     passed++;
@@ -24,7 +34,11 @@ function assert(condition, name, details = '') {
 }
 
 async function request(path, options = {}) {
-    const response = await fetch(`${backendUrl}${path}`, options);
+    const headers = { ...(options.headers || {}) };
+    if (operatorToken && !headers['Authorization']) {
+        headers['Authorization'] = `Bearer ${operatorToken}`;
+    }
+    const response = await fetch(`${backendUrl}${path}`, { ...options, headers });
 
     let body = null;
     const text = await response.text();
@@ -70,6 +84,20 @@ function allChairsAre(chairs, expected) {
     );
 }
 
+async function authenticate() {
+    const res = await fetch(`${backendUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD })
+    });
+    if (!res.ok) {
+        throw new Error(`Falha no login de teste: HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    operatorToken = data.accessToken;
+    console.log(`  [AUTH] Login bem-sucedido como ${TEST_ADMIN_EMAIL} (role: ${data.user?.role})`);
+}
+
 async function main() {
     console.log('');
     console.log('======================================================');
@@ -79,10 +107,17 @@ async function main() {
     console.log('');
 
     // --------------------------------------------------
+    // 0. AUTENTICAÇÃO
+    // --------------------------------------------------
+    console.log('[0] Autenticação JWT para testes protegidos');
+    await authenticate();
+    assert(!!operatorToken, 'Token JWT obtido com sucesso');
+
+    // --------------------------------------------------
     // 1. HEALTH CHECK
     // --------------------------------------------------
 
-    console.log('[1] Health check');
+    console.log('\n[1] Health check');
 
     const status = await request('/api/status');
 
@@ -340,10 +375,28 @@ async function main() {
     );
 
     // --------------------------------------------------
+    // 10. VALIDAR QUE ENDPOINTS PROTEGIDOS EXIGEM AUTH
+    // --------------------------------------------------
+
+    console.log('\n[10] Validação de autenticação em endpoints protegidos');
+
+    const noAuthReset = await fetch(`${backendUrl}/api/reset`, { method: 'POST' });
+    assert(
+        noAuthReset.status === 401,
+        'POST /api/reset sem token retorna 401 Unauthorized'
+    );
+
+    const noAuthEvents = await fetch(`${backendUrl}/api/events`);
+    assert(
+        noAuthEvents.status === 401,
+        'GET /api/events sem token retorna 401 Unauthorized'
+    );
+
+    // --------------------------------------------------
     // CLEANUP
     // --------------------------------------------------
 
-    console.log('\n[10] Cleanup');
+    console.log('\n[11] Cleanup');
 
     await reset();
 
@@ -383,12 +436,6 @@ async function main() {
 main().catch(async (err) => {
     console.error('\n>>> [ERROR] Falha inesperada durante os testes:');
     console.error(err);
-
-    try {
-        await reset();
-    } catch {
-        // Backend pode estar indisponivel.
-    }
 
     process.exit(1);
 });

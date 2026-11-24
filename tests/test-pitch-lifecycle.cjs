@@ -16,6 +16,7 @@
  */
 
 const http = require('http');
+const { loginAs, authHeaders } = require('./test-auth-helper.cjs');
 
 let signalR = null;
 try {
@@ -31,6 +32,7 @@ try {
 const BASE_URL = process.env.TEST_BASE_URL || 'http://127.0.0.1:5000';
 let totalAssertions = 0;
 let passedAssertions = 0;
+let operatorToken = '';
 
 function assert(condition, message, details = '') {
   totalAssertions++;
@@ -52,9 +54,7 @@ function request(method, path, body = null) {
       hostname: url.hostname,
       port: url.port,
       path: url.pathname + url.search,
-      headers: {
-        'Accept': 'application/json',
-      },
+      headers: authHeaders(operatorToken, { 'Accept': 'application/json' }),
     };
 
     let postData = null;
@@ -95,6 +95,7 @@ async function run() {
   console.log('  ARENA VOICE POC — TEST SUITE: PITCH LIFECYCLE ENGINE (3B) ');
   console.log('============================================================');
   console.log(`Alvo do teste: ${BASE_URL}\n`);
+  operatorToken = await loginAs('Operator', { baseUrl: BASE_URL });
 
   let initialEventId = null;
   let initialProjectId = null;

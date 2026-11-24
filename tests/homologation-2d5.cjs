@@ -1,10 +1,12 @@
 const signalR = require('../frontend/node_modules/@microsoft/signalr');
+const { loginAs, authHeaders } = require('./test-auth-helper.cjs');
 
 const backendUrl = (process.env.VITE_BACKEND_URL || 'http://127.0.0.1:5000').replace(/\/+$/, '');
 const signalrUrl = `${backendUrl}/hubs/arena-poc`;
 
 let passed = 0;
 let failed = 0;
+let operatorToken = '';
 
 function pass(msg) {
   passed++;
@@ -22,7 +24,8 @@ function assert(condition, msg, details = '') {
 }
 
 async function request(path, options = {}) {
-  const res = await fetch(`${backendUrl}${path}`, options);
+  const mergedOptions = { ...options, headers: options.skipAuth ? (options.headers || {}) : authHeaders(operatorToken, options.headers || {}) };
+  const res = await fetch(`${backendUrl}${path}`, mergedOptions);
   const text = await res.text();
   let body = null;
   if (text) {
@@ -70,6 +73,7 @@ async function runHomologation() {
   console.log('======================================================');
   console.log(`Backend:  ${backendUrl}`);
   console.log(`SignalR:  ${signalrUrl}\n`);
+  operatorToken = await loginAs('Operator', { baseUrl: backendUrl });
 
   // ── CENÁRIO 1: FLUXO NORMAL INTEGRADO ───────────────────────────────────
   console.log('[CENÁRIO 1] Fluxo Normal Integrado (/operator & /stage)');

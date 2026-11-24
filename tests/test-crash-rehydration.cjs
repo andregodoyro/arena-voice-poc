@@ -13,6 +13,7 @@
  */
 
 const http = require('http');
+const { loginAs, authHeaders } = require('./test-auth-helper.cjs');
 const { spawn, execSync } = require('child_process');
 const path = require('path');
 const { getDotnetExe } = require('./tool-locator.cjs');
@@ -23,6 +24,7 @@ const DOTNET_EXE = getDotnetExe();
 
 let testsPassed = 0;
 let testsFailed = 0;
+let operatorToken = '';
 let backendProcess = null;
 
 function assert(condition, message) {
@@ -43,10 +45,7 @@ async function request(method, reqPath, body = null) {
       hostname: url.hostname,
       port: url.port,
       path: url.pathname + url.search,
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      }
+      headers: authHeaders(operatorToken, { 'Accept': 'application/json', 'Content-Type': 'application/json' })
     };
 
     const req = http.request(options, (res) => {
@@ -138,10 +137,14 @@ async function runRecoverySuite() {
   try {
     // Garante backend ativo no início
     await startBackend();
+    operatorToken = await loginAs('Operator', { baseUrl: BASE_URL });
 
     // Reset inicial para estado limpo
     await request('POST', '/api/reset');
     await request('POST', '/api/events/evt-demo-day-2026/activate');
+    await request('PUT', '/api/events/current', {
+      timers: { pitchDurationSeconds: 180, qaDurationSeconds: 60, votingDurationSeconds: 30, lockoutEnabled: false }
+    });
 
     // =========================================================================
     // CENÁRIO 1: Seleção de Projeto -> Restart Backend -> Projeto Continua

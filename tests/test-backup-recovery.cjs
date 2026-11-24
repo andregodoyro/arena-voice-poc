@@ -18,6 +18,7 @@
  */
 
 const http = require('http');
+const { loginAs, authHeaders } = require('./test-auth-helper.cjs');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
@@ -26,6 +27,7 @@ const { getPgRestoreExe } = require('./tool-locator.cjs');
 const BASE = process.env.ARENA_API_URL || process.env.BASE_URL || 'http://127.0.0.1:5000';
 let pass = 0;
 let fail = 0;
+let adminToken = '';
 const failures = [];
 
 function assert(condition, label) {
@@ -47,7 +49,7 @@ async function req(method, reqPath, body = null) {
             port: url.port,
             path: url.pathname + url.search,
             method,
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders(adminToken, { 'Content-Type': 'application/json' }),
             timeout: 10000
         };
 
@@ -90,6 +92,7 @@ async function waitForBackup(predicate, maxAttempts = 20, intervalMs = 500) {
 }
 
 async function run() {
+    adminToken = await loginAs('Admin', { baseUrl: BASE });
     console.log('\n============================================================');
     console.log('ARENA VOICE — TESTES DE SNAPSHOTS AUTOMÁTICOS & BACKUP (4D.2)');
     console.log('============================================================\n');
@@ -190,6 +193,8 @@ async function run() {
 
     // Arquiva a Rodada 1 explicitamente via POST /api/rounds/archive
     console.log('\n[5] Arquivando Rodada 1 (POST /api/rounds/archive) e medindo overhead no hot path...');
+    const beforeRound1 = await req('GET', '/api/admin/backups');
+    const existingFilesBeforeRound1 = new Set(Array.isArray(beforeRound1.body) ? beforeRound1.body.map(b => b.fileName) : []);
     const archiveRound1 = await req('POST', '/api/rounds/archive', { reason: 'Homologação 4D.2 Rodada 1' });
     assert(archiveRound1.status === 200, 'POST /api/rounds/archive retorna 200 OK');
     assert(archiveRound1.durationMs < 500, `Resposta rápida no hot path da rodada: ${archiveRound1.durationMs}ms (< 500ms)`);
@@ -199,7 +204,7 @@ async function run() {
 
     // 6. Aguarda e valida snapshot automático da Rodada 1
     console.log('\n[6] Aguardando criação assíncrona do snapshot automático da Rodada 1...');
-    const snapshotRound1 = await waitForBackup(b => b.trigger === 'RoundArchived' && b.roundNumber === 1);
+    const snapshotRound1 = await waitForBackup(b => b.trigger === 'RoundArchived' && b.roundNumber === 1 && !existingFilesBeforeRound1.has(b.fileName));
     assert(snapshotRound1 !== null, 'Snapshot automático round_1_*.pgdump detectado no filesystem');
 
     if (snapshotRound1) {
@@ -224,11 +229,20 @@ async function run() {
 
     // 7. Rastreabilidade no Audit Trail da Rodada 1
     console.log('\n[7] Verificação de rastreabilidade de eventos de auditoria da Rodada 1...');
-    await sleep(400); // Aguarda flush do AuditEventWriter (200ms)
-    const auditRes = await req('GET', '/api/audit?includeTechnical=true&pageSize=50');
+    let auditRes = null;
+    let auditItems = [];
+    for (let attempt = 0; attempt < 15; attempt++) {
+        await sleep(350); // Aguarda flush do AuditEventWriter (200ms)
+        auditRes = await req('GET', '/api/audit?includeTechnical=true&pageSize=50');
+        auditItems = auditRes.body && auditRes.body.items ? auditRes.body.items : [];
+        if (auditItems.some(e => e.eventType === 'AutoSnapshotCreated' && e.payload?.roundNumber === 1)) {
+            break;
+        }
+    }
+
     assert(auditRes.status === 200, 'GET /api/audit?includeTechnical=true retorna 200 OK');
 
-    const auditItems = auditRes.body && auditRes.body.items ? auditRes.body.items : [];
+
     const roundArchivedEv = auditItems.find(e => e.eventType === 'RoundArchived' && e.aggregateId === round1Id);
     assert(roundArchivedEv !== undefined, `Evento RoundArchived encontrado para a rodada ${round1Id}`);
 

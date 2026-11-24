@@ -1,9 +1,11 @@
+const { loginAs, authHeaders } = require('./test-auth-helper.cjs');
 const backendUrl = (
     process.env.VITE_BACKEND_URL || 'http://127.0.0.1:5000'
 ).replace(/\/+$/, '');
 
 let passed = 0;
 let failed = 0;
+let operatorToken = '';
 
 function pass(name) {
     passed++;
@@ -24,7 +26,8 @@ function assert(condition, name, details = '') {
 }
 
 async function request(path, options = {}) {
-    const response = await fetch(`${backendUrl}${path}`, options);
+    const mergedOptions = { ...options, headers: options.skipAuth ? (options.headers || {}) : authHeaders(operatorToken, options.headers || {}) };
+    const response = await fetch(`${backendUrl}${path}`, mergedOptions);
     let body = null;
     const text = await response.text();
 
@@ -48,6 +51,7 @@ async function run() {
     console.log('    ARENA VOICE - EVENT & PROJECT API VALIDATION     ');
     console.log('======================================================');
     console.log(`Backend: ${backendUrl}\n`);
+    operatorToken = await loginAs('Operator', { baseUrl: backendUrl });
 
     // =========================================================================
     // 1. EVENT MANAGEMENT (/api/events/current)

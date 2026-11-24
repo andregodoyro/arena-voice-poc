@@ -1,4 +1,5 @@
 const signalR = require('../frontend/node_modules/@microsoft/signalr');
+const { loginAs, authHeaders } = require('./test-auth-helper.cjs');
 
 const backendUrl = (
     process.env.VITE_BACKEND_URL || 'http://127.0.0.1:5000'
@@ -13,6 +14,7 @@ const EVENT_TIMEOUT_MS = 3000;
 
 let passed = 0;
 let failed = 0;
+let operatorToken = '';
 
 function pass(message) {
     passed++;
@@ -35,7 +37,8 @@ function assert(condition, message, details = '') {
 }
 
 async function request(path, options = {}) {
-    const response = await fetch(`${backendUrl}${path}`, options);
+    const mergedOptions = { ...options, headers: options.skipAuth ? (options.headers || {}) : authHeaders(operatorToken, options.headers || {}) };
+    const response = await fetch(`${backendUrl}${path}`, mergedOptions);
 
     const text = await response.text();
 
@@ -96,6 +99,7 @@ function waitForCondition(check, timeoutMs = EVENT_TIMEOUT_MS) {
 }
 
 async function main() {
+    operatorToken = await loginAs('Operator', { baseUrl: backendUrl });
     console.log('');
     console.log('======================================================');
     console.log('     ARENA VOICE - SIGNALR E2E VALIDATION');
