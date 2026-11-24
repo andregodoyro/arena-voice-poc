@@ -1,0 +1,27 @@
+# ==============================================================================
+# ARENA VOICE — RENDER BLUEPRINT (INFRASTRUCTURE AS CODE)
+# ==============================================================================
+services:
+  - type: web
+    name: arena-voice-backend
+    runtime: docker
+    dockerContext: backend
+    dockerfilePath: backend/Dockerfile
+    region: virginia
+    plan: starter # planos free não suportam Persistent Disk; se for free, remova a seção disk
+    healthCheckPath: /health
+    disk:
+      name: arena-voice-uploads
+      mountPath: /app/uploads
+      sizeGB: 1
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ARENA_STORAGE_ENGINE
+        value: postgres
+      - key: UPLOADS_DIR
+        value: /app/uploads
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://arena-voice-poc.vercel.app
+      - key: DATABASE_URL
+        sync: false # Preencher manualmente com a URL do Render PostgreSQL criado

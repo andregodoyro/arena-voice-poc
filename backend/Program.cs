@@ -20,7 +20,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Configuração de host e porta (permite sobrescrita por variáveis de ambiente)
 var hostEnv = Environment.GetEnvironmentVariable("BACKEND_HOST") ?? "0.0.0.0";
-var portEnv = Environment.GetEnvironmentVariable("BACKEND_PORT");
+var portEnv = Environment.GetEnvironmentVariable("PORT") ?? Environment.GetEnvironmentVariable("BACKEND_PORT");
 var port = int.TryParse(portEnv, out var p) ? p : 5000;
 
 builder.WebHost.ConfigureKestrel(options =>
@@ -31,27 +31,95 @@ builder.WebHost.ConfigureKestrel(options =>
     options.Limits.MaxRequestBodySize = 105 * 1024 * 1024; // 105 MB com margem de overhead
 });
 
-// Configuração CORS permissiva para desenvolvimento local
+// Configuração CORS: suporte a origens configuráveis via env var, Vercel e dev local
+var rawAllowedOrigins = Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGINS") 
+                     ?? Environment.GetEnvironmentVariable("FRONTEND_URL");
+
+var explicitOrigins = (rawAllowedOrigins ?? "https://arena-voice-poc.vercel.app")
+    .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.SetIsOriginAllowed(_ => true)
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
+        policy.SetIsOriginAllowed(origin =>
+        {
+            if (string.IsNullOrWhiteSpace(origin)) return false;
+
+            var trimmedOrigin = origin.TrimEnd('/');
+
+            // 1. Origens explicitamente permitidas (ex: https://arena-voice-poc.vercel.app)
+            if (explicitOrigins.Any(allowed => trimmedOrigin.Equals(allowed.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)))
+                return true;
+
+            // 2. Todos os deploys da Vercel (*.vercel.app)
+            if (trimmedOrigin.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // 3. Desenvolvimento local
+            if (trimmedOrigin.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase) ||
+                trimmedOrigin.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            return false;
+        })
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials();
     });
 });
 
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = true;
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+    options.HandshakeTimeout = TimeSpan.FromSeconds(15);
+});
 
 // =========================================================================
 // CONFIGURAÇÃO DE PERSISTÊNCIA & REGISTRO CONDICIONAL DE SERVIÇOS (MILESTONE 4A)
 // =========================================================================
+static string NormalizePostgresConnectionString(string raw)
+{
+    if (string.IsNullOrWhiteSpace(raw)) return raw;
+    raw = raw.Trim();
+    if (raw.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
+        raw.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+    {
+        var uri = new Uri(raw);
+        var userInfo = uri.UserInfo.Split(':');
+        var username = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : "";
+        var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
+        var port = uri.Port > 0 ? uri.Port : 5432;
+        var database = uri.AbsolutePath.TrimStart('/');
+        return $"Host={uri.Host};Port={port};Database={database};Username={username};Password={password};SSL Mode=Require;Trust Server Certificate=true;";
+    }
+
+    if (!raw.Contains("SSL Mode", StringComparison.OrdinalIgnoreCase) && 
+        !raw.Contains("localhost", StringComparison.OrdinalIgnoreCase) && 
+        !raw.Contains("127.0.0.1"))
+    {
+        raw = raw.TrimEnd(';') + ";SSL Mode=Require;Trust Server Certificate=true;";
+    }
+
+    return raw;
+}
+
 var persistenceSection = builder.Configuration.GetSection(ArenaPersistenceOptions.SectionName);
 builder.Services.Configure<ArenaPersistenceOptions>(persistenceSection);
 
 var persistenceOptions = persistenceSection.Get<ArenaPersistenceOptions>() ?? new ArenaPersistenceOptions();
+var rawConnString = Environment.GetEnvironmentVariable("DATABASE_URL")
+                 ?? Environment.GetEnvironmentVariable("ArenaPersistence__ConnectionString")
+                 ?? persistenceOptions.ConnectionString;
+var effectiveConnectionString = NormalizePostgresConnectionString(rawConnString);
+
+builder.Services.PostConfigure<ArenaPersistenceOptions>(opts =>
+{
+    opts.ConnectionString = effectiveConnectionString;
+});
 var storageEngineEnv = Environment.GetEnvironmentVariable("ARENA_STORAGE_ENGINE") ?? Environment.GetEnvironmentVariable("ARENA_STORAGE");
 var effectiveStorageEngine = !string.IsNullOrWhiteSpace(storageEngineEnv)
     ? storageEngineEnv
@@ -97,7 +165,7 @@ else
     // Modo Oficial: PostgreSQL Portable via EF Core 10 + Npgsql
     builder.Services.AddPooledDbContextFactory<ArenaDbContext>(opt =>
     {
-        opt.UseNpgsql(persistenceOptions.ConnectionString, npgsqlOpt =>
+        opt.UseNpgsql(effectiveConnectionString, npgsqlOpt =>
         {
             npgsqlOpt.CommandTimeout(persistenceOptions.CommandTimeoutSeconds);
         });
@@ -120,10 +188,23 @@ var app = builder.Build();
 var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseStartup");
 DatabaseStartupValidator.ValidateAndMigrate(app.Services, logger);
 
+app.UseWebSockets();
+
 app.UseCors();
 
+// Health check para Render e monitoramento de proxies
+app.MapGet("/health", () => Results.Ok(new
+{
+    status = "healthy",
+    timestamp = DateTimeOffset.UtcNow,
+    environment = app.Environment.EnvironmentName
+}));
+
 // Servir arquivos estáticos para uploads
-var uploadsDir = Path.Combine(app.Environment.ContentRootPath, "uploads");
+var configuredUploads = Environment.GetEnvironmentVariable("UPLOADS_DIR") ?? Environment.GetEnvironmentVariable("UPLOADS_PATH");
+var uploadsDir = !string.IsNullOrWhiteSpace(configuredUploads)
+    ? configuredUploads
+    : Path.Combine(app.Environment.ContentRootPath, "uploads");
 if (!Directory.Exists(uploadsDir)) Directory.CreateDirectory(uploadsDir);
 app.UseStaticFiles(new StaticFileOptions
 {
@@ -909,7 +990,10 @@ app.MapPost("/api/upload", async (IFormFile? file, IWebHostEnvironment env) =>
     }
 
     var safeFileName = $"{Guid.NewGuid():N}{ext}";
-    var targetDir = Path.Combine(env.ContentRootPath, "uploads");
+    var configuredUploads = Environment.GetEnvironmentVariable("UPLOADS_DIR") ?? Environment.GetEnvironmentVariable("UPLOADS_PATH");
+    var targetDir = !string.IsNullOrWhiteSpace(configuredUploads)
+        ? configuredUploads
+        : Path.Combine(env.ContentRootPath, "uploads");
     if (!Directory.Exists(targetDir)) Directory.CreateDirectory(targetDir);
     var targetPath = Path.Combine(targetDir, safeFileName);
 
