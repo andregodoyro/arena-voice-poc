@@ -1,4 +1,5 @@
 import { request } from './apiClient';
+import { projectsApi } from './projectsApi';
 
 /**
  * eventsApi — Endpoints de Gestão do Ciclo de Vida de Eventos e Estado Global.
@@ -25,7 +26,7 @@ export const eventsApi = {
 
   /**
    * Cria um novo evento no catálogo.
-   * @param {Object} payload { title, description, scheduledDate, status, branding }
+   * @param {Object} payload { title, description, scheduledDate, status, branding, timers }
    */
   createEvent: (payload) => {
     return request('/api/events', {
@@ -38,7 +39,7 @@ export const eventsApi = {
   /**
    * Atualiza dados e branding de um evento específico.
    * @param {string} id
-   * @param {Object} payload { title, description, scheduledDate, status, branding }
+   * @param {Object} payload { title, description, scheduledDate, status, branding, timers }
    */
   updateEvent: (id, payload) => {
     return request(`/api/events/${encodeURIComponent(id)}`, {
@@ -59,7 +60,7 @@ export const eventsApi = {
   },
 
   /**
-   * Encerra formalmente um evento (transiciona para Finished).
+   * Encerra formalmente um evento ativo.
    * @param {string} id
    */
   finishEvent: (id) => {
@@ -69,7 +70,7 @@ export const eventsApi = {
   },
 
   /**
-   * Arquiva um evento histórico (rejeita com 409 se for o evento ativo).
+   * Arquiva um evento inativo (draft, ready ou finished).
    * @param {string} id
    */
   archiveEvent: (id) => {
@@ -79,12 +80,33 @@ export const eventsApi = {
   },
 
   /**
-   * Clona um evento existente criando uma cópia em Draft.
+   * Duplica um evento existente como novo Draft (com todos os projetos associados).
    * @param {string} id
    */
   duplicateEvent: (id) => {
     return request(`/api/events/${encodeURIComponent(id)}/duplicate`, {
       method: 'POST',
+    });
+  },
+
+  /**
+   * Obtém a composição da banca do evento (júris ativos vs disponíveis).
+   * @param {string} id
+   */
+  getEventJury: (id) => {
+    return request(`/api/events/${encodeURIComponent(id)}/jury`);
+  },
+
+  /**
+   * Aloca ou reordena os jurados da banca do evento.
+   * @param {string} id
+   * @param {Array<string>} judgeIds Lista de IDs dos jurados
+   */
+  assignEventJury: (id, judgeIds) => {
+    return request(`/api/events/${encodeURIComponent(id)}/jury`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ judgeIds }),
     });
   },
 
@@ -104,7 +126,7 @@ export const eventsApi = {
 
   /**
    * Atualiza as configurações e branding do evento ativo (retrocompatível).
-   * @param {Object} payload { title, description, scheduledDate, branding: { primaryColor, secondaryColor, logoUrl, tagline } }
+   * @param {Object} payload { title, description, scheduledDate, branding: { primaryColor, secondaryColor, logoUrl, tagline, coverImageUrl, videoUrl, mediaMode } }
    */
   updateCurrentEvent: (payload) => {
     return request('/api/events/current', {
@@ -115,4 +137,11 @@ export const eventsApi = {
       body: JSON.stringify(payload),
     });
   },
+
+  /**
+   * Upload de arquivo de mídia para eventos (imagens e vídeos).
+   * @param {File} file
+   * @returns {Promise<{ url: string, fileName: string, size: number }>}
+   */
+  uploadMedia: (file) => projectsApi.uploadMedia(file),
 };

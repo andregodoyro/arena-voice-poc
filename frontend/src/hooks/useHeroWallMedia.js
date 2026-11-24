@@ -7,11 +7,11 @@ import { resolveMediaUrl } from '../utils/mediaResolver';
  * Responsabilidades:
  *  1. Derivar `wallMode` a partir de pitchState + currentProject.
  *  2. Resolver `mediaCandidate` conforme a Matriz de Prioridade:
- *     - EventIdle   → imagem do evento (branding) ou canvas corporativo
- *     - Waiting     → imagem do projeto (cover ou logo)
- *     - PitchRunning→ vídeo do projeto (com fallback automático para cover/logo)
- *     - Voting      → imagem do projeto mantida fixa como protagonista
- *     - Result      → imagem do projeto mantida fixa como protagonista
+ *     - EventIdle    → mídia institucional (video/cover/logo) ou canvas corporativo conforme mediaMode
+ *     - Waiting      → imagem do projeto (cover ou logo) com fallback para evento
+ *     - PitchRunning → vídeo do projeto (com fallback automático para cover/logo)
+ *     - Voting       → imagem do projeto mantida fixa como protagonista
+ *     - Result       → imagem do projeto mantida fixa como protagonista
  *  3. Notificar callback opcional `onWallModeChange` para futuras integrações (ex: áudio).
  *
  * @param {Object} params
@@ -42,7 +42,7 @@ export function useHeroWallMedia({ currentProject, currentEvent, pitchState, onW
   return { wallMode, mediaCandidate };
 }
 
-// ── Funções Puras ────────────────────────────────────────────────────────────
+// ─── Funções Puras ─────────────────────────────────────────────────────────────
 
 function deriveWallMode(pitchState, currentProject) {
   if (!currentProject) return 'event-idle';
@@ -81,16 +81,29 @@ function resolveMediaCandidate(wallMode, project, event) {
   }
 
   switch (wallMode) {
-    case 'event-idle':
+    case 'event-idle': {
+      const mode = (brand.mediaMode || 'auto').toLowerCase();
+      if (mode === 'image') {
+        return firstValid([
+          { type: 'image', url: resolveMediaUrl(brand.coverImageUrl) },
+          { type: 'image', url: resolveMediaUrl(brand.logoUrl || event?.logoUrl) },
+          { type: 'canvas', url: null, label: event?.title ?? 'Arena Voice', themeColor: primaryColor },
+        ]);
+      }
+      // 'auto' e 'video': VideoUrl → CoverImageUrl → LogoUrl → CanvasFallback
       return firstValid([
+        { type: 'video', url: resolveMediaUrl(brand.videoUrl) },
+        { type: 'image', url: resolveMediaUrl(brand.coverImageUrl) },
         { type: 'image', url: resolveMediaUrl(brand.logoUrl || event?.logoUrl) },
         { type: 'canvas', url: null, label: event?.title ?? 'Arena Voice', themeColor: primaryColor },
       ]);
+    }
 
     case 'waiting':
       return firstValid([
         { type: 'image', url: resolveMediaUrl(media.coverImageUrl) },
         { type: 'image', url: resolveMediaUrl(media.logoUrl) },
+        { type: 'image', url: resolveMediaUrl(brand.coverImageUrl) },
         { type: 'image', url: resolveMediaUrl(brand.logoUrl || event?.logoUrl) },
         { type: 'canvas', url: null, label, themeColor: primaryColor },
       ]);
