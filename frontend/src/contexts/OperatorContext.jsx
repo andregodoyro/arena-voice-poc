@@ -8,7 +8,9 @@ import { auditApi } from '../api/auditApi';
 import { mapAuditEventToActivityItem } from '../utils/auditMapper';
 import { isCurrentProject } from '../utils/projectStatus';
 import { useSignalR } from '../services/useSignalR';
-import { getBackendUrl } from '../api/apiClient';
+import { getBackendUrl, request } from '../api/apiClient';
+import { useAuth } from './AuthContext';
+import { experienceEventBus, EXPERIENCE_EVENTS } from '../services/experienceEventBus';
 
 const OperatorContext = createContext(null);
 
@@ -34,6 +36,8 @@ const DEFAULT_CHAIRS = [
  * - Milestone 4C (Audit Trail & ActivityLog Rehydration): Reidratação durável após F5 via tabela audit_events.
  */
 export function OperatorProvider({ children }) {
+  const { isAuthenticated, hasRole } = useAuth();
+  const canOperate = isAuthenticated && hasRole('Admin', 'Operator');
   // ── Estado Institucional e de Projetos (Fase 2 & Fase 3A) ──────────────────
   const [currentEvent, setCurrentEvent] = useState(null);
   const [currentProject, setCurrentProject] = useState(null);
@@ -81,6 +85,7 @@ export function OperatorProvider({ children }) {
     };
 
     addRealtimeActivity(eventItem);
+    experienceEventBus.emit(EXPERIENCE_EVENTS.CHAIR_PRESSED, { chairId, source });
   }, [addRealtimeActivity]);
 
   const resetAllChairs = useCallback(() => {
@@ -98,6 +103,7 @@ export function OperatorProvider({ children }) {
     };
 
     addRealtimeActivity(eventItem);
+    experienceEventBus.emit(EXPERIENCE_EVENTS.ARENA_RESET, { source: 'SIGNALR' });
   }, [addRealtimeActivity]);
 
   // ── Busca de Snapshot Autoritativo e Reidratação de Auditoria (ADR-002 / 4C.5) ─
@@ -200,7 +206,7 @@ export function OperatorProvider({ children }) {
     } finally {
       if (showLoading) setLoading(false);
     }
-  }, []);
+  }, [canOperate]);
 
   const refresh = useCallback(() => {
     return fetchOperationalData(false);
@@ -244,6 +250,8 @@ export function OperatorProvider({ children }) {
         timestamp: Date.now(),
       });
     }
+
+    experienceEventBus.emit(EXPERIENCE_EVENTS.PROJECT_CHANGED, { project: newCurrent, previousProject: prevProject });
 
     // 2. Re-hidratação autoritativa silenciosa em background (ADR-002)
     fetchOperationalData(false);
@@ -371,6 +379,7 @@ export function OperatorProvider({ children }) {
     if (!payload?.round) return;
     console.log('[OperatorContext] Sincronizando rodada arquivada no histórico:', payload.round);
     setRounds((prev) => [payload.round, ...prev.filter((r) => r.id !== payload.round.id)]);
+    experienceEventBus.emit(EXPERIENCE_EVENTS.RESULTS_CALCULATED, { round: payload.round });
 
     const now = new Date().toLocaleTimeString('pt-BR');
     addRealtimeActivity({
@@ -449,17 +458,7 @@ export function OperatorProvider({ children }) {
 
   // ── Despacho Autoritativo de Reset de Arena ──────────────────────────────
   const requestResetArena = useCallback(async () => {
-    const baseUrl = getBackendUrl().replace(/\/+$/, '');
-    const response = await fetch(`${baseUrl}/api/reset`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Falha no reset: HTTP ${response.status}`);
-    }
-
-    return response.json();
+    return request('/api/reset', { method: 'POST' });
   }, []);
 
   // ── Inicialização do Snapshot na Montagem ────────────────────────────────
