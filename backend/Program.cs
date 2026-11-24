@@ -102,6 +102,8 @@ else
             npgsqlOpt.CommandTimeout(persistenceOptions.CommandTimeoutSeconds);
         });
 
+        opt.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+
         if (persistenceOptions.EnableSensitiveDataLogging)
         {
             opt.EnableSensitiveDataLogging();
@@ -351,7 +353,10 @@ app.MapPut("/api/events/current", async (UpdateEventDto dto, IArenaProjectStore 
             PrimaryColor = primary,
             SecondaryColor = secondary,
             LogoUrl = dto.Branding.LogoUrl ?? currentEvent.Branding.LogoUrl,
-            Tagline = dto.Branding.Tagline ?? currentEvent.Branding.Tagline
+            Tagline = dto.Branding.Tagline ?? currentEvent.Branding.Tagline,
+            CoverImageUrl = dto.Branding.CoverImageUrl ?? currentEvent.Branding.CoverImageUrl,
+            VideoUrl = dto.Branding.VideoUrl ?? currentEvent.Branding.VideoUrl,
+            MediaMode = dto.Branding.MediaMode ?? currentEvent.Branding.MediaMode
         };
         brandingChanged = true;
     }
@@ -449,7 +454,10 @@ app.MapPost("/api/events", (CreateEventDto dto, IArenaProjectStore store) =>
             PrimaryColor = primary,
             SecondaryColor = secondary,
             LogoUrl = dto.Branding?.LogoUrl?.Trim() ?? "/branding/event-logo.png",
-            Tagline = dto.Branding?.Tagline?.Trim() ?? "O palco onde as melhores ideias conquistam as cadeiras."
+            Tagline = dto.Branding?.Tagline?.Trim() ?? "O palco onde as melhores ideias conquistam as cadeiras.",
+            CoverImageUrl = dto.Branding?.CoverImageUrl?.Trim() ?? string.Empty,
+            VideoUrl = dto.Branding?.VideoUrl?.Trim() ?? string.Empty,
+            MediaMode = dto.Branding?.MediaMode?.Trim() ?? "auto"
         },
         Timers = new TimerConfig
         {
@@ -522,7 +530,10 @@ app.MapPut("/api/events/{id}", async (string id, UpdateEventDto dto, IArenaProje
             PrimaryColor = primary,
             SecondaryColor = secondary,
             LogoUrl = dto.Branding.LogoUrl ?? evt.Branding.LogoUrl,
-            Tagline = dto.Branding.Tagline ?? evt.Branding.Tagline
+            Tagline = dto.Branding.Tagline ?? evt.Branding.Tagline,
+            CoverImageUrl = dto.Branding.CoverImageUrl ?? evt.Branding.CoverImageUrl,
+            VideoUrl = dto.Branding.VideoUrl ?? evt.Branding.VideoUrl,
+            MediaMode = dto.Branding.MediaMode ?? evt.Branding.MediaMode
         };
         brandingChanged = true;
     }

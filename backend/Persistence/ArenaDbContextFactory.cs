@@ -26,6 +26,7 @@ public class ArenaDbContextFactory : IDesignTimeDbContextFactory<ArenaDbContext>
 
         var optionsBuilder = new DbContextOptionsBuilder<ArenaDbContext>();
         optionsBuilder.UseNpgsql(connectionString);
+        optionsBuilder.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
 
         return new ArenaDbContext(optionsBuilder.Options);
     }
