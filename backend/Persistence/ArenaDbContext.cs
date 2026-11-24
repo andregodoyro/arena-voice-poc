@@ -17,6 +17,7 @@ public class ArenaDbContext : DbContext
     public DbSet<Round> RoundHistoryEntries => Set<Round>();
     public DbSet<ActiveSessionState> ActiveSessionState => Set<ActiveSessionState>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<User> Users => Set<User>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

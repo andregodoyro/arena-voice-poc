@@ -119,7 +119,16 @@ var effectiveConnectionString = NormalizePostgresConnectionString(rawConnString)
 builder.Services.PostConfigure<ArenaPersistenceOptions>(opts =>
 {
     opts.ConnectionString = effectiveConnectionString;
+    if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ARENA_STORAGE_ENGINE") ?? Environment.GetEnvironmentVariable("ARENA_STORAGE")))
+    {
+        opts.StorageEngine = Environment.GetEnvironmentVariable("ARENA_STORAGE_ENGINE") ?? Environment.GetEnvironmentVariable("ARENA_STORAGE")!;
+    }
 });
+
+// =========================================================================
+// AUTENTICAÇÃO JWT, RBAC & HARDWARE DEVICE AUTH (MILESTONE 5H)
+// =========================================================================
+builder.Services.AddArenaAuthenticationAndAuthorization(builder.Configuration);
 var storageEngineEnv = Environment.GetEnvironmentVariable("ARENA_STORAGE_ENGINE") ?? Environment.GetEnvironmentVariable("ARENA_STORAGE");
 var effectiveStorageEngine = !string.IsNullOrWhiteSpace(storageEngineEnv)
     ? storageEngineEnv
@@ -187,10 +196,16 @@ var app = builder.Build();
 // Validação de inicialização e aplicação automática de migrações no boot
 var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseStartup");
 DatabaseStartupValidator.ValidateAndMigrate(app.Services, logger);
+await app.Services.GetRequiredService<IAuthService>().EnsureSeedUsersAsync();
 
 app.UseWebSockets();
 
 app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Endpoints de Autenticação JWT (/api/auth/login, /refresh, /logout, /me)
+app.MapArenaAuthEndpoints();
 
 // Health check para Render e monitoramento de proxies
 app.MapGet("/health", () => Results.Ok(new
@@ -221,8 +236,12 @@ app.UseStaticFiles(new StaticFileOptions
 // 1. ENDPOINTS PRINCIPAIS DE CADEIRA: LOCKOUT AUTORITATIVO & HARDWARE BRIDGE
 // Compatível com { "chairId": 1 } e também { "seatNumber": 1 }
 // =========================================================================
-app.MapPost("/api/chair-press", async (ChairPressRequest request, HttpContext http, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
+app.MapPost("/api/chair-press", async (ChairPressRequest request, HttpContext http, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext, IAuthService authService) =>
 {
+    if (!EndpointSecurityExtensions.IsHardwareOrOperatorAuthorized(http, authService))
+    {
+        return Results.Unauthorized();
+    }
     int id = request.GetEffectiveChairId();
     var clientIp = http.Connection.RemoteIpAddress?.ToString() ?? "desconhecido";
     var timestamp = DateTimeOffset.UtcNow;
@@ -290,8 +309,12 @@ app.MapPost("/api/chair-press", async (ChairPressRequest request, HttpContext ht
 });
 
 // Alias retrocompatível: POST /api/support
-app.MapPost("/api/support", async (ChairPressRequest request, HttpContext http, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
+app.MapPost("/api/support", async (ChairPressRequest request, HttpContext http, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext, IAuthService authService) =>
 {
+    if (!EndpointSecurityExtensions.IsHardwareOrOperatorAuthorized(http, authService))
+    {
+        return Results.Unauthorized();
+    }
     int id = request.GetEffectiveChairId();
     var clientIp = http.Connection.RemoteIpAddress?.ToString() ?? "desconhecido";
     var timestamp = DateTimeOffset.UtcNow;
@@ -367,7 +390,7 @@ app.MapPost("/api/reset", async (IArenaProjectStore store, IHubContext<ArenaPocH
     await hubContext.Clients.All.SendAsync("ChairsReset");
 
     return Results.Ok(new { message = "Todas as cadeiras foram resetadas.", chairs = store.GetChairStates() });
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // GET /api/status — Health check rápido
 app.MapGet("/api/status", () => Results.Ok(new
@@ -472,7 +495,7 @@ app.MapPut("/api/events/current", async (UpdateEventDto dto, IArenaProjectStore 
     }
 
     return Results.Ok(currentEvent);
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // GET /api/events — Lista todos os eventos com filtro opcional por status
 app.MapGet("/api/events", (IArenaProjectStore store, string? status) =>
@@ -496,7 +519,7 @@ app.MapGet("/api/events", (IArenaProjectStore store, string? status) =>
 
     var events = store.GetAllEvents(filter);
     return Results.Ok(events);
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // GET /api/events/{id} — Detalhes de um evento específico
 app.MapGet("/api/events/{id}", (string id, IArenaProjectStore store) =>
@@ -505,9 +528,18 @@ app.MapGet("/api/events/{id}", (string id, IArenaProjectStore store) =>
     return evt != null
         ? Results.Ok(evt)
         : Results.NotFound(new { error = "Evento não encontrado.", id });
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // POST /api/events — Cria novo evento
+// GET /api/events/{id}/results — Classificação oficial consolidada (Milestone 6A)
+app.MapGet("/api/events/{id}/results", (string id, IArenaProjectStore store) =>
+{
+    var results = store.GetEventResults(id);
+    return results is not null
+        ? Results.Ok(results)
+        : Results.NotFound(new { error = "Evento não encontrado.", id });
+});
+
 app.MapPost("/api/events", (CreateEventDto dto, IArenaProjectStore store) =>
 {
     if (string.IsNullOrWhiteSpace(dto.Title) || dto.Title.Trim().Length < 3 || dto.Title.Trim().Length > 150)
@@ -551,7 +583,7 @@ app.MapPost("/api/events", (CreateEventDto dto, IArenaProjectStore store) =>
 
     var created = store.AddEvent(newEvent);
     return Results.Created($"/api/events/{created.Id}", created);
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // PUT /api/events/{id} — Atualiza evento específico
 app.MapPut("/api/events/{id}", async (string id, UpdateEventDto dto, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
@@ -650,7 +682,7 @@ app.MapPut("/api/events/{id}", async (string id, UpdateEventDto dto, IArenaProje
     }
 
     return Results.Ok(evt);
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // POST /api/events/{id}/activate — Ativação atômica de evento
 app.MapPost("/api/events/{id}/activate", async (string id, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
@@ -674,7 +706,7 @@ app.MapPost("/api/events/{id}/activate", async (string id, IArenaProjectStore st
         activatedEvent = result.ActivatedEvent,
         previousEvent = result.PreviousEvent
     });
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // POST /api/events/{id}/finish — Encerra formalmente o evento
 app.MapPost("/api/events/{id}/finish", (string id, IArenaProjectStore store) =>
@@ -683,7 +715,7 @@ app.MapPost("/api/events/{id}/finish", (string id, IArenaProjectStore store) =>
     return finished != null
         ? Results.Ok(new { success = true, finishedEvent = finished })
         : Results.NotFound(new { error = "Evento não encontrado.", id });
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // POST /api/events/{id}/archive — Arquiva evento inativo
 app.MapPost("/api/events/{id}/archive", (string id, IArenaProjectStore store) =>
@@ -699,7 +731,7 @@ app.MapPost("/api/events/{id}/archive", (string id, IArenaProjectStore store) =>
     }
 
     return Results.Ok(new { success = true, archivedEvent = result.ArchivedEvent });
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // POST /api/events/{id}/duplicate — Duplica evento existente como Draft
 app.MapPost("/api/events/{id}/duplicate", (string id, IArenaProjectStore store) =>
@@ -711,7 +743,7 @@ app.MapPost("/api/events/{id}/duplicate", (string id, IArenaProjectStore store) 
     }
 
     return Results.Created($"/api/events/{duplicated.Id}", duplicated);
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // =========================================================================
 // GESTÃO DE JURADOS & BANCA DO EVENTO (Milestone 3E)
@@ -722,7 +754,7 @@ app.MapGet("/api/judges", (IArenaProjectStore store, bool? includeInactive) =>
 {
     var judges = store.GetAllJudges(includeInactive ?? false);
     return Results.Ok(judges);
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // GET /api/judges/{id} — Detalhes de um jurado específico
 app.MapGet("/api/judges/{id}", (string id, IArenaProjectStore store) =>
@@ -731,7 +763,7 @@ app.MapGet("/api/judges/{id}", (string id, IArenaProjectStore store) =>
     return judge != null
         ? Results.Ok(judge)
         : Results.NotFound(new { error = "Jurado não encontrado.", id });
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // POST /api/judges — Cadastra novo jurado no catálogo
 app.MapPost("/api/judges", (CreateJudgeDto dto, IArenaProjectStore store) =>
@@ -768,7 +800,7 @@ app.MapPost("/api/judges", (CreateJudgeDto dto, IArenaProjectStore store) =>
 
     var created = store.AddJudge(newJudge);
     return Results.Created($"/api/judges/{created.Id}", created);
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // PUT /api/judges/{id} — Atualiza dados cadastrais de um jurado
 app.MapPut("/api/judges/{id}", (string id, UpdateJudgeDto dto, IArenaProjectStore store) =>
@@ -828,7 +860,7 @@ app.MapPut("/api/judges/{id}", (string id, UpdateJudgeDto dto, IArenaProjectStor
 
     store.UpdateJudge(existing);
     return Results.Ok(existing);
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // DELETE /api/judges/{id} — Remove jurado com proteção contra exclusão de membros da banca ativa
 app.MapDelete("/api/judges/{id}", (string id, IArenaProjectStore store) =>
@@ -844,7 +876,7 @@ app.MapDelete("/api/judges/{id}", (string id, IArenaProjectStore store) =>
     }
 
     return Results.Ok(new { success = true, id, message = "Jurado removido com sucesso." });
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // GET /api/events/{id}/jury — Obtém a composição da banca do evento
 app.MapGet("/api/events/{id}/jury", (string id, IArenaProjectStore store) =>
@@ -886,7 +918,7 @@ app.MapPut("/api/events/{id}/jury", async (string id, AssignEventJuryDto dto, IA
     }
 
     return Results.Ok(new EventJuryDto(id, result.Jury!.Select(j => new EventJuryMemberDto(j.ChairId, j.Judge!, j.AssignedAt)).ToList()));
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // GET /api/projects — Lista projetos do evento
 app.MapGet("/api/projects", (IArenaProjectStore store, string? eventId, bool? includeCompleted) =>
@@ -959,36 +991,18 @@ app.MapPost("/api/projects", (CreateProjectDto dto, IArenaProjectStore store) =>
 
     var created = store.AddProject(project);
     return Results.Created($"/api/projects/{created.Id}", created);
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
-// POST /api/upload — Upload de ativos visuais e de vídeo do projeto (Phase 5C.2B / 5C.4)
+// POST /api/upload — Upload seguro de mídia e áudio (Phase 5C.2B / 5C.4 / 5H.4)
 app.MapPost("/api/upload", async (IFormFile? file, IWebHostEnvironment env) =>
 {
-    if (file == null || file.Length == 0)
+    var validation = await FileUploadValidator.ValidateAsync(file);
+    if (!validation.IsValid || file == null)
     {
-        return Results.BadRequest(new { error = "Nenhum arquivo enviado." });
+        return Results.BadRequest(new { error = validation.ErrorMessage ?? "Arquivo inválido." });
     }
-
-    // Imagens: até 20 MB | Vídeos: até 100 MB
-    var allowedImages = new[] { ".jpg", ".jpeg", ".png", ".webp", ".svg" };
-    var allowedVideos = new[] { ".mp4", ".webm" };
-    var allowedExtensions = allowedImages.Concat(allowedVideos).ToArray();
 
     var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-    if (!allowedExtensions.Contains(ext))
-    {
-        return Results.BadRequest(new { error = $"Formato '{ext}' não suportado. Formatos aceitos: JPG, JPEG, PNG, WEBP, SVG, MP4, WEBM." });
-    }
-
-    bool isVideo = allowedVideos.Contains(ext);
-    long maxBytes = isVideo ? 100L * 1024 * 1024 : 20L * 1024 * 1024;
-    string limitLabel = isVideo ? "100MB" : "20MB";
-
-    if (file.Length > maxBytes)
-    {
-        return Results.BadRequest(new { error = $"O arquivo excede o limite de {limitLabel} para {(isVideo ? "vídeos" : "imagens")}." });
-    }
-
     var safeFileName = $"{Guid.NewGuid():N}{ext}";
     var configuredUploads = Environment.GetEnvironmentVariable("UPLOADS_DIR") ?? Environment.GetEnvironmentVariable("UPLOADS_PATH");
     var targetDir = !string.IsNullOrWhiteSpace(configuredUploads)
@@ -1008,10 +1022,11 @@ app.MapPost("/api/upload", async (IFormFile? file, IWebHostEnvironment env) =>
         url = $"/uploads/{safeFileName}",
         fileName = file.FileName,
         safeFileName,
+        category = validation.Category,
         size = file.Length,
         contentType = file.ContentType
     });
-}).DisableAntiforgery();
+}).DisableAntiforgery().RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // PUT /api/projects/{id} — Atualiza dados de um projeto existente
 app.MapPut("/api/projects/{id}", async (string id, UpdateProjectDto dto, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
@@ -1095,7 +1110,7 @@ app.MapPut("/api/projects/{id}", async (string id, UpdateProjectDto dto, IArenaP
     }
 
     return Results.Ok(reloadedAfterSave ?? project);
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // DELETE /api/projects/{id} — Remove um projeto
 app.MapDelete("/api/projects/{id}", (string id, IArenaProjectStore store) =>
@@ -1112,7 +1127,7 @@ app.MapDelete("/api/projects/{id}", (string id, IArenaProjectStore store) =>
     }
 
     return Results.Ok(new { message = "Projeto removido com sucesso.", id });
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // POST /api/projects/{id}/select — Seleciona projeto ativo
 app.MapPost("/api/projects/{id}/select", async (string id, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
@@ -1174,7 +1189,7 @@ app.MapPost("/api/projects/{id}/select", async (string id, IArenaProjectStore st
         previousProject = result.PreviousProject,
         activeContext = store.GetActiveContext()
     });
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // =========================================================================
 // 4. PITCH LIFECYCLE & TIMERS ENGINE (MILESTONE 3B & 3C)
@@ -1277,7 +1292,7 @@ app.MapPost("/api/pitch/transition", async (PitchTransitionDto dto, IArenaProjec
         allowedTransitions = state.AllowedTransitions,
         archivedRound = result.ArchivedRound != null ? RoundDto.FromEntity(result.ArchivedRound) : null
     });
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // POST /api/pitch/reset — Reseta cadeiras e retorna estágio para Waiting mantendo projeto
 app.MapPost("/api/pitch/reset", async (IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
@@ -1316,7 +1331,7 @@ app.MapPost("/api/pitch/reset", async (IArenaProjectStore store, IHubContext<Are
         projectId = resetResult.ProjectId,
         chairs = store.GetChairStates()
     });
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // POST /api/pitch/timer/pause — Pausa o cronômetro do estágio ativo
 app.MapPost("/api/pitch/timer/pause", async (IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
@@ -1352,7 +1367,7 @@ app.MapPost("/api/pitch/timer/pause", async (IArenaProjectStore store, IHubConte
         isExpired = state.IsExpired,
         isVotingAllowed = state.IsVotingAllowed
     });
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // POST /api/pitch/timer/resume — Retoma a contagem do estágio ativo
 app.MapPost("/api/pitch/timer/resume", async (IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
@@ -1387,7 +1402,7 @@ app.MapPost("/api/pitch/timer/resume", async (IArenaProjectStore store, IHubCont
         isExpired = state.IsExpired,
         isVotingAllowed = state.IsVotingAllowed
     });
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // POST /api/pitch/timer/adjust — Ajusta a duração alocada da rodada (+30s, +60s, +120s)
 app.MapPost("/api/pitch/timer/adjust", async (AdjustPitchTimerDto dto, IArenaProjectStore store, IHubContext<ArenaPocHub> hubContext) =>
@@ -1428,7 +1443,7 @@ app.MapPost("/api/pitch/timer/adjust", async (AdjustPitchTimerDto dto, IArenaPro
         isExpired = state.IsExpired,
         isVotingAllowed = state.IsVotingAllowed
     });
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // =========================================================================
 // 5. ROUND HISTORY & RESULT ENGINE (MILESTONE 3D)
@@ -1481,7 +1496,7 @@ app.MapPost("/api/rounds/archive", async (IArenaProjectStore store, IHubContext<
     });
 
     return Results.Ok(dto);
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // =========================================================================
 // 6. AUDIT TRAIL — QUERY LAYER & TIMELINE (MILESTONE 4C.4)
@@ -1510,7 +1525,7 @@ app.MapGet("/api/audit", async (
 
     var result = await auditQuery.QueryAsync(filter, ct);
     return Results.Ok(result);
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // GET /api/audit/{id} — Consulta evento de auditoria por ID
 app.MapGet("/api/audit/{id:long}", async (long id, IAuditQueryService auditQuery, CancellationToken ct) =>
@@ -1519,7 +1534,7 @@ app.MapGet("/api/audit/{id:long}", async (long id, IAuditQueryService auditQuery
     return dto != null
         ? Results.Ok(dto)
         : Results.NotFound(new { error = "Evento de auditoria não encontrado.", id });
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // GET /api/audit/project/{projectId} — Histórico de auditoria por projeto
 app.MapGet("/api/audit/project/{projectId}", async (
@@ -1545,7 +1560,7 @@ app.MapGet("/api/audit/project/{projectId}", async (
 
     var result = await auditQuery.GetByProjectIdAsync(projectId, filter, ct);
     return Results.Ok(result);
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // GET /api/audit/event/{eventId} — Histórico de auditoria por evento (arena event)
 app.MapGet("/api/audit/event/{eventId}", async (
@@ -1571,7 +1586,7 @@ app.MapGet("/api/audit/event/{eventId}", async (
 
     var result = await auditQuery.GetByArenaEventIdAsync(eventId, filter, ct);
     return Results.Ok(result);
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // GET /api/audit/session — Timeline de sessão (checkpoints, session updates)
 app.MapGet("/api/audit/session", async (
@@ -1593,7 +1608,7 @@ app.MapGet("/api/audit/session", async (
 
     var result = await auditQuery.GetSessionTimelineAsync(filter, ct);
     return Results.Ok(result);
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyOperatorOrAdmin);
 
 // =========================================================================
 // 7. ENDPOINTS ADMINISTRATIVOS: BACKUP & DISASTER RECOVERY (MILESTONE 4D.1)
@@ -1639,14 +1654,14 @@ app.MapPost("/api/admin/backup", async (
         requestedAt = requestedAt,
         message = "Backup manual enfileirado com sucesso. Execução assíncrona iniciada."
     });
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyAdminOnly);
 
 // GET /api/admin/backups — Listagem dos backups disponíveis via Filesystem
 app.MapGet("/api/admin/backups", (IBackupOrchestrator orchestrator) =>
 {
     var backups = orchestrator.GetAvailableBackups();
     return Results.Ok(backups);
-});
+}).RequireAuthorization(EndpointSecurityExtensions.PolicyAdminOnly);
 
 // =========================================================================
 // 8. MAPEAMENTO DO HUB SIGNALR

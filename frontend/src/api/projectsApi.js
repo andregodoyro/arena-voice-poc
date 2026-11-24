@@ -1,4 +1,4 @@
-import { request } from './apiClient';
+import { request, uploadFile } from './apiClient';
 
 /**
  * projectsApi — Endpoints operacionais de Projetos (Milestones 2B, 2C.3, 5C.2B, 5C.4).
@@ -79,28 +79,18 @@ export const projectsApi = {
    */
   uploadMedia: async (file) => {
     try {
-      const baseUrl = (
-        localStorage.getItem('arena_poc_backend_url') ||
-        import.meta.env.VITE_BACKEND_URL ||
-        'http://localhost:5000'
-      ).replace(/\/+$/, '');
-
       const formData = new FormData();
       formData.append('file', file);
-
-      const response = await fetch(`${baseUrl}/api/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (response.ok) {
-        return await response.json();
-      }
+      return await uploadFile('/api/upload', formData);
     } catch (err) {
-      console.warn('[projectsApi] Upload via API falhou, utilizando fallback local DataURL:', err);
+      // Nunca mascara erros HTTP de segurança/validação (400, 401, 403)
+      if (err && typeof err.status === 'number') {
+        throw err;
+      }
+      console.warn('[projectsApi] Upload via API indisponível (rede), utilizando fallback local DataURL:', err);
     }
 
-    // Fallback offline-first via FileReader DataURL
+    // Fallback offline-first via FileReader DataURL apenas em falha de rede
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
