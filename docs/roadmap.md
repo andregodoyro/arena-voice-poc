@@ -141,6 +141,7 @@ PRÓXIMAS ENTREGAS PRIORITÁRIAS (ROADMAP V2 INTEGRADO AO EVOLUTION PLAN)
   │     ├─ [x] 5D.4: Cockpit Audio Control Center (`ExperienceEventBus`, `AudioEventSubscriber`, `OperatorAudioTab`, `SoundItemModal`, preview isolado, sync SignalR, 11/11 testes)
   │     ├─ [x] 5D.5: QA & Regression (auditoria 5D.1–5D.4, correção de roteamento de Bus case-insensitive, lifecycle `closed` AudioContext, ducking, preview offset/duration, validação `ValidEventKeys`, 11/11 + 41/41 + 130/130 + 16/16 + 32/32)
   │     └─ [x] 5D.6: Sound Design Polish (limiter anti-clipping `DynamicsCompressorNode`, envelope de ducking `attack 0.06s / release 0.35s`, fade-out de loops em transições, `pitchJitter` ±2.5% em SFX one-shot, distinção `PITCH_START` vs `CHAIR_TURN`, volume efetivo no Cockpit; validação técnica 13/13 + 41/41 + 130/130 + 16/16 + 32/32; validação auditiva em navegador real pendente)
+  │     └─ [x] 5D.7: Full Show Integration & Operational Rehearsal (auditoria de ciclo completo, deduplicação idempotente de `ChairTurned` + `ChairSupported` em `OperatorContext`, resync de `AudioConfigUpdated` pós-reconexão SignalR, ensaio operacional E2E cenários A–I: 10/10 + 13/13 + 41/41 + 130/130 + 16/16 + 32/32; hardware ESP32 real, navegador e escuta auditiva pendentes)
   │
   ├─► FASE 5E: Arena Population & Audience Reactions (HIGH PRIORITY)
   │     ├─ Phase 5C.5 Fase 2: Plateia fictícia 3D em leque (InstancedMesh leve)
@@ -246,6 +247,6 @@ A Phase 5 superou a meta original de ser apenas uma "fase de áudio" e transform
 
 > [!IMPORTANT]
 > **Hardening 5I + Security Quick Wins Concluídos (`5I` ✅):** PostgreSQL RLS (`users`, `audit_events`, `arena_readonly`), Painel Administrativo de Usuários (`/admin` + `/api/admin/users/*`), Security Quick Wins e Suíte de Regressão JWT 100% verde (`692/692` em 14 suítes + `32/32` Admin Panel + `32/32` Auth/Ranking).  
-> **Fase Atual (`5D` ✅):** **FASE 5D CONCLUÍDA (5D.1 a 5D.6 ✅)** — Sound Design Polish validado tecnicamente (`13/13` + `41/41` + `130/130` + `16/16` + `32/32`); validação auditiva em navegador/equipamento real pendente.  
-> **Próxima Fase Recomendada:** **FASE 5E — Arena Population & Audience Reactions** (ou consolidação Git da 5D.4–5D.6) aguardando autorização.  
+> **Fase Atual (`5D` ✅):** **FASE 5D CONCLUÍDA (5D.1 a 5D.7 ✅)** — Ensaio operacional completo validado (`10/10` + `13/13` + `41/41` + `130/130` + `16/16` + `32/32`); validação presencial em navegador, escuta auditiva e ESP32 físico pendente.  
+> **Próxima Fase Recomendada:** **FASE 5E — Arena Population & Audience Reactions** (após consolidação Git da 5D.7) aguardando autorização.  
 > Branch oficial: `feat/phase5-live-show-experience`

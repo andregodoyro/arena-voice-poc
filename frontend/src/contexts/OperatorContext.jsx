@@ -66,7 +66,11 @@ export function OperatorProvider({ children }) {
   }, []);
 
   // ── Ações de Cadeiras (Fase 1 / Realtime) ─────────────────────────────────
+  const turnedChairsRef = React.useRef(new Set());
+
   const turnChair = useCallback((chairId, source = 'SIGNALR') => {
+    if (turnedChairsRef.current.has(chairId)) return;
+    turnedChairsRef.current.add(chairId);
     setChairs((prev) =>
       prev.map((c) => (c.id === chairId ? { ...c, isTurned: true } : c))
     );
@@ -89,6 +93,7 @@ export function OperatorProvider({ children }) {
   }, [addRealtimeActivity]);
 
   const resetAllChairs = useCallback(() => {
+    turnedChairsRef.current.clear();
     setChairs((prev) => prev.map((c) => ({ ...c, isTurned: false })));
 
     const now = new Date().toLocaleTimeString('pt-BR');
@@ -135,6 +140,11 @@ export function OperatorProvider({ children }) {
 
       // Sincroniza estado das cadeiras com o snapshot autoritativo
       if (stateData?.chairs) {
+        const nextTurned = new Set();
+        for (const [k, v] of Object.entries(stateData.chairs)) {
+          if (v === true) nextTurned.add(Number(k));
+        }
+        turnedChairsRef.current = nextTurned;
         setChairs((prev) =>
           prev.map((chair) => ({
             ...chair,
@@ -326,6 +336,7 @@ export function OperatorProvider({ children }) {
 
     if (stageName === 'Waiting' || payload.source === 'RESET') {
       setChairs((prevChairs) => prevChairs.map((c) => ({ ...c, isTurned: false })));
+      turnedChairsRef.current.clear();
     }
 
     // Emite transição de estágio no ExperienceEventBus (Fase 5D.4)
@@ -421,6 +432,7 @@ export function OperatorProvider({ children }) {
     setIsResyncing(true);
     try {
       await fetchOperationalData(false);
+      experienceEventBus.emit(EXPERIENCE_EVENTS.AUDIO_CONFIG_UPDATED, { reason: 'reconnect' }, { source: 'RECONNECT' });
     } catch (err) {
       console.error('[OperatorContext] Falha no resync pós-reconexão:', err);
     } finally {
