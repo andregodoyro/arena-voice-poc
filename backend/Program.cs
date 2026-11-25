@@ -142,6 +142,7 @@ builder.Services.AddArenaAuthenticationAndAuthorization(builder.Configuration);
 // ADMIN USER SERVICE — PAINEL ADMINISTRATIVO DE USUÁRIOS (MILESTONE 5I)
 // =========================================================================
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
+builder.Services.AddScoped<ISoundLibraryService, SoundLibraryService>();
 var storageEngineEnv = Environment.GetEnvironmentVariable("ARENA_STORAGE_ENGINE") ?? Environment.GetEnvironmentVariable("ARENA_STORAGE");
 var effectiveStorageEngine = !string.IsNullOrWhiteSpace(storageEngineEnv)
     ? storageEngineEnv
@@ -252,6 +253,10 @@ app.Use(async (context, next) =>
 var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseStartup");
 DatabaseStartupValidator.ValidateAndMigrate(app.Services, logger);
 await app.Services.GetRequiredService<IAuthService>().EnsureSeedUsersAsync();
+using (var seedScope = app.Services.CreateScope())
+{
+    await seedScope.ServiceProvider.GetRequiredService<ISoundLibraryService>().EnsureSeededAsync();
+}
 
 app.UseWebSockets();
 
@@ -261,6 +266,7 @@ app.UseAuthorization();
 
 // Endpoints de Autenticação JWT (/api/auth/login, /refresh, /logout, /me)
 app.MapArenaAuthEndpoints();
+app.MapSoundLibraryEndpoints();
 
 // =========================================================================
 // ENDPOINTS ADMINISTRATIVOS DE USUÁRIOS (MILESTONE 5I) — Restritos a Admin

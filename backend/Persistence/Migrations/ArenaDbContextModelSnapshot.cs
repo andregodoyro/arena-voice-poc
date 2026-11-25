@@ -573,6 +573,167 @@ namespace ArenaVoicePocBackend.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ArenaVoicePocBackend.Domain.Entities.SoundEventMapping", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Enabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("EventKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("event_key");
+
+                    b.Property<int>("LayerOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("layer_order");
+
+                    b.Property<Guid>("SoundLibraryItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sound_library_item_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<double?>("VolumeOverride")
+                        .HasColumnType("double precision")
+                        .HasColumnName("volume_override");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventKey")
+                        .HasDatabaseName("ix_sound_event_mappings_event_key");
+
+                    b.HasIndex("SoundLibraryItemId");
+
+                    b.HasIndex("EventKey", "SoundLibraryItemId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sound_event_mappings_event_sound_unique");
+
+                    b.ToTable("sound_event_mappings", (string)null);
+                });
+
+            modelBuilder.Entity("ArenaVoicePocBackend.Domain.Entities.SoundLibraryItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Bus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("bus");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<double>("DefaultVolume")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("double precision")
+                        .HasDefaultValue(0.80000000000000004)
+                        .HasColumnName("default_volume");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<double?>("DurationSeconds")
+                        .HasColumnType("double precision")
+                        .HasColumnName("duration_seconds");
+
+                    b.Property<bool>("IsBuiltIn")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_built_in");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_enabled");
+
+                    b.Property<bool>("IsLoop")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_loop");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("key");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
+
+                    b.Property<double>("OffsetSeconds")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("double precision")
+                        .HasDefaultValue(0.0)
+                        .HasColumnName("offset_seconds");
+
+                    b.Property<string>("PackName")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasDefaultValue("default")
+                        .HasColumnName("pack_name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("url");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Bus")
+                        .HasDatabaseName("ix_sound_library_bus");
+
+                    b.HasIndex("Category")
+                        .HasDatabaseName("ix_sound_library_category");
+
+                    b.HasIndex("IsEnabled")
+                        .HasDatabaseName("ix_sound_library_is_enabled");
+
+                    b.HasIndex("Key")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sound_library_key");
+
+                    b.ToTable("sound_library", (string)null);
+                });
+
             modelBuilder.Entity("ArenaVoicePocBackend.Domain.Entities.User", b =>
                 {
                     b.Property<string>("Id")
@@ -862,6 +1023,22 @@ namespace ArenaVoicePocBackend.Persistence.Migrations
 
                     b.Navigation("TimerConfig")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("ArenaVoicePocBackend.Domain.Entities.SoundEventMapping", b =>
+                {
+                    b.HasOne("ArenaVoicePocBackend.Domain.Entities.SoundLibraryItem", "SoundLibraryItem")
+                        .WithMany("EventMappings")
+                        .HasForeignKey("SoundLibraryItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SoundLibraryItem");
+                });
+
+            modelBuilder.Entity("ArenaVoicePocBackend.Domain.Entities.SoundLibraryItem", b =>
+                {
+                    b.Navigation("EventMappings");
                 });
 #pragma warning restore 612, 618
         }

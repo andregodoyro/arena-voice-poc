@@ -18,6 +18,8 @@ public class ArenaDbContext : DbContext
     public DbSet<ActiveSessionState> ActiveSessionState => Set<ActiveSessionState>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<SoundLibraryItem> SoundLibrary => Set<SoundLibraryItem>();
+    public DbSet<SoundEventMapping> SoundEventMappings => Set<SoundEventMapping>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

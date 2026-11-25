@@ -134,10 +134,10 @@ PRÓXIMAS ENTREGAS PRIORITÁRIAS (ROADMAP V2 INTEGRADO AO EVOLUTION PLAN)
   │     ├─ Role PostgreSQL `arena_readonly` sem acesso a linhas (isolamento validado via `SET LOCAL ROLE`)
   │     └─ Painel Admin (`/admin`, `/api/admin/users/*`), auditoria de operações e suíte de regressão JWT (692/692 + 32/32 Admin Panel)
   │
-  ├─► 🔄 FASE 5D: Arena Soundscape & Configurable Audio System (EM ANDAMENTO — 5D.2 Concluída)
+  ├─► 🔄 FASE 5D: Arena Soundscape & Configurable Audio System (EM ANDAMENTO — 5D.3 Concluída)
   │     ├─ [x] 5D.1: Audio Asset Curation & Sound Map (`frontend/public/audio/`, `soundCatalog.js`, `soundMap.js`)
   │     ├─ [x] 5D.2: AudioEngine (4 barramentos Master/SFX/Ambient/Music, cooldown, prioridade, ducking, crossfade, `playEvent`, `triggerDucking`, `stopLoop`, persistência localStorage, 41/41 testes)
-  │     ├─ [ ] 5D.3: Sound Library Backend (`sound_library`, `sound_event_mappings`, Sound Packs, SignalR)
+  │     ├─ [x] 5D.3: Sound Library Backend (`sound_library`, `sound_event_mappings`, REST `/api/audio/*`, RBAC, SignalR `AudioConfigUpdated`, seed idempotente, `audioConfigClient.js`, 16/16 testes)
   │     ├─ [ ] 5D.4: Cockpit Audio Control Center (Mixer, Preview, Upload, Sync com Stage)
   │     ├─ [ ] 5D.5: QA & Regression
   │     └─ [ ] 5D.6: Sound Design Polish (calibragem de volumes, timing e testes em ambiente real)
@@ -246,6 +246,6 @@ A Phase 5 superou a meta original de ser apenas uma "fase de áudio" e transform
 
 > [!IMPORTANT]
 > **Hardening 5I + Security Quick Wins Concluídos (`5I` ✅):** PostgreSQL RLS (`users`, `audit_events`, `arena_readonly`), Painel Administrativo de Usuários (`/admin` + `/api/admin/users/*`), Security Quick Wins e Suíte de Regressão JWT 100% verde (`692/692` em 14 suítes + `32/32` Admin Panel + `32/32` Auth/Ranking).  
-> **Fase Atual (`5D` 🔄):** Subfases **5D.1 ✅ e 5D.2 ✅ Concluídas** ([phase-5d-sound-map.md](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/docs/phase-5d-sound-map.md)). Próxima subfase aguardando autorização: **5D.3 (Backend Sound Library)**.  
-> **Próxima Fase Recomendada:** **5D.3 — Sound Library Backend** (`sound_library`, `sound_event_mappings`, REST `/api/audio/*`, SignalR `AudioConfigUpdated`) aguardando autorização.  
+> **Fase Atual (`5D` 🔄):** Subfases **5D.1 ✅, 5D.2 ✅ e 5D.3 ✅ Concluídas**. Próxima subfase aguardando autorização: **5D.4 (ExperienceEventBus + Cockpit Audio Management UI)**.  
+> **Próxima Fase Recomendada:** **5D.4 — Cockpit Audio Control Center** (Mixer, Preview, Sync com Stage via SignalR) aguardando autorização.  
 > Branch oficial: `feat/phase5-live-show-experience`
