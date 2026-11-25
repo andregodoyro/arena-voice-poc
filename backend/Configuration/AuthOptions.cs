@@ -32,9 +32,9 @@ public sealed class AuthOptions
     public string DeviceApiKey { get; set; } = string.Empty;
 
     /// <summary>
-    /// Quando true (ou quando DeviceApiKey estiver configurado), exige X-Device-Key ou JWT nas rotas de hardware.
+    /// Por segurança, exige X-Device-Key ou JWT Operator/Admin nas rotas de hardware por padrão.
     /// </summary>
-    public bool RequireDeviceKey { get; set; } = false;
+    public bool RequireDeviceKey { get; set; } = true;
 
     /// <summary>
     /// Credenciais opcionais para seed idempotente do usuário Administrador inicial.

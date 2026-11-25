@@ -10,7 +10,7 @@ public sealed record FileUploadValidationResult(bool IsValid, string? ErrorMessa
 /// </summary>
 public static class FileUploadValidator
 {
-    private static readonly string[] AllowedImages = [".jpg", ".jpeg", ".png", ".webp", ".svg"];
+    private static readonly string[] AllowedImages = [".jpg", ".jpeg", ".png", ".webp"];
     private static readonly string[] AllowedVideos = [".mp4", ".webm"];
     private static readonly string[] AllowedAudio = [".mp3", ".wav", ".ogg", ".m4a"];
 
@@ -50,7 +50,7 @@ public static class FileUploadValidator
         }
         else
         {
-            return new FileUploadValidationResult(false, $"Formato '{ext}' não suportado. Formatos aceitos: JPG, JPEG, PNG, WEBP, SVG, MP3, WAV, OGG, M4A, MP4, WEBM.");
+            return new FileUploadValidationResult(false, $"Formato '{ext}' não suportado. Formatos aceitos: JPG, JPEG, PNG, WEBP, MP3, WAV, OGG, M4A, MP4, WEBM.");
         }
 
         if (file.Length > maxBytes)
@@ -59,7 +59,7 @@ public static class FileUploadValidator
         }
 
         // Validação de magic bytes / conteúdo inicial
-        var headerLen = ext == ".svg" ? (int)Math.Min(file.Length, 4096) : (int)Math.Min(file.Length, 16);
+        var headerLen = (int)Math.Min(file.Length, 16);
         var header = new byte[headerLen];
 
         await using var stream = file.OpenReadStream();
@@ -96,25 +96,7 @@ public static class FileUploadValidator
             ".ogg" => bytes.Length >= 4 && bytes[0] == (byte)'O' && bytes[1] == (byte)'g' && bytes[2] == (byte)'g' && bytes[3] == (byte)'S',
             ".mp3" => (bytes.Length >= 3 && bytes[0] == (byte)'I' && bytes[1] == (byte)'D' && bytes[2] == (byte)'3') ||
                       (bytes.Length >= 2 && bytes[0] == 0xFF && (bytes[1] & 0xE0) == 0xE0),
-            ".svg" => ValidateSvgHeader(bytes),
             _ => false
         };
-    }
-
-    private static bool ValidateSvgHeader(ReadOnlySpan<byte> bytes)
-    {
-        var text = Encoding.UTF8.GetString(bytes).TrimStart('\uFEFF', ' ', '\t', '\r', '\n');
-        if (!text.Contains("<svg", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-        // Rejeita vetores óbvios de XSS embutidos no cabeçalho do SVG
-        if (text.Contains("<script", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("javascript:", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("onload=", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-        return true;
     }
 }

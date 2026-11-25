@@ -16,6 +16,7 @@ using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using System.Threading.Channels;
 
+DotEnvLoader.LoadIfPresent();
 var builder = WebApplication.CreateBuilder(args);
 
 // Configuração de host e porta (permite sobrescrita por variáveis de ambiente)
@@ -39,6 +40,11 @@ var explicitOrigins = (rawAllowedOrigins ?? "https://arena-voice-poc.vercel.app"
     .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
     .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+var allowVercelPreview = string.Equals(Environment.GetEnvironmentVariable("CORS_ALLOW_VERCEL_PREVIEW"), "true", StringComparison.OrdinalIgnoreCase);
+var explicitAspNetEnvForCors = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+var isStrictProductionForCors = string.Equals(explicitAspNetEnvForCors, "Production", StringComparison.OrdinalIgnoreCase)
+                             || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RENDER"));
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -53,13 +59,15 @@ builder.Services.AddCors(options =>
             if (explicitOrigins.Any(allowed => trimmedOrigin.Equals(allowed.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)))
                 return true;
 
-            // 2. Todos os deploys da Vercel (*.vercel.app)
-            if (trimmedOrigin.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase))
+            // 2. Deploys preview da Vercel (*.vercel.app) apenas em non-Production ou se explicitamente habilitado
+            if ((!isStrictProductionForCors || allowVercelPreview) &&
+                trimmedOrigin.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase))
                 return true;
 
-            // 3. Desenvolvimento local
-            if (trimmedOrigin.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase) ||
-                trimmedOrigin.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase))
+            // 3. Desenvolvimento local apenas em ambiente non-Production
+            if (!isStrictProductionForCors &&
+                (trimmedOrigin.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase) ||
+                 trimmedOrigin.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase)))
                 return true;
 
             return false;
@@ -198,6 +206,48 @@ else
 
 var app = builder.Build();
 
+// Guarda de Segurança de Startup em Produção explícita (Render / Docker / ASPNETCORE_ENVIRONMENT=Production)
+var explicitAspNetEnv = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+var isStrictProduction = string.Equals(explicitAspNetEnv, "Production", StringComparison.OrdinalIgnoreCase)
+                      || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RENDER"));
+
+if (isStrictProduction)
+{
+    var authOpts = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<AuthOptions>>().Value;
+    if (AuthService.IsUsingFallbackJwtSecret(authOpts))
+    {
+        throw new InvalidOperationException(
+            "ERRO DE SEGURANÇA: JWT_SECRET não configurada ou utilizando fallback inseguro em ambiente de Produção. Defina JWT_SECRET com >= 32 caracteres.");
+    }
+
+    var adminPassEnv = Environment.GetEnvironmentVariable("ARENA_ADMIN_PASSWORD");
+    if (string.IsNullOrWhiteSpace(adminPassEnv) && authOpts.SeedAdminPassword == "ArenaAdmin@2026")
+    {
+        throw new InvalidOperationException(
+            "ERRO DE SEGURANÇA: ARENA_ADMIN_PASSWORD utilizando senha padrão de POC em ambiente de Produção. Defina ARENA_ADMIN_PASSWORD via variável de ambiente.");
+    }
+
+    app.UseExceptionHandler(errApp =>
+    {
+        errApp.Run(async context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsJsonAsync(new { error = "Erro interno no servidor." });
+        });
+    });
+}
+
+// Security Headers básicos compatíveis com Three.js, Uploads e SignalR
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.TryAdd("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.TryAdd("X-Frame-Options", "SAMEORIGIN");
+    context.Response.Headers.TryAdd("Referrer-Policy", "strict-origin-when-cross-origin");
+    context.Response.Headers.TryAdd("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    await next();
+});
+
 // Validação de inicialização e aplicação automática de migrações no boot
 var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseStartup");
 DatabaseStartupValidator.ValidateAndMigrate(app.Services, logger);
@@ -334,6 +384,7 @@ app.UseStaticFiles(new StaticFileOptions
     {
         ctx.Context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
         ctx.Context.Response.Headers.Append("Cache-Control", "public, max-age=86400");
+        ctx.Context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
     }
 });
 

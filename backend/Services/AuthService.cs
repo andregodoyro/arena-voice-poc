@@ -49,6 +49,17 @@ public sealed class AuthService : IAuthService
         _jwtKeyBytes = Encoding.UTF8.GetBytes(resolvedSecret);
     }
 
+    public const string LocalDevFallbackJwtSecret = "ArenaVoice-LocalDev-Fallback-JWT-Secret-Key-2026-MustBeAtLeast32Bytes!";
+
+    public static bool IsUsingFallbackJwtSecret(AuthOptions options)
+    {
+        var secret = Environment.GetEnvironmentVariable("JWT_SECRET")
+                  ?? Environment.GetEnvironmentVariable("ArenaAuth__JwtSecret")
+                  ?? options.JwtSecret;
+
+        return string.IsNullOrWhiteSpace(secret) || secret.Length < 32 || secret == LocalDevFallbackJwtSecret;
+    }
+
     public static string ResolveJwtSecret(AuthOptions options)
     {
         var secret = Environment.GetEnvironmentVariable("JWT_SECRET")
@@ -57,8 +68,8 @@ public sealed class AuthService : IAuthService
 
         if (string.IsNullOrWhiteSpace(secret) || secret.Length < 32)
         {
-            // Fallback determinístico exclusivo para ambiente local sem variável configurada
-            secret = "ArenaVoice-LocalDev-Fallback-JWT-Secret-Key-2026-MustBeAtLeast32Bytes!";
+            // Fallback determinístico exclusivo para ambiente local de desenvolvimento
+            secret = LocalDevFallbackJwtSecret;
         }
 
         return secret;
