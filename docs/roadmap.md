@@ -242,6 +242,6 @@ A Phase 5 superou a meta original de ser apenas uma "fase de áudio" e transform
 ## 🎯 PRÓXIMA FASE OFICIAL RECOMENDADA
 
 > [!IMPORTANT]
-> **Hardening 5I Concluído (`5I` ✅):** PostgreSQL RLS (`users`, `audit_events`, `arena_readonly`), Painel Administrativo de Usuários (`/admin` + `/api/admin/users/*`) e Suíte de Regressão JWT 100% verde (`692/692` em 14 suítes + `32/32` em `test-admin-panel.cjs` + `32/32` em `test-auth-and-ranking.cjs`).  
+> **Hardening 5I + Security Quick Wins Concluídos (`5I` ✅):** PostgreSQL RLS (`users`, `audit_events`, `arena_readonly`), Painel Administrativo de Usuários (`/admin` + `/api/admin/users/*`), Security Quick Wins (Startup Guard em Produção, `RequireDeviceKey = true`, bloqueio de `.svg` em uploads, Security Headers, CORS restrito em produção, `DotEnvLoader` e templates `.env.example` / `render.yaml`) e Suíte de Regressão JWT 100% verde (`692/692` em 14 suítes + `32/32` em `test-admin-panel.cjs` + `32/32` em `test-auth-and-ranking.cjs`). Referência: [security-and-config.md](file:///c:/Users/ANDREROC/Documents/arena-voice-poc/docs/security-and-config.md).
 > **Próxima Fase Recomendada:** **FASE 5D (Arena Soundscape & Configurable Audio System)** aguardando autorização.  
 > Branch oficial: `feat/phase5-live-show-experience`
