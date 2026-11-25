@@ -328,6 +328,19 @@ export function OperatorProvider({ children }) {
       setChairs((prevChairs) => prevChairs.map((c) => ({ ...c, isTurned: false })));
     }
 
+    // Emite transição de estágio no ExperienceEventBus (Fase 5D.4)
+    experienceEventBus.emit(EXPERIENCE_EVENTS.STAGE_CHANGED, {
+      stage: stageName,
+      fromStage: payload.fromStage,
+      projectId: payload.projectId,
+    }, { source: 'SIGNALR' });
+
+    if (stageName === 'VotingOpen') {
+      experienceEventBus.emit(EXPERIENCE_EVENTS.VOTING_STARTED, { stage: stageName }, { source: 'SIGNALR' });
+    } else if (stageName === 'VotingClosed' || stageName === 'Finished') {
+      experienceEventBus.emit(EXPERIENCE_EVENTS.VOTING_FINISHED, { stage: stageName }, { source: 'SIGNALR' });
+    }
+
     // Registra transição relevante no log operacional
     const now = new Date().toLocaleTimeString('pt-BR');
     let evtType = 'PITCH_STAGE';
@@ -426,6 +439,7 @@ export function OperatorProvider({ children }) {
     onPitchTimerUpdated: handlePitchTimerUpdated,
     onRoundArchived: handleRoundArchived,
     onEventJuryUpdated: handleEventJuryUpdated,
+    onAudioConfigUpdated: (payload) => experienceEventBus.emit(EXPERIENCE_EVENTS.AUDIO_CONFIG_UPDATED, payload || {}, { source: 'SIGNALR' }),
     onReconnected: handleReconnected,
     initialBackendUrl: getBackendUrl(),
   });

@@ -1,8 +1,8 @@
 /**
- * experienceEventBus — Barramento central de eventos de experiência (Milestone 5H.1).
+ * experienceEventBus — Barramento central de eventos de experiência (Milestone 5H.1 / 5D.4).
  *
- * Desacopla os eventos autoritativos recebidos do backend (via SignalR) dos efeitos
- * audiovisuais, animações 3D, reações de plateia e transições de câmera/pódio.
+ * Desacopla os eventos autoritativos recebidos do backend (via SignalR) e ações do
+ * show flow dos efeitos audiovisuais, animações 3D, reações de plateia e áudio.
  *
  * IMPORTANTE: Eventos de reidratação inicial (F5 / reconexão) NÃO devem ser emitidos
  * neste barramento para evitar disparos retroativos de áudio/partículas.
@@ -19,6 +19,7 @@ export const EXPERIENCE_EVENTS = Object.freeze({
   ARENA_RESET: 'ArenaReset',
   PROJECT_CHANGED: 'ProjectChanged',
   EVENT_CHANGED: 'EventChanged',
+  AUDIO_CONFIG_UPDATED: 'AudioConfigUpdated',
 });
 
 class ExperienceEventBus {
@@ -39,11 +40,18 @@ class ExperienceEventBus {
     set.add(handler);
 
     return () => {
-      set.delete(handler);
-      if (set.size === 0) {
-        this._listeners.delete(eventType);
-      }
+      this.unsubscribe(eventType, handler);
     };
+  }
+
+  unsubscribe(eventType, handler) {
+    if (!eventType || !handler) return;
+    const set = this._listeners.get(eventType);
+    if (!set) return;
+    set.delete(handler);
+    if (set.size === 0) {
+      this._listeners.delete(eventType);
+    }
   }
 
   subscribeMany(handlersMap = {}) {
@@ -55,14 +63,19 @@ class ExperienceEventBus {
     };
   }
 
-  emit(eventType, payload = {}) {
+  emit(eventType, payload = {}, options = {}) {
     const set = this._listeners.get(eventType);
     if (!set || set.size === 0) return;
 
+    const now = Date.now();
     const eventEnvelope = {
       type: eventType,
+      eventKey: options.eventKey || eventType,
+      source: options.source || 'app',
       payload,
-      emittedAt: Date.now(),
+      metadata: options.metadata || {},
+      timestamp: now,
+      emittedAt: now,
     };
 
     for (const handler of Array.from(set)) {
@@ -72,6 +85,49 @@ class ExperienceEventBus {
         console.error(`[ExperienceEventBus] Erro ao processar listener para '${eventType}':`, err);
       }
     }
+  }
+
+  publish(eventOrType, payload = {}, options = {}) {
+    if (eventOrType && typeof eventOrType === 'object') {
+      const {
+        type,
+        eventKey,
+        source = 'app',
+        payload: innerPayload = {},
+        metadata = {},
+      } = eventOrType;
+      const targetType = type || eventKey;
+      if (!targetType) return;
+      this.emit(targetType, innerPayload, { eventKey: eventKey || targetType, source, metadata });
+      return;
+    }
+
+    if (typeof eventOrType === 'string') {
+      this.emit(eventOrType, payload, options);
+    }
+  }
+
+  clear(eventType) {
+    if (eventType) {
+      this._listeners.delete(eventType);
+    } else {
+      this._listeners.clear();
+    }
+  }
+
+  dispose() {
+    this.clear();
+  }
+
+  getListenerCount(eventType) {
+    if (eventType) {
+      return this._listeners.get(eventType)?.size || 0;
+    }
+    let total = 0;
+    for (const set of this._listeners.values()) {
+      total += set.size;
+    }
+    return total;
   }
 }
 

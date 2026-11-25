@@ -130,7 +130,11 @@ export class AudioEngine {
    * Cria 4 buses: Master, SFX, Ambient e Music (+ nós intermediários de ducking).
    */
   init() {
-    if (this.ctx) return;
+    if (this.ctx && this.ctx.state !== 'closed') return;
+    if (this.ctx?.state === 'closed') {
+      this.ctx = null;
+      this.isUnlocked = false;
+    }
 
     const AudioContextClass =
       (typeof globalThis !== 'undefined' && (globalThis.AudioContext || globalThis.webkitAudioContext)) || null;
@@ -145,10 +149,23 @@ export class AudioEngine {
 
     const now = this.ctx.currentTime ?? 0;
 
-    // 1. Nó de Ganho Master
+    // 1. Nó de Ganho Master -> Limiter/Compressor suave -> Destination (anti-clipping)
     this.masterGainNode = this.ctx.createGain();
     this.masterGainNode.gain.setValueAtTime(this.isMuted ? 0 : this.masterVolume, now);
-    this.masterGainNode.connect(this.ctx.destination);
+
+    if (typeof this.ctx.createDynamicsCompressor === 'function') {
+      this.compressorNode = this.ctx.createDynamicsCompressor();
+      this.compressorNode.threshold?.setValueAtTime?.(-6, now);
+      this.compressorNode.knee?.setValueAtTime?.(6, now);
+      this.compressorNode.ratio?.setValueAtTime?.(4, now);
+      this.compressorNode.attack?.setValueAtTime?.(0.003, now);
+      this.compressorNode.release?.setValueAtTime?.(0.15, now);
+      this.masterGainNode.connect(this.compressorNode);
+      this.compressorNode.connect(this.ctx.destination);
+    } else {
+      this.compressorNode = null;
+      this.masterGainNode.connect(this.ctx.destination);
+    }
 
     // 2. Barramento SFX -> Master
     this.sfxGainNode = this.ctx.createGain();
@@ -178,9 +195,14 @@ export class AudioEngine {
     }
   }
 
+  _normalizeBus(bus) {
+    return typeof bus === 'string' ? bus.trim().toLowerCase() : AUDIO_BUSES.SFX;
+  }
+
   _getBusNode(bus) {
-    if (bus === AUDIO_BUSES.MUSIC) return this.musicGainNode || this.ambientGainNode || this.sfxGainNode;
-    if (bus === AUDIO_BUSES.AMBIENT) return this.ambientGainNode || this.sfxGainNode;
+    const normalized = this._normalizeBus(bus);
+    if (normalized === AUDIO_BUSES.MUSIC) return this.musicGainNode || this.ambientGainNode || this.sfxGainNode;
+    if (normalized === AUDIO_BUSES.AMBIENT) return this.ambientGainNode || this.sfxGainNode;
     return this.sfxGainNode;
   }
 
@@ -310,14 +332,20 @@ export class AudioEngine {
   /**
    * Aciona ducking suave nos barramentos music e ambient com restauração coordenada por tokens.
    */
-  triggerDucking({ durationMs = 2200, musicFactor = 0.25, ambientFactor = 0.45 } = {}) {
+  triggerDucking({
+    durationMs = 2200,
+    musicFactor = 0.25,
+    ambientFactor = 0.45,
+    attackSec = 0.06,
+    releaseSec = 0.35,
+  } = {}) {
     if (!this.ctx || !this.musicDuckGainNode || !this.ambientDuckGainNode) return null;
 
     const token = Symbol('duck');
     this._duckTokens.add(token);
 
-    this._applyGainSmooth(this.musicDuckGainNode, clampVolume(musicFactor, 0.25), 0.08);
-    this._applyGainSmooth(this.ambientDuckGainNode, clampVolume(ambientFactor, 0.45), 0.08);
+    this._applyGainSmooth(this.musicDuckGainNode, clampVolume(musicFactor, 0.25), attackSec);
+    this._applyGainSmooth(this.ambientDuckGainNode, clampVolume(ambientFactor, 0.45), attackSec);
 
     if (this._duckRestoreTimer) {
       clearTimeout(this._duckRestoreTimer);
@@ -326,8 +354,8 @@ export class AudioEngine {
     const release = () => {
       this._duckTokens.delete(token);
       if (this._duckTokens.size === 0) {
-        this._applyGainSmooth(this.musicDuckGainNode, 1.0, 0.25);
-        this._applyGainSmooth(this.ambientDuckGainNode, 1.0, 0.25);
+        this._applyGainSmooth(this.musicDuckGainNode, 1.0, releaseSec);
+        this._applyGainSmooth(this.ambientDuckGainNode, 1.0, releaseSec);
       }
     };
 
@@ -453,13 +481,15 @@ export class AudioEngine {
       return null;
     }
 
+    const normalizedBus = this._normalizeBus(bus);
+
     // Se for loop no barramento music ou ambient, aplica crossfade substituindo o anterior
-    if (loop && (bus === AUDIO_BUSES.MUSIC || bus === AUDIO_BUSES.AMBIENT)) {
-      const existingLoop = this.activeLoops.get(bus);
+    if (loop && (normalizedBus === AUDIO_BUSES.MUSIC || normalizedBus === AUDIO_BUSES.AMBIENT)) {
+      const existingLoop = this.activeLoops.get(normalizedBus);
       if (existingLoop && existingLoop.key === key) {
         return existingLoop.source;
       }
-      this.stopLoop(bus, crossfadeMs);
+      this.stopLoop(normalizedBus, crossfadeMs);
     }
 
     if (!this._enforceConcurrencyLimit(priority, maxConcurrent)) {
@@ -486,16 +516,16 @@ export class AudioEngine {
     }
 
     source.connect(gainNode);
-    gainNode.connect(this._getBusNode(bus));
+    gainNode.connect(this._getBusNode(normalizedBus));
 
     const voiceId = `${key}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
     const cleanup = () => {
       this.activeSources.delete(voiceId);
       this.activeVoices.delete(voiceId);
-      const activeLoop = this.activeLoops.get(bus);
+      const activeLoop = this.activeLoops.get(normalizedBus);
       if (activeLoop && activeLoop.voiceId === voiceId) {
-        this.activeLoops.delete(bus);
+        this.activeLoops.delete(normalizedBus);
       }
     };
 
@@ -505,10 +535,10 @@ export class AudioEngine {
     };
 
     this.activeSources.set(voiceId, source);
-    this.activeVoices.set(voiceId, { source, gainNode, bus, priority, key, stop: stopVoice });
+    this.activeVoices.set(voiceId, { source, gainNode, bus: normalizedBus, priority, key, stop: stopVoice });
 
-    if (loop && (bus === AUDIO_BUSES.MUSIC || bus === AUDIO_BUSES.AMBIENT)) {
-      this.activeLoops.set(bus, { key, source, gainNode, voiceId });
+    if (loop && (normalizedBus === AUDIO_BUSES.MUSIC || normalizedBus === AUDIO_BUSES.AMBIENT)) {
+      this.activeLoops.set(normalizedBus, { key, source, gainNode, voiceId });
     }
 
     source.onended = cleanup;

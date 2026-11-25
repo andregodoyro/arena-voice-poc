@@ -19,6 +19,7 @@ export function useSignalR({
   onPitchStageChanged,
   onPitchTimerUpdated,
   onRoundArchived,
+  onAudioConfigUpdated,
   onReconnecting,
   onReconnected,
   onClose,
@@ -45,6 +46,7 @@ export function useSignalR({
     onPitchStageChanged,
     onPitchTimerUpdated,
     onRoundArchived,
+    onAudioConfigUpdated,
     onReconnecting,
     onReconnected,
     onClose,
@@ -59,6 +61,7 @@ export function useSignalR({
     onPitchStageChanged,
     onPitchTimerUpdated,
     onRoundArchived,
+    onAudioConfigUpdated,
     onReconnecting,
     onReconnected,
     onClose,
@@ -223,6 +226,14 @@ export function useSignalR({
       console.log('[SignalR Evento] RoundArchived recebido:', data);
       if (callbacksRef.current.onRoundArchived) {
         callbacksRef.current.onRoundArchived(data);
+      }
+    });
+
+    // 10. Atualização de Configuração de Áudio (Fase 5D.3 / 5D.4)
+    connection.on('AudioConfigUpdated', (data) => {
+      console.log('[SignalR Evento] AudioConfigUpdated recebido:', data);
+      if (callbacksRef.current.onAudioConfigUpdated) {
+        callbacksRef.current.onAudioConfigUpdated(data);
       }
     });
 

@@ -22,7 +22,7 @@ export function buildAudioConfigFromApi(libraryItems = [], mappings = []) {
             name: item.name,
             category: item.category,
             url: item.url,
-            bus: item.bus || 'SFX',
+            bus: (item.bus || 'sfx').toLowerCase(),
             defaultVolume: typeof item.defaultVolume === 'number' ? item.defaultVolume : 0.8,
             isLoop: Boolean(item.isLoop),
             offsetSeconds: typeof item.offsetSeconds === 'number' ? item.offsetSeconds : 0,
@@ -34,19 +34,32 @@ export function buildAudioConfigFromApi(libraryItems = [], mappings = []) {
 
     const soundMap = { ...SOUND_MAP };
     if (Array.isArray(mappings) && mappings.length > 0) {
+        const touchedEvents = new Set();
         const grouped = new Map();
         for (const m of mappings) {
-            if (!m || !m.eventKey || !m.enabled || !m.soundIsEnabled) continue;
+            if (!m || !m.eventKey) continue;
+            touchedEvents.add(m.eventKey);
+            if (!m.enabled || !m.soundIsEnabled) continue;
             if (!catalog[m.soundKey]) continue;
             if (!grouped.has(m.eventKey)) grouped.set(m.eventKey, []);
             grouped.get(m.eventKey).push(m);
         }
 
-        for (const [eventKey, layers] of grouped.entries()) {
+        for (const eventKey of touchedEvents) {
+            const base = SOUND_MAP[eventKey] || {};
+            const layers = grouped.get(eventKey);
+            if (!layers || layers.length === 0) {
+                soundMap[eventKey] = {
+                    ...base,
+                    assetKey: null,
+                    layers: []
+                };
+                continue;
+            }
+
             layers.sort((a, b) => (a.layerOrder ?? 0) - (b.layerOrder ?? 0));
             const primary = layers[0];
             const secondary = layers.slice(1);
-            const base = SOUND_MAP[eventKey] || {};
 
             soundMap[eventKey] = {
                 ...base,

@@ -134,13 +134,13 @@ PRÓXIMAS ENTREGAS PRIORITÁRIAS (ROADMAP V2 INTEGRADO AO EVOLUTION PLAN)
   │     ├─ Role PostgreSQL `arena_readonly` sem acesso a linhas (isolamento validado via `SET LOCAL ROLE`)
   │     └─ Painel Admin (`/admin`, `/api/admin/users/*`), auditoria de operações e suíte de regressão JWT (692/692 + 32/32 Admin Panel)
   │
-  ├─► 🔄 FASE 5D: Arena Soundscape & Configurable Audio System (EM ANDAMENTO — 5D.3 Concluída)
+  ├─► ✅ FASE 5D: Arena Soundscape & Configurable Audio System (CONCLUÍDA — 5D.1 a 5D.6)
   │     ├─ [x] 5D.1: Audio Asset Curation & Sound Map (`frontend/public/audio/`, `soundCatalog.js`, `soundMap.js`)
   │     ├─ [x] 5D.2: AudioEngine (4 barramentos Master/SFX/Ambient/Music, cooldown, prioridade, ducking, crossfade, `playEvent`, `triggerDucking`, `stopLoop`, persistência localStorage, 41/41 testes)
   │     ├─ [x] 5D.3: Sound Library Backend (`sound_library`, `sound_event_mappings`, REST `/api/audio/*`, RBAC, SignalR `AudioConfigUpdated`, seed idempotente, `audioConfigClient.js`, 16/16 testes)
-  │     ├─ [ ] 5D.4: Cockpit Audio Control Center (Mixer, Preview, Upload, Sync com Stage)
-  │     ├─ [ ] 5D.5: QA & Regression
-  │     └─ [ ] 5D.6: Sound Design Polish (calibragem de volumes, timing e testes em ambiente real)
+  │     ├─ [x] 5D.4: Cockpit Audio Control Center (`ExperienceEventBus`, `AudioEventSubscriber`, `OperatorAudioTab`, `SoundItemModal`, preview isolado, sync SignalR, 11/11 testes)
+  │     ├─ [x] 5D.5: QA & Regression (auditoria 5D.1–5D.4, correção de roteamento de Bus case-insensitive, lifecycle `closed` AudioContext, ducking, preview offset/duration, validação `ValidEventKeys`, 11/11 + 41/41 + 130/130 + 16/16 + 32/32)
+  │     └─ [x] 5D.6: Sound Design Polish (limiter anti-clipping `DynamicsCompressorNode`, envelope de ducking `attack 0.06s / release 0.35s`, fade-out de loops em transições, `pitchJitter` ±2.5% em SFX one-shot, distinção `PITCH_START` vs `CHAIR_TURN`, volume efetivo no Cockpit; validação técnica 13/13 + 41/41 + 130/130 + 16/16 + 32/32; validação auditiva em navegador real pendente)
   │
   ├─► FASE 5E: Arena Population & Audience Reactions (HIGH PRIORITY)
   │     ├─ Phase 5C.5 Fase 2: Plateia fictícia 3D em leque (InstancedMesh leve)
@@ -246,6 +246,6 @@ A Phase 5 superou a meta original de ser apenas uma "fase de áudio" e transform
 
 > [!IMPORTANT]
 > **Hardening 5I + Security Quick Wins Concluídos (`5I` ✅):** PostgreSQL RLS (`users`, `audit_events`, `arena_readonly`), Painel Administrativo de Usuários (`/admin` + `/api/admin/users/*`), Security Quick Wins e Suíte de Regressão JWT 100% verde (`692/692` em 14 suítes + `32/32` Admin Panel + `32/32` Auth/Ranking).  
-> **Fase Atual (`5D` 🔄):** Subfases **5D.1 ✅, 5D.2 ✅ e 5D.3 ✅ Concluídas**. Próxima subfase aguardando autorização: **5D.4 (ExperienceEventBus + Cockpit Audio Management UI)**.  
-> **Próxima Fase Recomendada:** **5D.4 — Cockpit Audio Control Center** (Mixer, Preview, Sync com Stage via SignalR) aguardando autorização.  
+> **Fase Atual (`5D` ✅):** **FASE 5D CONCLUÍDA (5D.1 a 5D.6 ✅)** — Sound Design Polish validado tecnicamente (`13/13` + `41/41` + `130/130` + `16/16` + `32/32`); validação auditiva em navegador/equipamento real pendente.  
+> **Próxima Fase Recomendada:** **FASE 5E — Arena Population & Audience Reactions** (ou consolidação Git da 5D.4–5D.6) aguardando autorização.  
 > Branch oficial: `feat/phase5-live-show-experience`

@@ -8,6 +8,7 @@ import { OperatorCockpitTab } from './pages/operator/OperatorCockpitTab';
 import { OperatorProjectsTab } from './pages/operator/OperatorProjectsTab';
 import { OperatorEventTab } from './pages/operator/OperatorEventTab';
 import { OperatorJuryTab } from './pages/operator/OperatorJuryTab';
+import { OperatorAudioTab } from './pages/operator/OperatorAudioTab';
 import { OperatorProvider } from './contexts/OperatorContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { RequireAuth } from './components/auth/RequireAuth';
@@ -53,6 +54,7 @@ export default function App() {
             <Route path="projects" element={<OperatorProjectsTab />} />
             <Route path="event" element={<OperatorEventTab />} />
             <Route path="jury" element={<OperatorJuryTab />} />
+            <Route path="audio" element={<OperatorAudioTab />} />
           </Route>
 
           {/* Fallback de rotas desconhecidas */}

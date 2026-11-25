@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FolderKanban, Sliders, Users } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Sliders, Users, Music } from 'lucide-react';
 
 /**
  * OperatorNavTabs — Sub-navegação por abas contextuais da mesa técnica.
@@ -36,6 +36,12 @@ export function OperatorNavTabs() {
       label: 'Banca & Jurados',
       icon: Users,
       title: 'Banca oficial do evento e catálogo global de jurados',
+    },
+    {
+      to: '/operator/audio',
+      label: 'Áudio & Soundscape',
+      icon: Music,
+      title: 'Sound Library, Event Sound Mappings e controle sonoro da arena',
     },
   ];
 

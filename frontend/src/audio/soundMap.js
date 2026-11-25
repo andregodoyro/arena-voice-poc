@@ -159,15 +159,15 @@ export const SOUND_MAP = Object.freeze({
   },
   [SOUND_EVENTS.PITCH_START]: {
     eventKey: SOUND_EVENTS.PITCH_START,
-    soundId: 'stage-chair-bass-whoosh',
+    soundId: 'stage-transition-dreamy',
     bus: AUDIO_BUSES.SFX,
-    volume: 0.7,
+    volume: 0.62,
     loop: false,
     priority: SOUND_PRIORITIES.HIGH,
     cooldownMs: 500,
     duckMusic: true,
     fallbackSynth: null,
-    notes: 'Marca entrada da startup no palco (Waiting -> PitchRunning).',
+    notes: 'Transição cinematográfica limpa na entrada da startup no palco (Waiting -> PitchRunning), distinta do impacto de cadeira.',
   },
   [SOUND_EVENTS.PITCH_AMBIENCE]: {
     eventKey: SOUND_EVENTS.PITCH_AMBIENCE,
