@@ -138,18 +138,19 @@ async function runTests() {
 
     // ── 5. Admin: Criar usuário ───────────────────────────────────────────
     console.log('\n── [5] Admin: Criar novo usuário ───────────────────────────');
+    const testEmail = `teste5i-${Date.now()}@arenavoice.local`;
     const createRes = await req('/api/admin/users', {
       method: 'POST',
       headers: authHeader(adminToken),
       body: JSON.stringify({
         name: 'Usuário de Teste 5I',
-        email: 'teste5i@arenavoice.local',
+        email: testEmail,
         password: 'Teste5I@Pass!',
         role: 'Viewer',
       }),
     });
     assert(createRes.status === 201, 'POST /api/admin/users cria usuário → 201 Created');
-    assert(createRes.body?.email === 'teste5i@arenavoice.local', 'E-mail do usuário criado confere');
+    assert(createRes.body?.email === testEmail, 'E-mail do usuário criado confere');
     assert(createRes.body?.role === 'Viewer', 'Role do usuário criado confere (Viewer)');
     assert(createRes.body?.isActive === true, 'Usuário criado inicia como ativo');
     createdUserId = createRes.body?.id;
@@ -161,7 +162,7 @@ async function runTests() {
       headers: authHeader(adminToken),
       body: JSON.stringify({
         name: 'Duplicado',
-        email: 'teste5i@arenavoice.local',
+        email: testEmail,
         password: 'Duplicado@123',
         role: 'Viewer',
       }),
@@ -207,7 +208,7 @@ async function runTests() {
       const r = await req('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'teste5i@arenavoice.local', password: 'Teste5I@Pass!' }),
+        body: JSON.stringify({ email: testEmail, password: 'Teste5I@Pass!' }),
       });
       loginFailed = r.status === 401;
     } catch { loginFailed = false; }
@@ -243,7 +244,7 @@ async function runTests() {
     const oldPassLogin = await req('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'teste5i@arenavoice.local', password: 'Teste5I@Pass!' }),
+      body: JSON.stringify({ email: testEmail, password: 'Teste5I@Pass!' }),
     });
     assert(oldPassLogin.status === 401, 'Login com senha antiga retorna 401 após reset');
 
@@ -251,7 +252,7 @@ async function runTests() {
     const newPassLogin = await req('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'teste5i@arenavoice.local', password: 'NovaSenha@5I!' }),
+      body: JSON.stringify({ email: testEmail, password: 'NovaSenha@5I!' }),
     });
     assert(newPassLogin.status === 200, 'Login com nova senha → 200 OK');
 
