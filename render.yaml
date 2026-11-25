@@ -25,3 +25,9 @@ services:
         value: https://arena-voice-poc.vercel.app
       - key: DATABASE_URL
         sync: false # Preencher manualmente com a URL do Render PostgreSQL criado
+      - key: JWT_SECRET
+        sync: false # Obrigatorio em Production (>= 32 caracteres)
+      - key: ARENA_DEVICE_API_KEY
+        sync: false # Chave para autenticacao dos dispositivos ESP32
+      - key: ARENA_ADMIN_PASSWORD
+        sync: false # Obrigatorio em Production (substitui senha seed padrao)
